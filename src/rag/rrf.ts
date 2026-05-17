@@ -37,6 +37,11 @@ function assertValidTopK(topK: number): void {
  * Normalization-free by design — that is the whole point of RRF (Cormack
  * 2009 §3.2 "normalization is the source of degradation"); do not preprocess
  * BM25 / vec scores into a shared scale before fusing.
+ *
+ * Caller contract: every source MUST use ids drawn from the SAME id space
+ * (typically `docs.id` from a shared `IndexHandle`). Fusing lists keyed by
+ * different id spaces (e.g. docId from one index + chunk-index from another)
+ * will collide silently and produce semantically broken fused rows.
  */
 export function rrfFuse<T>(
   sources: ReadonlyArray<ReadonlyArray<RankedRow<T>>>,
@@ -60,6 +65,14 @@ export function rrfFuse<T>(
       const row = list[j];
       if (!row) continue;
       const { id, rank, payload } = row;
+      // `id` is the Map key + the tiebreak comparator input — non-integer /
+      // unsafe-integer values (NaN, ±Infinity, 1.5, MAX_SAFE_INTEGER + 1)
+      // either collide silently with adjacent ids or break sort determinism.
+      if (!Number.isSafeInteger(id)) {
+        throw new Error(
+          `rrfFuse: id must be a safe integer at source[${i}][${j}], got ${String(id)}`,
+        );
+      }
       if (!Number.isInteger(rank) || rank < 1) {
         throw new Error(
           `rrfFuse: rank must be a positive integer at source[${i}][${j}], got ${String(rank)}`,
@@ -79,13 +92,23 @@ export function rrfFuse<T>(
       }
       fused.score += 1 / (k + rank);
       fused.ranks[i] = rank;
-      fused.payloads[i] = payload;
+      // Coerce caller-supplied `undefined` payload to `null` so the
+      // "null === did-not-hit" contract on `FusedRow.payloads` stays
+      // unambiguous downstream.
+      fused.payloads[i] = payload ?? null;
     }
   }
 
-  const fusedList = Array.from(accumulator.values()).sort(
-    (a, b) => b.score - a.score || a.id - b.id,
-  );
+  const fusedList = Array.from(accumulator.values()).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    // Comparator subtraction loses precision near `MAX_SAFE_INTEGER` and
+    // produces `NaN` for `Infinity - Infinity`; a sign-only compare is
+    // correct for every safe-integer id and any future id type that admits
+    // `<` / `>`.
+    if (a.id < b.id) return -1;
+    if (a.id > b.id) return 1;
+    return 0;
+  });
 
   if (topK === Number.POSITIVE_INFINITY) return fusedList;
   return fusedList.slice(0, topK);

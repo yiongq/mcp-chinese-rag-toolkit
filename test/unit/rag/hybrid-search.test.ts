@@ -167,7 +167,7 @@ describe('createHybridSearch (unit, stub embedder + real sqlite)', () => {
     await expect(search('   ')).rejects.toThrow(/hybridSearch: query must be a non-empty string/);
 
     await expect(search('q', { topK: 0 })).rejects.toThrow(
-      /hybridSearch: topK must be an integer in \[1, 1000\]/,
+      /hybridSearch: topK must be a positive integer/,
     );
     await expect(search('q', { topK: -1 })).rejects.toThrow(/hybridSearch: topK/);
     await expect(search('q', { topK: 1.5 })).rejects.toThrow(/hybridSearch: topK/);
@@ -177,6 +177,80 @@ describe('createHybridSearch (unit, stub embedder + real sqlite)', () => {
     );
     await expect(search('q', { rrfK: 0 })).rejects.toThrow(/hybridSearch: rrfK/);
     await expect(search('q', { rrfK: 1001 })).rejects.toThrow(/hybridSearch: rrfK/);
+  });
+
+  it('accepts topK = Infinity ("return every fused hit") to match rrfFuse contract', async () => {
+    const embedder = makeStubEmbedder(() => 4);
+    const search = createHybridSearch({ handle, embedder });
+    const hits = await search('试用期', { topK: Number.POSITIVE_INFINITY });
+    // All 5 fixture chunks should round-trip via fts ∪ vec under default
+    // perSourceTopK = 30; Infinity must not be coerced or truncated.
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.length).toBeLessThanOrEqual(5);
+  });
+
+  it('validates defaultOpts at factory time so misconfiguration fails fast (not at first query)', () => {
+    const embedder = makeStubEmbedder(() => 4);
+    expect(() => createHybridSearch({ handle, embedder, defaultOpts: { topK: 0 } })).toThrow(
+      /hybridSearch: topK/,
+    );
+    expect(() =>
+      createHybridSearch({ handle, embedder, defaultOpts: { perSourceTopK: 1001 } }),
+    ).toThrow(/hybridSearch: perSourceTopK must be an integer/);
+    expect(() => createHybridSearch({ handle, embedder, defaultOpts: { rrfK: -1 } })).toThrow(
+      /hybridSearch: rrfK/,
+    );
+  });
+
+  it('freezes a shallow copy of defaultOpts so caller mutation cannot drift effective defaults', async () => {
+    const embedder = makeStubEmbedder(() => 4);
+    const defaults: { topK: number } = { topK: 3 };
+    const search = createHybridSearch({ handle, embedder, defaultOpts: defaults });
+    // Mutate AFTER factory; the frozen clone must continue to honour topK = 3.
+    defaults.topK = 999;
+    const hits = await search('试用期');
+    expect(hits.length).toBeLessThanOrEqual(3);
+  });
+
+  it('rejects (embedder, handle) dim mismatches at factory time', () => {
+    const wrongDimEmbedder: Embedder = {
+      modelId: 'wrong-dim-stub',
+      dim: 256,
+      async embed(): Promise<Float32Array> {
+        return new Float32Array(256);
+      },
+      async embedBatch(): Promise<Float32Array[]> {
+        return [];
+      },
+    };
+    expect(() => createHybridSearch({ handle, embedder: wrongDimEmbedder })).toThrow(
+      /createHybridSearch: embedder\.dim \(256\) does not match handle's meta\.embedding_dim \(1024\)/,
+    );
+  });
+
+  it('vec-only recovery at rank=2: verifies RRF math 1/(60+2) at a non-trivial rank', async () => {
+    // perSourceTopK=2 + seed=2 (id=2 self-hits at rank 1) leaves rank-2 vec
+    // slot open for a stub that maps the rare query token to id=5's embedding.
+    const embedder = makeStubEmbedder((q) => (q === '蓝鲸深空探测' ? 2 : 4));
+    // Custom embedder placing id=5 as rank-2 vec hit; cheaper than rebuilding
+    // the fixture — just override `embed` to return a vector midway between
+    // id=2's and id=5's seed embeddings.
+    vi.spyOn(embedder, 'embed').mockImplementation(async () => {
+      const a = makeEmbedding(2);
+      const b = makeEmbedding(5);
+      const mixed = new Float32Array(a.length);
+      for (let i = 0; i < a.length; i += 1) mixed[i] = (a[i] ?? 0) * 0.6 + (b[i] ?? 0) * 0.4;
+      return mixed;
+    });
+    const search = createHybridSearch({ handle, embedder });
+    const hits = await search('蓝鲸深空探测', { perSourceTopK: 2, topK: 5 });
+
+    // No BM25 hits for unknown tokens → fused list is purely vec; check the
+    // rank-2 chunk surfaces with the spec-exact `1/(60+2)` score.
+    const rank2Hit = hits.find((h) => h.vecRank === 2);
+    expect(rank2Hit).toBeDefined();
+    expect(rank2Hit?.bm25Rank).toBeUndefined();
+    expect(Math.abs((rank2Hit?.rrfScore ?? 0) - 1 / 62)).toBeLessThan(1e-12);
   });
 
   it('propagates embedder errors without swallowing them', async () => {
@@ -207,22 +281,32 @@ describe('createHybridSearch (unit, stub embedder + real sqlite)', () => {
     expect(second).toEqual(first);
   });
 
-  it('runs FTS and vec embed in parallel (sanity, not benchmark)', async () => {
+  it('starts embed() BEFORE the synchronous ftsSearch (call-order parallel sanity, jitter-free)', async () => {
+    // Wall-clock thresholds against `setTimeout(50)` are flaky on shared CI.
+    // The real invariant is that the async `embed()` is kicked off before the
+    // blocking `ftsSearch` runs — otherwise FTS serializes ahead of the ONNX
+    // forward pass and there is no parallelism gain to claim. Order-only spy
+    // is deterministic and robust to runner contention.
+    const events: string[] = [];
     const embedder = makeStubEmbedder(() => 4);
     vi.spyOn(embedder, 'embed').mockImplementationOnce(async () => {
-      await new Promise((r) => setTimeout(r, 50));
+      events.push('embed-start');
+      await Promise.resolve();
       return makeEmbedding(4);
     });
+    const originalFts = handle.ftsSearch.bind(handle);
+    vi.spyOn(handle, 'ftsSearch').mockImplementationOnce((q, opts) => {
+      events.push('fts-start');
+      return originalFts(q, opts);
+    });
     const search = createHybridSearch({ handle, embedder });
-
-    const start = performance.now();
     await search('试用期', { topK: 3 });
-    const elapsed = performance.now() - start;
 
-    // FTS path is synchronous (~0ms), vec path is ~50ms; serial wiring would
-    // not change the wall-clock here, but the assertion is a smoke test that
-    // hybrid does not introduce extra serial work beyond the embed call.
-    // Threshold padded for runner jitter (CI macOS / Linux variance).
-    expect(elapsed).toBeLessThan(120);
+    // Embed MUST have been kicked off before FTS started; otherwise hybrid
+    // serializes the two and the AC11 / README "parallel" claim is false.
+    const embedStartIdx = events.indexOf('embed-start');
+    const ftsStartIdx = events.indexOf('fts-start');
+    expect(embedStartIdx).toBeGreaterThanOrEqual(0);
+    expect(ftsStartIdx).toBeGreaterThan(embedStartIdx);
   });
 });

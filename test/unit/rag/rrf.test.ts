@@ -141,6 +141,37 @@ describe('rrfFuse', () => {
     );
   });
 
+  it('rejects rows whose `id` is not a safe integer (with [i][j] index in message)', () => {
+    const badNaN: RankedRow<Payload>[] = [{ id: Number.NaN, rank: 1, payload: { label: 'x' } }];
+    expect(() => rrfFuse([badNaN])).toThrow(
+      /rrfFuse: id must be a safe integer at source\[0\]\[0\]/,
+    );
+
+    const badFloat: RankedRow<Payload>[] = [{ id: 1.5, rank: 1, payload: { label: 'x' } }];
+    expect(() => rrfFuse([badFloat])).toThrow(/rrfFuse: id must be a safe integer/);
+
+    const badInf: RankedRow<Payload>[] = [
+      { id: Number.POSITIVE_INFINITY, rank: 1, payload: { label: 'x' } },
+    ];
+    expect(() => rrfFuse([badInf])).toThrow(/rrfFuse: id must be a safe integer/);
+
+    const badUnsafe: RankedRow<Payload>[] = [
+      { id: Number.MAX_SAFE_INTEGER + 1, rank: 1, payload: { label: 'x' } },
+    ];
+    expect(() => rrfFuse([badUnsafe])).toThrow(/rrfFuse: id must be a safe integer/);
+  });
+
+  it('coerces caller-supplied undefined payloads to null so single-source survival stays observable', () => {
+    const source0: RankedRow<Payload | undefined>[] = [{ id: 1, rank: 1, payload: undefined }];
+    const fused = rrfFuse<Payload | undefined>([source0, []]);
+    expect(fused).toHaveLength(1);
+    // The hit source should still record `null` (not `undefined`) so callers
+    // can use a single `=== null` check for "did not hit this source".
+    expect(fused[0]?.payloads[0]).toBeNull();
+    expect(fused[0]?.payloads[1]).toBeNull();
+    expect(fused[0]?.ranks).toEqual([1, null]);
+  });
+
   it('rejects rows whose `rank` is not a positive integer (with [i][j] index in message)', () => {
     const bad0: RankedRow<Payload>[] = [row(1, 0)];
     expect(() => rrfFuse([bad0])).toThrow(

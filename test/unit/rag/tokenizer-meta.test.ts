@@ -1,12 +1,26 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { openIndex } from '../../../src/rag/sqlite-store.js';
 import { JIEBA_VERSION, writeTokenizerMeta } from '../../../src/rag/tokenizer-meta.js';
 import type { IndexHandle } from '../../../src/rag/types.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(__dirname, '../../..');
+
 describe('JIEBA_VERSION constant', () => {
-  it('matches the @node-rs/jieba dep pinned in package.json (2.0.1)', () => {
-    expect(JIEBA_VERSION).toBe('@node-rs/jieba@2.0.1');
+  it('matches the @node-rs/jieba dep pinned in package.json (cross-check, not tautology)', () => {
+    const pkg = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+    const range = pkg.dependencies['@node-rs/jieba'];
+    if (!range) throw new Error('package.json missing @node-rs/jieba dependency');
+    const pinned = range.replace(/^[\^~]/, '');
+    expect(JIEBA_VERSION).toBe(`@node-rs/jieba@${pinned}`);
   });
 });
 
@@ -59,5 +73,25 @@ describe('writeTokenizerMeta', () => {
       /refusing to overwrite with '@node-rs\/jieba@1\.10\.4'/,
     );
     expect(readTokenizerVersion()).toBe('@node-rs/jieba@2.0.1');
+  });
+
+  it('rejects empty / whitespace-only version arguments fail-fast', () => {
+    expect(() => writeTokenizerMeta(handle.db, '')).toThrow(
+      /writeTokenizerMeta: version must be a non-empty string/,
+    );
+    expect(() => writeTokenizerMeta(handle.db, '   ')).toThrow(
+      /writeTokenizerMeta: version must be a non-empty string/,
+    );
+    // No write should have happened.
+    expect(readTokenizerVersion()).toBe('');
+  });
+
+  it('throws a guidance message when the db lacks the Story 2.2 meta table', () => {
+    const rawDb = new Database(':memory:');
+    try {
+      expect(() => writeTokenizerMeta(rawDb)).toThrow(/writeTokenizerMeta: meta table is missing/);
+    } finally {
+      rawDb.close();
+    }
   });
 });
