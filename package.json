@@ -1,0 +1,72 @@
+{
+  "name": "@yiong/mcp-chinese-rag-toolkit",
+  "version": "0.0.0",
+  "description": "Reusable MCP server + Chinese RAG pipeline toolkit (factory + Tool builder + error envelope + eval framework). Powers @yiong/mcp-hr, @yiong/mcp-modeling and third-party MCP servers.",
+  "license": "MIT",
+  "author": "yiong <gin280@gmail.com> (https://github.com/yiongq)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yiongq/mcp-chinese-rag-toolkit.git",
+    "directory": "packages/mcp-chinese-rag-toolkit"
+  },
+  "homepage": "https://github.com/yiongq/mcp-chinese-rag-toolkit/tree/main/packages/mcp-chinese-rag-toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/yiongq/mcp-chinese-rag-toolkit/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "inspector:smoke": "tsx scripts/inspector-smoke.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.4",
+    "@modelcontextprotocol/inspector": "^0.21.2",
+    "publint": "^0.3.21",
+    "tsdown": "^0.16.8"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "rag",
+    "chinese",
+    "toolkit",
+    "factory"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  }
+}
