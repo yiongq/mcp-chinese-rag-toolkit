@@ -10,9 +10,13 @@ export type {
   Chunk,
   ChunkOptions,
   ChunkRow,
+  Embedder,
+  EmbedderOptions,
   FtsHit,
   IndexHandle,
   IndexStats,
+  ManifestEntry,
+  ModelManifest,
   OpenIndexOptions,
   ParsePdfResult,
   PdfPage,
@@ -20,7 +24,22 @@ export type {
   SearchOptions,
   VecHit,
 } from './rag/index.js';
-export { buildSchema, chunk, chunkPdfPages, openIndex, parsePdf, tokenize } from './rag/index.js';
+export {
+  BGE_LARGE_ZH_V1_5_MANIFEST,
+  buildSchema,
+  chunk,
+  chunkPdfPages,
+  configureTransformersEnv,
+  loadEmbedder,
+  ModelFileMissingError,
+  ModelHashMismatchError,
+  openIndex,
+  parsePdf,
+  resolveCacheDir,
+  tokenize,
+  verifyModelFiles,
+  writeEmbedderMeta,
+} from './rag/index.js';
 export type {
   McpServerConfig,
   McpServerHandle,

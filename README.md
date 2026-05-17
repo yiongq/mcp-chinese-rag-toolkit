@@ -315,6 +315,71 @@ tokenizer for query expansion / synonym lookup, not just indexing.
 Story 2.3 will land the `bge-large-zh-v1.5` embedder so `indexChunks`
 can be driven from `chunk.content` end-to-end without external glue.
 
+## Embedder (Story 2.3+)
+
+This section is the **semantic layer** of the Chinese RAG indexing
+pipeline. It exposes `loadEmbedder()` (returns an `Embedder` whose
+`embed` / `embedBatch` produce 1024-dim L2-normalized vectors via
+`@huggingface/transformers` + `Xenova/bge-large-zh-v1.5`) and the
+supply-chain guardrails (`verifyModelFiles` + a pinned
+`BGE_LARGE_ZH_V1_5_MANIFEST`). Hybrid Search + RRF that consume these
+vectors land in Story 2.4.
+
+### `loadEmbedder` — bge-large-zh-v1.5 (1024-dim, CLS pooling, L2-normalized)
+
+```ts
+import { loadEmbedder, openIndex, writeEmbedderMeta } from '@yiong/mcp-chinese-rag-toolkit';
+
+const embedder = await loadEmbedder(); // default cacheDir = <userCacheDir>/mcp-chinese-rag-toolkit/models
+const handle = openIndex(':memory:', { embeddingDim: 1024 });
+writeEmbedderMeta(handle.db, embedder); // → meta.embedding_model = 'Xenova/bge-large-zh-v1.5'
+
+const query = await embedder.embed('试用期多久'); // Float32Array(1024)
+const batch = await embedder.embedBatch(['请假流程', '加班政策'], { batchSize: 32 });
+```
+
+`loadEmbedder` caches the underlying pipeline as a process-level singleton
+keyed by `(modelId, cacheDir, dtype)`, so subsequent calls return in <5 ms.
+Failed loads are evicted from the cache, so a re-run after fixing a
+tampered file just works.
+
+### `verifyModelFiles` + `ModelHashMismatchError` — supply-chain attestation
+
+```ts
+import {
+  BGE_LARGE_ZH_V1_5_MANIFEST,
+  ModelHashMismatchError,
+  resolveCacheDir,
+  verifyModelFiles,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+try {
+  await verifyModelFiles(resolveCacheDir(), BGE_LARGE_ZH_V1_5_MANIFEST, { strict: true });
+} catch (err) {
+  if (err instanceof ModelHashMismatchError) {
+    // CI / ops can run this as an independent attestation step before serving traffic.
+  }
+}
+```
+
+`loadEmbedder` runs the same verification twice automatically (pre-load
+opportunistic + post-load strict). The standalone export exists so
+operators can attest a pre-baked cache directory without instantiating
+the pipeline. Catch with `err instanceof ModelHashMismatchError` OR
+`err.name === 'ModelHashMismatchError'` — the latter survives the
+ESM/CJS boundary should both copies of the package coexist.
+
+### `BGE_LARGE_ZH_V1_5_MANIFEST` — pinned SHA-256 + byte size
+
+The manifest is hardcoded; never fetched at runtime. To bump it for a
+new upstream revision: run `pnpm manifest:fetch` (dev tool), paste the
+output into `src/rag/model-manifest.ts`, run Story 2.7 eval to confirm
+no Hit Rate@5 regression, then ship as a toolkit minor bump.
+
+Story 2.4 will provide the hybrid search that fuses `embed(query)` with
+`ftsSearch` via Reciprocal Rank Fusion — wiring the embedder above into
+the storage layer end-to-end.
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).

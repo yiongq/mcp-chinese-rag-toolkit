@@ -160,3 +160,86 @@ export interface IndexHandle {
   /** Closes the underlying connection. Idempotent. */
   close(): void;
 }
+
+// ---------------------------------------------------------------------------
+// Story 2.3 — bge-large-zh-v1.5 embedder + model hash verification types
+// ---------------------------------------------------------------------------
+
+/**
+ * A single entry inside a {@link ModelManifest}. The (path, sha256, bytes)
+ * triple is the unit of supply-chain pinning consumed by `verifyModelFiles`.
+ *
+ * `relativePath` MUST be a POSIX-style path relative to the per-model cache
+ * directory (`<cacheDir>/<modelId>/...`). It is rejected at verify time if it
+ * is absolute, contains `..` segments, or holds NUL / control characters.
+ */
+export interface ManifestEntry {
+  /** Path relative to the per-model cache directory (e.g. `'onnx/model.onnx'`). */
+  relativePath: string;
+  /** Lowercase hex SHA-256 of the file contents. */
+  sha256: string;
+  /** Total file size in bytes — pre-flight check before streaming the full hash. */
+  bytes: number;
+}
+
+/**
+ * Hardcoded supply-chain pin for a HuggingFace Hub model used by
+ * {@link loadEmbedder}. The list is intentionally narrow — only files the
+ * toolkit actually loads are pinned; extra files in the cache (README, full
+ * PyTorch weights, alternative dtypes) are neither verified nor considered a
+ * tamper signal.
+ */
+export interface ModelManifest {
+  /** HF Hub repo id consumed by `pipeline('feature-extraction', modelId)`. */
+  modelId: string;
+  /** Optional pinned git revision; defaults to 'main' tracking. */
+  revision?: string;
+  /** Frozen list of files to verify. */
+  files: readonly ManifestEntry[];
+}
+
+/**
+ * Options for {@link loadEmbedder}.
+ *
+ * All fields are optional. `verifyHashes` should never be set to `false` in
+ * production code paths — it exists for test fixtures that mock the pipeline
+ * with synthetic models whose hashes are not under our control.
+ */
+export interface EmbedderOptions {
+  /**
+   * Override the default bge-large-zh-v1.5 manifest — keep the value in sync
+   * with a `ModelManifest` whose `modelId` matches the model you intend to
+   * load. @default BGE_LARGE_ZH_V1_5_MANIFEST
+   */
+  manifest?: ModelManifest;
+  /** Absolute path override; defaults to `<userCacheDir>/mcp-chinese-rag-toolkit/models`. */
+  cacheDir?: string;
+  /** ONNX precision — `'fp32'` for production quality, `'q8'` for memory-constrained edge cases. @default 'fp32' */
+  dtype?: 'fp32' | 'q8' | 'fp16';
+  /** Whether transformers.js may fetch missing files from HF Hub. Set false for fully offline / air-gapped runs. @default true */
+  allowRemoteModels?: boolean;
+  /** Hash-verification toggle — never set false in production. @default true */
+  verifyHashes?: boolean;
+}
+
+/**
+ * Result returned by {@link loadEmbedder}.
+ *
+ * `embed` / `embedBatch` produce L2-normalized vectors (`Σ x_i² ≈ 1`)
+ * suitable for direct insertion into a sqlite-vec `docs_vec` table opened
+ * with {@link openIndex}. `dim` MUST equal `meta.embedding_dim`; mismatches
+ * are caught by Story 2.2 `schema.ts` at index-open time.
+ */
+export interface Embedder {
+  /** Compute a single L2-normalized embedding. `result.length === dim`. */
+  embed(text: string): Promise<Float32Array>;
+  /**
+   * Batched variant; semantically equivalent to N sequential `embed` calls
+   * but uses a single tokenization + ONNX forward when `batchSize > 1`.
+   */
+  embedBatch(texts: string[], opts?: { batchSize?: number }): Promise<Float32Array[]>;
+  /** 1024 for bge-large-zh-v1.5. */
+  readonly dim: number;
+  /** Echo of the manifest's `modelId` — written to `meta.embedding_model` by {@link writeEmbedderMeta}. */
+  readonly modelId: string;
+}
