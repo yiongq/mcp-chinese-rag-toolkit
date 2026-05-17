@@ -377,9 +377,82 @@ new upstream revision: run `pnpm manifest:fetch` (dev tool), paste the
 output into `src/rag/model-manifest.ts`, run Story 2.7 eval to confirm
 no Hit Rate@5 regression, then ship as a toolkit minor bump.
 
-Story 2.4 will provide the hybrid search that fuses `embed(query)` with
-`ftsSearch` via Reciprocal Rank Fusion — wiring the embedder above into
-the storage layer end-to-end.
+## Hybrid Search (Story 2.4+)
+
+The retrieval layer composes the Story 2.2 storage primitives and the
+Story 2.3 embedder into a single fused query: BM25 (`ftsSearch`) and
+vector KNN (`vecSearch`) run in parallel, and Reciprocal Rank Fusion
+(Cormack et al. 2009) merges the two ranked lists without normalizing
+their disparate score scales. Story 2.5 adds the
+`bge-reranker-v2-m3` cross-encoder on top of the hybrid top-K; Story 2.6
+adds the LRU cache around the whole pipeline.
+
+### `createHybridSearch` — BM25 + vec fused via RRF
+
+```ts
+import {
+  createHybridSearch,
+  loadEmbedder,
+  openIndex,
+  writeEmbedderMeta,
+  writeTokenizerMeta,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+const embedder = await loadEmbedder();
+const handle = openIndex('index.db', { embeddingDim: embedder.dim });
+writeEmbedderMeta(handle.db, embedder); // → meta.embedding_model
+writeTokenizerMeta(handle.db); // → meta.tokenizer_version = '@node-rs/jieba@2.0.1'
+
+// (mcp-hr / mcp-modeling build-index.ts owns the chunk → embedding → indexChunks loop.)
+
+const search = createHybridSearch({ handle, embedder });
+const hits = await search('试用期管理规定', { topK: 5 });
+// hits[0]?.rrfScore  → ~0.03 (both BM25 and vec hit)
+// hits[0]?.bm25Rank  → 1
+// hits[0]?.vecRank   → 1 or 2
+// hits[0]?.chunk.content → '试用期管理覆盖入职三个月内的所有同事…'
+```
+
+Defaults: `perSourceTopK = 30` (each side before fusion), `topK = 10`
+(final fused cap), `rrfK = 60`. Pass `defaultOpts` to the factory to
+share opts across calls, or override per-call. All three options accept
+positive integers in `[1, 1000]` — out-of-range / non-integer / empty
+query inputs throw fail-fast `Error('hybridSearch: …')`. Errors from
+`embedder.embed` / `handle.ftsSearch` / `handle.vecSearch` propagate to
+the caller unmodified; `wrapHandler` (server layer) is the canonical
+spot to convert them into MCP error envelopes.
+
+### `rrfFuse` — pure rank-fusion helper
+
+```ts
+import { rrfFuse } from '@yiong/mcp-chinese-rag-toolkit';
+
+const bm25 = [{ id: 1, rank: 1, payload: 'a' }, { id: 2, rank: 2, payload: 'b' }];
+const vec = [{ id: 2, rank: 1, payload: 'B' }, { id: 3, rank: 2, payload: 'C' }];
+const fused = rrfFuse([bm25, vec], { k: 60 });
+// fused[0] → { id: 2, score: 1/61 + 1/62, ranks: [2, 1], payloads: ['b', 'B'] }
+```
+
+`rrfFuse` is the same fusion `createHybridSearch` uses internally —
+exposed standalone so the Story 2.5 reranker can fuse its own third
+ranked list (`rrfFuse([fts, vec, rerank], { k: 60 })`) and so third-party
+toolkit consumers can test alternative fusion strategies against the RRF
+baseline.
+
+### `writeTokenizerMeta` + `JIEBA_VERSION` — pin the active jieba release
+
+```ts
+import { JIEBA_VERSION, writeTokenizerMeta } from '@yiong/mcp-chinese-rag-toolkit';
+
+writeTokenizerMeta(handle.db); // defaults to JIEBA_VERSION ('@node-rs/jieba@2.0.1')
+// SELECT value FROM meta WHERE key = 'tokenizer_version' → '@node-rs/jieba@2.0.1'
+```
+
+Symmetric to `writeEmbedderMeta`: call once during indexing to pin the
+jieba release into the on-disk index. Story 2.6's cache key and any
+future jieba-dictionary upgrade trigger a reindex decision based on this
+field; upgrading the dep without bumping `JIEBA_VERSION` is a
+correctness bug.
 
 ## License
 

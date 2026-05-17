@@ -253,3 +253,92 @@ export interface Embedder {
   /** Echo of the manifest's `modelId` — written to `meta.embedding_model` by {@link writeEmbedderMeta}. */
   readonly modelId: string;
 }
+
+// ---------------------------------------------------------------------------
+// Story 2.4 — Hybrid Search + Reciprocal Rank Fusion (RRF) types
+// ---------------------------------------------------------------------------
+
+/**
+ * Rank-bearing input row consumed by `rrfFuse`. Generic so callers can fuse
+ * `FtsHit[]` (using `bm25Rank`) and `VecHit[]` (using `arrayIndex + 1`)
+ * without coercing them into a shared intermediate object shape.
+ */
+export interface RankedRow<T> {
+  /** Stable identifier — typically `docId` from {@link FtsHit} / {@link VecHit}. */
+  id: number;
+  /** Caller-supplied payload (passed through unchanged into the fused result). */
+  payload: T;
+  /** 1-indexed rank within this list (so `1/(k + 1)` for the top element). */
+  rank: number;
+}
+
+/**
+ * Output row from `rrfFuse`. `ranks[i]` / `payloads[i]` mirror the order of
+ * the input `sources` array; entries are `null` when the corresponding
+ * source did not return this id — BDD#2 single-source survival relies on
+ * this contract.
+ */
+export interface FusedRow<T> {
+  id: number;
+  /** Accumulated RRF score `Σ 1/(k + rank_i)` over every source that contained `id`. */
+  score: number;
+  /** Per-source rank lookup. `null` for sources that did not hit `id`. */
+  ranks: Array<number | null>;
+  /** Per-source payload lookup. `null` for sources that did not hit `id`. */
+  payloads: Array<T | null>;
+}
+
+/** Options for `rrfFuse`. */
+export interface RrfOptions {
+  /** RRF constant — defaults to 60 (Cormack 2009 / Elasticsearch / Weaviate convention). Range [1, 1000]. */
+  k?: number;
+  /** Final fused top-K cap. @default Infinity (return everything fused) */
+  topK?: number;
+}
+
+/** Options for the bound query function returned by `createHybridSearch`. */
+export interface HybridSearchOptions {
+  /** Per-source candidate cap before RRF fusion (top-N from FTS, top-N from vec). @default 30 */
+  perSourceTopK?: number;
+  /** Final fused top-K returned to the caller. @default 10 */
+  topK?: number;
+  /** RRF constant. @default 60 (Cormack 2009 convention) */
+  rrfK?: number;
+}
+
+/**
+ * A single fused hit returned by the bound hybrid-search function.
+ *
+ * Field semantics intentionally mirror the upstream Story 2.2 types:
+ * `bm25Score` is the FTS5 native `rank` column (negative-floor, closer to
+ * 0 = more relevant); `distance` is the sqlite-vec L2 distance (lower =
+ * closer). Optional fields are `undefined` when the corresponding source
+ * did not contribute to this hit (single-source survival).
+ */
+export interface HybridHit {
+  /** `docs.id` — stable per-index identifier. */
+  docId: number;
+  /** Chunk content + provenance (source / page / section). */
+  chunk: Chunk;
+  /** `Σ 1/(rrfK + rank_i)` across whichever sources hit this docId. */
+  rrfScore: number;
+  /** 1-indexed BM25 position within `ftsSearch` top-N — undefined when only vec hit. */
+  bm25Rank?: number;
+  /** Mirrors {@link FtsHit.bm25Score} — undefined when only vec hit. */
+  bm25Score?: number;
+  /** 1-indexed vector position within `vecSearch` top-N — undefined when only BM25 hit. */
+  vecRank?: number;
+  /** Mirrors {@link VecHit.distance} — undefined when only BM25 hit. */
+  distance?: number;
+}
+
+/** Dependencies bound by `createHybridSearch`. */
+export interface HybridSearchDeps {
+  handle: IndexHandle;
+  embedder: Embedder;
+  /** Optional default options applied when the per-call `opts` does not override. */
+  defaultOpts?: HybridSearchOptions;
+}
+
+/** Bound query function returned by `createHybridSearch`. */
+export type HybridSearchFn = (query: string, opts?: HybridSearchOptions) => Promise<HybridHit[]>;
