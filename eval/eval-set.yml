@@ -1,0 +1,103 @@
+# Toolkit self-contained RAG eval set — smoke test against the Story 2.5
+# 12-chunk bench fixture (bin/latency-harness.ts#FIXTURE_CHUNKS). Used by
+# the `rag-eval` CI job to enforce NFR14 (Hit Rate@5 ≥ 90% blocking gate)
+# WITHOUT waiting for Epic 4 mcp-hr eval set to land. Each query targets
+# ONE specific fixture chunk; this is a sanity check that the toolkit
+# pipeline (jieba + FTS + sqlite-vec + RRF + bge-reranker) correctly
+# surfaces obvious-match documents — NOT a domain evaluation.
+#
+# When adding queries: every new query MUST have a leading `# reason:`
+# comment line (AI Agent Rule #9) explaining WHY this query matters.
+# CI report.md echoes the reason when a query goes MISS so reviewers
+# can immediately judge severity.
+
+version: v1-hr-mini-fixture
+description: |
+  Toolkit self-contained eval set targeting the 12-chunk bench fixture.
+  Replaced by Epic 4 mcp-hr Story 4.5 (real PDF + 10+ domain queries)
+  for production-grade evaluation.
+
+queries:
+  # reason: 直接命中"差旅报销"主关键词，验证 BM25 路径基础功能
+  - query: 差旅报销需要保留什么凭证
+    category: leave-policy
+    expected:
+      - source: bench-fixture.md
+        page: 1
+
+  # reason: 同义改写——查询用"实习"chunk 用"实习期评估"——验证 jieba 中文分词
+  - query: 实习期评估怎么做
+    category: onboarding
+    expected:
+      - source: bench-fixture.md
+        page: 2
+
+  # reason: epics.md L704 标志性 BDD query；试用期是 HR 高频问题
+  - query: 试用期多久
+    category: probation
+    expected:
+      - source: bench-fixture.md
+        page: 3
+
+  # reason: 验证"培训计划"语义检索，BGE embedding 不依赖关键词全匹配
+  - query: 员工培训怎么安排
+    category: training
+    expected:
+      - source: bench-fixture.md
+        page: 4
+
+  # reason: 短 query"请假"+流程类问句，覆盖典型 HR 短问句场景
+  - query: 请假怎么申请
+    category: leave-policy
+    expected:
+      - source: bench-fixture.md
+        page: 5
+
+  # reason: 复合语义（加班+换算+工资），验证 reranker 在多概念 query 上的排序
+  - query: 加班可以换调休吗
+    category: compensation
+    expected:
+      - source: bench-fixture.md
+        page: 6
+
+  # reason: 节假日是 HR 高频咨询；验证"国家公历"等不常见词汇召回
+  - query: 法定节假日怎么安排
+    category: holidays
+    expected:
+      - source: bench-fixture.md
+        page: 7
+
+  # reason: 保密协议——专有名词类 query，验证 BGE 对术语的 embedding 准确度
+  - query: 保密协议覆盖哪些内容
+    category: compliance
+    expected:
+      - source: bench-fixture.md
+        page: 8
+
+  # reason: 年终奖发放规则——经典 HR 问题，验证 RRF 融合在数字相关 query 上效果
+  - query: 年终奖怎么发
+    category: compensation
+    expected:
+      - source: bench-fixture.md
+        page: 9
+
+  # reason: 体检福利——验证短 query + 实体类（"体检"）的召回稳定性
+  - query: 体检每年几次
+    category: benefits
+    expected:
+      - source: bench-fixture.md
+        page: 10
+
+  # reason: 离职流程——验证 hybrid search 在程序类 query 上的表现
+  - query: 离职手续怎么办
+    category: offboarding
+    expected:
+      - source: bench-fixture.md
+        page: 11
+
+  # reason: 长 query（含限定条件"出差预订机票"）——验证 reranker 对长 query 的差异化排序
+  - query: 出差预订机票有什么要求
+    category: travel
+    expected:
+      - source: bench-fixture.md
+        page: 12

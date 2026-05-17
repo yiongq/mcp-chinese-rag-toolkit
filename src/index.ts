@@ -6,6 +6,30 @@ export const TOOLKIT_NAME = 'mcp-chinese-rag-toolkit' as const;
 
 export type ToolkitName = typeof TOOLKIT_NAME;
 
+export type {
+  EvalExpected,
+  EvalQuery,
+  EvalQueryResult,
+  EvalRunnerOptions,
+  EvalSearchFn,
+  EvalSearchResult,
+  EvalSet,
+  EvalSummary,
+  WriteArtifactsOptions,
+} from './eval/index.js';
+export {
+  DEFAULT_EVAL_TOP_K,
+  DEFAULT_HIT_RATE_MIN,
+  DEFAULT_RESULTS_DIR,
+  emitGitHubActionsAnnotation,
+  loadEvalSet,
+  passesGate,
+  renderMarkdownReport,
+  resolveHitRateMin,
+  runEval,
+  scoreQuery,
+  writeArtifacts,
+} from './eval/index.js';
 export type { ToolHandler } from './middleware/with-lru-cache.js';
 export {
   canonicalize,

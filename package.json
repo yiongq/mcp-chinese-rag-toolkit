@@ -51,6 +51,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "test:eval": "tsx bin/run-eval.ts",
     "bench": "tsx bin/latency-harness.ts",
     "inspector:smoke": "tsx scripts/inspector-smoke.ts",
     "manifest:fetch": "tsx scripts/fetch-model-manifest.ts",
@@ -82,6 +83,7 @@
     "lru-cache": "^11.3.6",
     "sqlite-vec": "^0.1.9",
     "unpdf": "^1.6.2",
+    "yaml": "^2.6.0",
     "zod": "^3.25.76"
   }
 }

@@ -779,6 +779,170 @@ sha256 computation happen caller-side (architecture §AI Agent 强制规则
 `Hit Rate@5 ≥ 90%` as a CI gate; Epic 4 mcp-hr wires this Contextual
 Retrieval + L0 cache pair into a real HR Q&A end-to-end demo.
 
+## Eval Framework + RAG Eval CI Gate (Story 2.7+)
+
+Story 2.7 lands the **eval framework** + **`rag-eval` CI gate** that enforces
+`Hit Rate@5 ≥ 90%` (NFR14) on every PR — *before* Epic 4 mcp-hr ships, so the
+RAG pipeline parameters (chunking / RRF constants / reranker / embedder /
+contextual retrieval) are locked-in by a measurable contract rather than vibe.
+
+The eval framework covers FR39-FR43:
+- **FR39** YAML-declared eval set with reason comments (`AI Agent Rule #9`)
+- **FR40** Hit Rate@K + MRR aggregate metrics
+- **FR41** CI exit-code 1 when `Hit Rate@5 < 90%` (blocking, not warn)
+- **FR42** GitHub Actions artifact: `summary.json` + `report.md` + `per-query.json`
+- **FR43** per-query metric breakdown (`rerankScore` / `distance` / `ftsRank`)
+
+The 90% baseline mirrors Anthropic's
+[Contextual Retrieval blog (Sep 2024)](https://www.anthropic.com/news/contextual-retrieval)
+industry numbers for Chinese RAG (BM25 + reranker stack lands around 88-93%);
+toolkit fixture is engineered to land well above, so any regression points at a
+real pipeline change rather than a noisy bar.
+
+### YAML eval set schema
+
+```yaml
+version: v1-hr-mini-fixture           # free-form, used for cross-run diffing
+description: |                        # optional, surfaces in report.md header
+  Toolkit self-contained eval set.
+
+queries:
+  # reason: BM25 sanity check on 差旅 keyword — required by AI Agent Rule #9
+  - query: 差旅报销需要保留什么凭证
+    category: leave-policy            # kebab-case (architecture L440)
+    expected:                          # OR-semantics: ANY match scores hit
+      - source: bench-fixture.md
+        page: 1                        # optional, only enforced in strict mode
+```
+
+Required: `version`, `queries[].query`, `queries[].expected[].source`. Empty
+arrays / missing fields throw actionable errors at load time so a broken eval
+set can never silently let regressions slip through.
+
+### Using the API
+
+```ts
+import {
+  loadEvalSet,
+  runEval,
+  writeArtifacts,
+  passesGate,
+  resolveHitRateMin,
+} from '@yiong/mcp-chinese-rag-toolkit';
+import type { EvalSearchFn } from '@yiong/mcp-chinese-rag-toolkit';
+
+const evalSet = loadEvalSet('eval/eval-set.yml');
+
+// Caller owns the searchFn — wire whatever pipeline you want to evaluate.
+const searchFn: EvalSearchFn = async (query, opts) => {
+  const topK = opts?.topK ?? 5;
+  const hybrid = await hybridSearch(query, { topK: topK * 2 });
+  const reranked = await rerank(query, hybrid, { topK });
+  return reranked.map((r) => ({
+    source: r.chunk.source ?? 'unknown',
+    page: r.chunk.page,
+    rerankScore: r.rerankScore,
+    distance: r.distance,
+    ftsRank: r.bm25Rank,
+  }));
+};
+
+const summary = await runEval(evalSet, { searchFn, topK: 5 });
+writeArtifacts(summary, { outDir: 'eval-results' });
+
+const threshold = resolveHitRateMin();          // honours RAG_EVAL_HIT_RATE_MIN
+process.exit(passesGate(summary, threshold) ? 0 : 1);
+```
+
+### Adapter pattern for downstream MCP packages
+
+`mcp-hr` (Epic 4 Story 4.5) and `mcp-modeling` (Epic 6 Story 6.7) each own
+their own eval set + adapter. The toolkit provides no domain logic — only the
+runner, scorer, and CI helper. Wiring sketch:
+
+```ts
+// packages/mcp-hr/bin/run-eval.ts
+import { loadEvalSet, runEval, writeArtifacts, ... } from '@yiong/mcp-chinese-rag-toolkit';
+import { searchHrDocs } from '../src/tools/search-hr-docs.js';
+
+const searchFn: EvalSearchFn = async (q, opts) => {
+  const hits = await searchHrDocs({ query: q, topK: opts?.topK ?? 5 });
+  return hits.results.map((r) => ({ source: r.source, page: r.page, rerankScore: r.score }));
+};
+// …same loadEvalSet / runEval / writeArtifacts as above.
+```
+
+### CI integration
+
+`.github/workflows/ci.yml` ships with a `rag-eval` job that runs on every PR:
+
+```yaml
+rag-eval:
+  name: RAG Eval (Hit Rate@5 ≥ 90% blocking gate)
+  if: github.event_name == 'pull_request'
+  runs-on: ubuntu-latest
+  continue-on-error: false           # opposite of `bench` (warn-not-block)
+  timeout-minutes: 15
+  steps:
+    # …checkout / setup / install / build…
+    - name: Run RAG eval
+      env:
+        SKIP_MODEL_DOWNLOAD: ''      # force real model download for accurate eval
+        RAG_EVAL_HIT_RATE_MIN: '0.9' # NFR14 default; do NOT lower in main
+      run: pnpm --filter @yiong/mcp-chinese-rag-toolkit test:eval
+    - name: Upload RAG eval report
+      if: always()                   # upload even on failure for debugging
+      uses: actions/upload-artifact@v4
+      with:
+        name: rag-eval-report
+        path: |
+          packages/mcp-chinese-rag-toolkit/eval-results/summary.json
+          packages/mcp-chinese-rag-toolkit/eval-results/report.md
+          packages/mcp-chinese-rag-toolkit/eval-results/per-query.json
+        retention-days: 30          # default 90 wastes storage; 30 = ample PR window
+```
+
+### `RAG_EVAL_HIT_RATE_MIN` env var
+
+Threshold defaults to **0.9** (`DEFAULT_HIT_RATE_MIN`). Override only for dev
+debugging via `RAG_EVAL_HIT_RATE_MIN=0.85 pnpm test:eval`. Production CI keeps
+the default; any PR that flips it permanently must include explicit ADR
+justification (the env var exists for transient debugging, not as a knob to
+weaken NFR14).
+
+### Per-query metric breakdown semantics
+
+| Field         | Source                          | When undefined                                    |
+|---------------|---------------------------------|---------------------------------------------------|
+| `rerankScore` | Story 2.5 `bge-reranker-v2-m3`  | searchFn skipped reranker                         |
+| `distance`    | Story 2.4 `vecSearch` (L2)      | docId only came back from FTS branch              |
+| `ftsRank`     | Story 2.4 `ftsSearch` BM25 rank | docId only came back from vec branch              |
+| `section`     | Story 2.1 chunking heading path | source doc lacks Markdown headings                |
+
+Each is optional in `EvalSearchResult`. The renderer prints `-` when missing,
+never throws — so a third-party MCP server that wires only `rerankScore` is
+still a first-class citizen.
+
+### Anti-patterns
+
+- ❌ Don't introduce semantic-similarity-based `expected` matching (BERTScore
+  / cosine-threshold). Exact source/page match is intentional — it keeps the
+  eval set unambiguous and the regression signal sharp. Mirrors the cache
+  policy in [§Caching](#l0-tool-result-cache-story-26) — no soft matches at
+  evaluation time either.
+- ❌ Don't add per-package `Hit Rate@K` thresholds. Production CI is uniformly
+  0.9; if `mcp-modeling` truly cannot land there during MVP due to non-RAG
+  Oracle config tools, evaluate the allowlist in Epic 6 — don't fragment the
+  bar across packages.
+- ❌ Don't treat the toolkit self-eval (12-chunk fixture) as a domain
+  evaluation. It is a smoke test that the pipeline integrates end-to-end.
+  Real production gates live in `mcp-hr` Story 4.5 (real PDF, 10+ queries) and
+  `mcp-modeling` Story 6.7 (engine routing + hooks + db-config queries).
+
+**Next steps:** Story 2.8 layers the Vision Caption Plugin (ADR-0008) on top
+for PDFs with image-heavy pages; Story 2.9 ships the `create-mcp-rag` CLI that
+scaffolds a new MCP RAG package wired into this eval framework out of the box.
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).
