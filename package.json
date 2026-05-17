@@ -36,6 +36,8 @@
   },
   "files": [
     "dist",
+    "bench",
+    "bin",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -49,6 +51,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "bench": "tsx bin/latency-harness.ts",
     "inspector:smoke": "tsx scripts/inspector-smoke.ts",
     "manifest:fetch": "tsx scripts/fetch-model-manifest.ts",
     "smoke:native": "tsx scripts/smoke-native-deps.ts"

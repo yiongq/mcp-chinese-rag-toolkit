@@ -342,3 +342,194 @@ export interface HybridSearchDeps {
 
 /** Bound query function returned by `createHybridSearch`. */
 export type HybridSearchFn = (query: string, opts?: HybridSearchOptions) => Promise<HybridHit[]>;
+
+// ---------------------------------------------------------------------------
+// Story 2.5 — BGE-Reranker (cross-encoder) + stdio P95 latency harness types
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for {@link loadReranker}.
+ *
+ * Mirrors {@link EmbedderOptions} field-for-field so callers wiring both
+ * pipelines together (Epic 4 mcp-hr / mcp-modeling) get a uniform surface.
+ * `dtype` is currently fixed at `'q8'` (model_quantized.onnx) by the default
+ * manifest — see `BGE_RERANKER_V2_M3_MANIFEST` JSDoc for the rationale.
+ */
+export interface RerankerOptions {
+  /**
+   * Override the default bge-reranker-v2-m3 manifest. Pass a `ModelManifest`
+   * whose `modelId` is recognised by `@huggingface/transformers`
+   * `AutoModelForSequenceClassification.from_pretrained(modelId)`.
+   * @default BGE_RERANKER_V2_M3_MANIFEST
+   */
+  manifest?: ModelManifest;
+  /** Absolute path override; defaults to `<userCacheDir>/mcp-chinese-rag-toolkit/models` (shared with embedder). */
+  cacheDir?: string;
+  /** Whether transformers.js may fetch missing files from HF Hub. Set false for fully offline / air-gapped runs. @default true */
+  allowRemoteModels?: boolean;
+  /** Hash-verification toggle — never set false in production. @default true */
+  verifyHashes?: boolean;
+}
+
+/**
+ * Single rank result returned by {@link Reranker.rank}.
+ *
+ * `score` is `sigmoid(logit)` — bge-reranker-v2-m3 is a single-class
+ * sequence-classification model that emits one logit per `(query, doc)`
+ * pair; `sigmoid` converts that into a `[0, 1]` relevance probability.
+ * The FR25 / NFR17 `confidence: 'low'` threshold defaults to `< 0.5`
+ * and is enforced at the tool handler layer (Epic 4 mcp-hr), not here.
+ */
+export interface RankedDocument {
+  /** Position in the input `documents` array (0-indexed). */
+  index: number;
+  /** `sigmoid(logit)` ∈ `[0, 1]` — relevance probability. */
+  score: number;
+}
+
+/**
+ * Result returned by {@link loadReranker}.
+ *
+ * `rank(query, documents, opts?)` is the canonical surface: it tokenizes
+ * each `(query, document)` pair, runs a batched forward pass through the
+ * cross-encoder, applies sigmoid to the single output logit per pair, and
+ * returns `RankedDocument[]` aligned to the input `documents` array order
+ * (so callers can re-attach their own metadata). Sort / top-K filtering is
+ * the caller's job — see {@link createReranker} for the bound HybridHit
+ * variant that does both.
+ *
+ * Unlike {@link Embedder} (a bi-encoder that produces a per-document dense
+ * vector and lets the caller compute similarity offline), a cross-encoder
+ * sees the `(query, doc)` pair jointly through full self-attention; this
+ * is why reranking is significantly slower than embedding but also much
+ * more accurate at separating near-duplicate candidates.
+ */
+export interface Reranker {
+  /**
+   * Score `documents` against `query`. Returns one entry per input document,
+   * in the SAME order (so caller can `documents[i] ←→ scores[i]`).
+   *
+   * `opts.batchSize` clamped to `[1, 64]`; cross-encoder is heavier than
+   * the bi-encoder embedder (full attention over `[query | SEP | doc]`),
+   * so the practical batch ceiling is lower than the embedder's 256.
+   *
+   * `opts.maxLength` defaults to 512 tokens (bge-reranker-v2-m3 max
+   * positional embedding); pairs longer than this are truncated with
+   * `truncation: 'longest_first'` (drops from the longer side, usually
+   * the document) — matches FlagEmbedding's reference behaviour.
+   */
+  rank(
+    query: string,
+    documents: string[],
+    opts?: { batchSize?: number; maxLength?: number },
+  ): Promise<RankedDocument[]>;
+  /** Echo of the manifest's `modelId` — written to `meta.reranker_model` by {@link writeRerankerMeta}. */
+  readonly modelId: string;
+}
+
+/** Options for the bound rerank function returned by `createReranker`. */
+export interface RerankOptions {
+  /** Final reranked top-K cap. Accepts `Infinity` for "return every reranked hit". @default 5 */
+  topK?: number;
+  /** Forwarded to `reranker.rank()`. @default 32 */
+  batchSize?: number;
+  /** Forwarded to `reranker.rank()`. @default 512 */
+  maxLength?: number;
+}
+
+/**
+ * Reranked hit — extends `HybridHit` with `rerankScore` and re-orders
+ * candidates by sigmoid relevance score. `rerankScore` is in `[0, 1]`;
+ * FR25 / NFR17 `confidence: 'low'` threshold defaults to `< 0.5` and
+ * is enforced at the tool handler layer (Epic 4 mcp-hr), not here.
+ */
+export interface RerankedHit extends HybridHit {
+  /** `sigmoid(cross-encoder logit)` ∈ `[0, 1]`. */
+  rerankScore: number;
+}
+
+/** Dependencies bound by `createReranker`. */
+export interface RerankerDeps {
+  reranker: Reranker;
+  /** Optional default options applied when the per-call `opts` does not override. */
+  defaultOpts?: RerankOptions;
+}
+
+/** Bound rerank function returned by `createReranker`. */
+export type RerankFn = (
+  query: string,
+  candidates: HybridHit[],
+  opts?: RerankOptions,
+) => Promise<RerankedHit[]>;
+
+/** Options for `runStdioLatencyHarness`. */
+export interface LatencyHarnessOptions {
+  /** Number of throwaway warm-up calls before measurement starts. @default 5 */
+  warmupRuns?: number;
+  /** Number of measured tool calls. @default 100 */
+  measureRuns?: number;
+  /** Fixture: query strings cycled through during measurement. */
+  queries?: string[];
+  /**
+   * Tool name to invoke. Default tool is a hybrid + rerank pipeline over an
+   * in-memory 12-chunk HR fixture (mirrors the integration test fixture).
+   */
+  toolName?: string;
+}
+
+/**
+ * Snapshot returned by `runStdioLatencyHarness` — schema also written to
+ * `bench/baseline.json` by `bin/latency-harness.ts`.
+ */
+export interface LatencySnapshot {
+  /** ISO-8601 timestamp when the harness completed. */
+  timestamp: string;
+  /** Tool name that was measured. */
+  toolName: string;
+  /** Number of warmup runs that completed successfully. */
+  warmupRuns: number;
+  /** Number of measured runs. */
+  measureRuns: number;
+  /** Cold start latency — ms from harness start to first warmup completion. */
+  coldStartMs: number;
+  /** Warm-only P50 latency (ms). */
+  p50Ms: number;
+  /** Warm-only P95 latency (ms). NFR1: must stay < 200. */
+  p95Ms: number;
+  /** Warm-only P99 latency (ms). */
+  p99Ms: number;
+  /** Mean warm latency (ms). */
+  meanMs: number;
+  /** Min warm latency (ms). */
+  minMs: number;
+  /** Max warm latency (ms). */
+  maxMs: number;
+  /**
+   * Toolkit + reranker provenance — frozen into the snapshot so
+   * baseline.json regressions are debuggable years later without
+   * re-running git archaeology.
+   */
+  environment: {
+    /** Node version (e.g. 'v22.10.0'). */
+    node: string;
+    /** Platform (`darwin` / `linux` / `win32`). */
+    platform: string;
+    /** Arch (`arm64` / `x64`). */
+    arch: string;
+    /** Toolkit `package.json` version. */
+    toolkitVersion: string;
+    /** Reranker manifest modelId. */
+    rerankerModelId: string;
+    /** Embedder manifest modelId. */
+    embedderModelId: string;
+    /** `JIEBA_VERSION` constant. */
+    jiebaVersion: string;
+  };
+}
+
+/** Result returned by `runStdioLatencyHarness` — includes raw samples for debug. */
+export interface HarnessResult {
+  snapshot: LatencySnapshot;
+  /** Raw per-call latency array (warm runs only) — for histograms / debug. */
+  samples: number[];
+}

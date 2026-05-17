@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { BGE_LARGE_ZH_V1_5_MANIFEST } from '../../../src/rag/model-manifest.js';
+import {
+  BGE_LARGE_ZH_V1_5_MANIFEST,
+  BGE_RERANKER_V2_M3_MANIFEST,
+} from '../../../src/rag/model-manifest.js';
 import type { ManifestEntry, ModelManifest } from '../../../src/rag/types.js';
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
@@ -45,5 +48,53 @@ describe('BGE_LARGE_ZH_V1_5_MANIFEST', () => {
       });
     }
     expect(typeof _compileTimeOnly).toBe('function');
+  });
+});
+
+describe('BGE_RERANKER_V2_M3_MANIFEST', () => {
+  it('exposes the canonical onnx-community modelId, sentinel embeddingDim=1, and 5 pinned files', () => {
+    // Why onnx-community/* instead of Xenova/* — see Story 2.5 §架构现实校正 #7:
+    // the Xenova fork was never published on HF Hub (401 to anonymous fetch).
+    expect(BGE_RERANKER_V2_M3_MANIFEST.modelId).toBe('onnx-community/bge-reranker-v2-m3-ONNX');
+    // `embeddingDim: 1` is a sentinel — bge-reranker outputs a single logit
+    // (sequence-classification), not a dense vector. See Story 2.5 Dev Notes §6.
+    expect(BGE_RERANKER_V2_M3_MANIFEST.embeddingDim).toBe(1);
+    // Default dtype `q8` loads 5 files (config + tokenizer triple + model_quantized.onnx);
+    // upstream fp32 weights split across model.onnx + model.onnx_data total
+    // >2GB and are intentionally NOT pinned for the CI cache budget.
+    expect(BGE_RERANKER_V2_M3_MANIFEST.files).toHaveLength(5);
+    for (const entry of BGE_RERANKER_V2_M3_MANIFEST.files) {
+      expect(entry.sha256).toMatch(SHA256_HEX);
+      expect(entry.bytes).toBeGreaterThan(0);
+    }
+  });
+
+  it('pins onnx/model_quantized.onnx (570MB q8 single file) — NOT fp32 external-data layout', () => {
+    const onnxEntry = BGE_RERANKER_V2_M3_MANIFEST.files.find(
+      (f) => f.relativePath === 'onnx/model_quantized.onnx',
+    );
+    expect(onnxEntry).toBeDefined();
+    // 570MB ±10% sanity bracket — guards against future manifest refresh
+    // accidentally pinning the wrong dtype (e.g. swapping for fp16).
+    expect(onnxEntry?.bytes).toBeGreaterThan(500_000_000);
+    expect(onnxEntry?.bytes).toBeLessThan(700_000_000);
+  });
+
+  it('rejects path-traversal characters in pinned entries (manifest tamper guard)', () => {
+    for (const entry of BGE_RERANKER_V2_M3_MANIFEST.files) {
+      expect(entry.relativePath.startsWith('/')).toBe(false);
+      expect(entry.relativePath.includes('..')).toBe(false);
+      expect(entry.relativePath.includes('\\')).toBe(false);
+    }
+  });
+
+  it('embedderDim sentinel does NOT collide with bge-large-zh-v1.5 manifest dim', () => {
+    // Defensive cross-check — if a future refactor accidentally re-uses the
+    // embedder dim (1024) for the reranker, callers reading
+    // `manifest.embeddingDim` as the reranker output size would silently
+    // produce arrays of wrong length. The sentinel `1` must stay distinct.
+    expect(BGE_RERANKER_V2_M3_MANIFEST.embeddingDim).not.toBe(
+      BGE_LARGE_ZH_V1_5_MANIFEST.embeddingDim,
+    );
   });
 });

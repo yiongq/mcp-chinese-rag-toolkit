@@ -107,8 +107,9 @@ export function buildSchema(db: Database.Database, opts: SchemaOptions = {}): vo
     );
   }
 
-  // Story 2.3 / 2.4 owners populate these — write empty-string placeholders so
-  // downstream readers can rely on the keys existing.
+  // Story 2.3 / 2.4 / 2.5 owners populate these — write empty-string
+  // placeholders so downstream readers can rely on the keys existing.
   if (!metaSelect.get('embedding_model')) metaInsert.run('embedding_model', '');
   if (!metaSelect.get('tokenizer_version')) metaInsert.run('tokenizer_version', '');
+  if (!metaSelect.get('reranker_model')) metaInsert.run('reranker_model', '');
 }

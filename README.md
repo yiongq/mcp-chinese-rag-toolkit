@@ -454,6 +454,138 @@ future jieba-dictionary upgrade trigger a reindex decision based on this
 field; upgrading the dep without bumping `JIEBA_VERSION` is a
 correctness bug.
 
+## Reranker (Story 2.5+)
+
+The reranker stage is the *last* stop in the RAG retrieval pipeline
+(`hybrid → rerank → optional LRU cache`). It runs the
+`bge-reranker-v2-m3` cross-encoder over `(query, chunk.content)` pairs
+to produce a sigmoid-of-logit relevance score in `[0, 1]` and trims the
+hybrid top-10 down to the canonical top-5 envelope used by
+`mcp-hr.search_hr_docs` and `mcp-modeling.*`. The Story 2.6 LRU cache,
+when it lands, wraps the entire `hybrid + rerank` pipeline as a single
+`withLruCache` middleware — the reranker is intentionally a separate
+factory so callers can skip it (ablation eval) or share its cache.
+
+This section is also the home of NFR1 (`stdio P95 < 200ms`): the
+`runStdioLatencyHarness` + `bin/latency-harness.ts` + `bench/baseline.json`
+trio enforces the P95 contract on every PR.
+
+### `loadReranker` + `Reranker.rank`
+
+```ts
+import { loadReranker } from '@yiong/mcp-chinese-rag-toolkit';
+
+const reranker = await loadReranker();
+const scores = await reranker.rank('试用期', [
+  '试用期管理覆盖入职三个月内的所有同事。',
+  '加班补偿可换算调休。',
+  '请假流程通过 OA 提交。',
+]);
+// scores[0]?.score → ~0.95 (exact relevance — cross-encoder is much
+//                            sharper than the bi-encoder embedder)
+// scores[1]?.score → ~0.05
+```
+
+`loadReranker(opts?)` returns a process-wide singleton keyed by
+`(manifestFingerprint, cacheDir, verifyHashes, allowRemoteModels)` —
+mirroring `loadEmbedder`. The default manifest pins
+`onnx-community/bge-reranker-v2-m3-ONNX` at `dtype: 'q8'` (570MB
+single-file ONNX; see manifest JSDoc for the trade-off rationale).
+`rank(query, documents, opts?)` clamps `batchSize` to `[1, 64]` and
+`maxLength` to `[16, 512]`; `documents` order is preserved in the
+result so callers can re-attach their own metadata via the
+`RankedDocument.index` field.
+
+### `createReranker` + `RerankedHit`
+
+```ts
+import {
+  createHybridSearch,
+  createReranker,
+  loadEmbedder,
+  loadReranker,
+  openIndex,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+const embedder = await loadEmbedder();
+const reranker = await loadReranker();
+const handle = openIndex('index.db', { embeddingDim: embedder.dim });
+
+const search = createHybridSearch({ handle, embedder });
+const rerank = createReranker({ reranker, defaultOpts: { topK: 5 } });
+
+const hybrid = await search('试用期管理规定', { topK: 10 });
+const reranked = await rerank('试用期管理规定', hybrid);
+// reranked[0]?.rerankScore → ~0.95 (sigmoid(logit))
+// reranked[0]?.chunk.content → '试用期管理覆盖入职三个月内的所有同事…'
+// reranked[0]?.rrfScore     → preserved from hybrid (FR43 metric breakdown)
+// reranked[0]?.bm25Rank     → preserved
+```
+
+`RerankedHit extends HybridHit` — every hybrid metric (RRF score, BM25
+rank, vec distance) is preserved so tool handlers can build the FR43
+`metric breakdown` envelope without re-querying. Output is sorted by
+`rerankScore` descending; ties break on `docId` ascending (Story 2.4 H3
+symbol comparison). `topK` accepts `Infinity` for "return every
+reranked candidate" — matching `createHybridSearch`'s contract.
+
+The FR25 / NFR17 `confidence: 'low'` threshold (default `< 0.5`) is
+the tool handler's responsibility (Epic 4 `mcp-hr` owner); the toolkit
+exposes `rerankScore` raw.
+
+### `writeRerankerMeta` + `BGE_RERANKER_V2_M3_MANIFEST`
+
+```ts
+import {
+  BGE_RERANKER_V2_M3_MANIFEST,
+  writeRerankerMeta,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+writeRerankerMeta(handle.db, reranker);
+// SELECT value FROM meta WHERE key = 'reranker_model'
+//   → 'onnx-community/bge-reranker-v2-m3-ONNX'
+```
+
+Symmetric to `writeEmbedderMeta` / `writeTokenizerMeta`: pins the
+reranker modelId into the on-disk index for provenance / debug.
+**Intentionally NOT part of the Story 2.6 cache key** — swapping the
+reranker does not invalidate the FTS / vec stores, so the cache key
+stays `(toolName, indexVersion, args)`.
+
+`BGE_RERANKER_V2_M3_MANIFEST` is the supply-chain pin — same "edit
+the literal, never automate the refresh, run Story 2.7 eval before
+bumping" discipline as `BGE_LARGE_ZH_V1_5_MANIFEST`.
+
+### `runStdioLatencyHarness` + `bench/baseline.json`
+
+```bash
+pnpm bench                       # measure + diff against bench/baseline.json
+pnpm bench -- --write            # overwrite baseline.json (PR-reviewed!)
+pnpm bench -- --measure-runs 200 # override sample size (default 100)
+```
+
+The CLI wires `loadEmbedder + loadReranker + createHybridSearch +
+createReranker` over an in-memory 12-chunk HR fixture, then runs
+5 warmup + 100 measured tool calls through an in-process MCP server
+pair (`InMemoryTransport.createLinkedPair()`). The resulting snapshot
+includes P50/P95/P99 + cold-start + a full environment fingerprint
+(`node` / `platform` / `arch` / toolkit + model + jieba versions).
+
+`bench/baseline.json` is committed as a contract file — `pnpm bench`
+warns on `> 50ms` P95 drift, and the GitHub Actions bench job emits a
+`::warning::` annotation on regressed PRs (warn-not-block in the MVP;
+Phase 2 may flip to block). `bench/latest.json` is gitignored
+per-run output for CI artifact upload and local diffing.
+Cross-platform baselines are NOT comparable (CI Linux x64 vs local
+macOS arm64 will skip the numeric diff and print `⚠️ env drift`
+instead).
+
+Story 2.6 will wrap the full `hybrid + rerank` pipeline in an LRU
+cache (`withLruCache`); cache hits will collapse the entire reranker
+forward pass + hybrid query to a single dict lookup, knocking p50 down
+to ~0ms for warm queries. Story 2.7 then layers the eval framework on
+top to enforce `Hit Rate@5 ≥ 90%` as a CI gate.
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).
