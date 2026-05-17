@@ -246,6 +246,75 @@ const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
 Indexing (jieba tokenizer + FTS5 + `bge-large-zh-v1.5` embedder + `vec0`)
 arrives in Story 2.2; hybrid search and reranking follow in Stories 2.4–2.5.
 
+## RAG storage layer (Story 2.2+)
+
+The toolkit now ships an opinionated SQLite + `sqlite-vec` + jieba storage
+layer that turns `Chunk[]` (from `chunkPdfPages` / `chunk`) into a single
+`.db` file with three tables: `docs` (content + provenance), `docs_fts`
+(FTS5 BM25 over jieba-pretokenized text) and `docs_vec` (`vec0` virtual
+table holding the per-chunk embedding). Hybrid Search + RRF land in
+Story 2.4 — this section is the storage substrate they sit on.
+
+### `openIndex` — open / create an index handle
+
+```ts
+import { openIndex } from '@yiong/mcp-chinese-rag-toolkit';
+
+const handle = openIndex('data/hr-index.db', { embeddingDim: 1024 });
+try {
+  console.log(handle.getIndexVersion()); // → 'v1-…' (Story 2.6 cache key)
+} finally {
+  handle.close();
+}
+```
+
+Pass `{ readonly: true }` to open a prebuilt `.db` (e.g. one shipped
+inside an mcp-hr npm tarball) without re-running the schema.
+
+### `indexChunks` — three-table transactional write
+
+```ts
+import { openIndex, parsePdf, chunkPdfPages } from '@yiong/mcp-chinese-rag-toolkit';
+
+const handle = openIndex('data/hr-index.db');
+const { pages } = await parsePdf('hr.pdf');
+const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
+// `embedding` is a Float32Array of length `embeddingDim` (default 1024,
+// matching bge-large-zh-v1.5 — Story 2.3 will provide the embedder).
+handle.indexChunks(chunks.map((chunk, i) => ({ chunk, embedding: embeddings[i] })));
+handle.close();
+```
+
+Dimension mismatches fail fast and roll back the entire batch (single
+`better-sqlite3` transaction — 50–100× faster than per-row autocommit).
+
+### `ftsSearch` — BM25 over jieba-pretokenized text
+
+```ts
+const hits = handle.ftsSearch('请假流程', { topK: 30 });
+hits[0]?.bm25Rank; // 1-indexed, ready for Story 2.4 RRF fusion
+```
+
+### `vecSearch` — sqlite-vec KNN
+
+```ts
+const hits = handle.vecSearch(queryEmbedding, { topK: 30 });
+hits[0]?.distance; // sqlite-vec L2 distance (Story 2.3 may opt into cosine)
+```
+
+### `tokenize` — standalone jieba pre-tokenization
+
+```ts
+import { tokenize } from '@yiong/mcp-chinese-rag-toolkit';
+tokenize('试用期管理规定'); // → '试用期 管理 规定'
+```
+
+Exposed as a top-level helper so business code can reuse the same
+tokenizer for query expansion / synonym lookup, not just indexing.
+
+Story 2.3 will land the `bge-large-zh-v1.5` embedder so `indexChunks`
+can be driven from `chunk.content` end-to-end without external glue.
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).

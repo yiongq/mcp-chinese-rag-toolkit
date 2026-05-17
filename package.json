@@ -49,11 +49,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "inspector:smoke": "tsx scripts/inspector-smoke.ts"
+    "inspector:smoke": "tsx scripts/inspector-smoke.ts",
+    "smoke:native": "tsx scripts/smoke-native-deps.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
     "@modelcontextprotocol/inspector": "^0.21.2",
+    "@types/better-sqlite3": "^7.6.13",
     "@vitest/coverage-v8": "^3.2.4",
     "publint": "^0.3.21",
     "tsdown": "^0.16.8"
@@ -69,6 +71,9 @@
   "dependencies": {
     "@langchain/textsplitters": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@node-rs/jieba": "^2.0.1",
+    "better-sqlite3": "^12.10.0",
+    "sqlite-vec": "^0.1.9",
     "unpdf": "^1.6.2",
     "zod": "^3.25.76"
   }

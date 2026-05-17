@@ -1,0 +1,86 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import Database from 'better-sqlite3';
+import * as sqliteVec from 'sqlite-vec';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { buildSchema } from '../../../src/rag/schema.js';
+
+describe('buildSchema', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    sqliteVec.load(db);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('creates docs / docs_fts / docs_vec / meta tables in sqlite_master', () => {
+    buildSchema(db);
+    const names = db
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type IN ('table','view')",
+      )
+      .all()
+      .map((r) => r.name);
+    expect(names).toEqual(expect.arrayContaining(['docs', 'docs_fts', 'docs_vec', 'meta']));
+  });
+
+  it('enables WAL journal mode on a file-backed DB (:memory: ignores WAL by design)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rag-schema-'));
+    const filePath = join(dir, 'schema.db');
+    const fileDb = new Database(filePath);
+    sqliteVec.load(fileDb);
+    try {
+      buildSchema(fileDb);
+      const mode = fileDb.pragma('journal_mode', { simple: true });
+      expect(mode).toBe('wal');
+    } finally {
+      fileDb.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('writes embedding_dim=1024 by default and respects an override', () => {
+    buildSchema(db);
+    const defaultDim = db
+      .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')
+      .get('embedding_dim');
+    expect(defaultDim?.value).toBe('1024');
+
+    const db2 = new Database(':memory:');
+    sqliteVec.load(db2);
+    buildSchema(db2, { embeddingDim: 768 });
+    const customDim = db2
+      .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')
+      .get('embedding_dim');
+    expect(customDim?.value).toBe('768');
+    db2.close();
+  });
+
+  it('is idempotent — two consecutive calls do not throw', () => {
+    expect(() => {
+      buildSchema(db);
+      buildSchema(db);
+    }).not.toThrow();
+  });
+
+  it('preserves the existing index_version on a second call (avoids Story 2.6 cache drift)', () => {
+    buildSchema(db, { indexVersion: 'first-version' });
+    const first = db
+      .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')
+      .get('index_version');
+    expect(first?.value).toBe('first-version');
+
+    buildSchema(db, { indexVersion: 'second-version' });
+    const second = db
+      .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')
+      .get('index_version');
+    expect(second?.value).toBe('first-version');
+  });
+});
