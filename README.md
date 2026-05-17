@@ -191,6 +191,61 @@ Invariants you can rely on:
 
 See the umbrella roadmap in the repo root [`README.md`](../../README.md) for cross-package status.
 
+## RAG primitives (Story 2.1+)
+
+The first slice of the Chinese RAG pipeline lands as pure primitives — PDF
+text extraction and Markdown-aware chunking. They are the data-shape source
+of truth (`Chunk` / `ChunkOptions` / `ParsePdfResult` / `PdfPage`) consumed
+by every subsequent indexing / retrieval layer. The higher-level
+`ChineseRagPipeline` (jieba + FTS5 + sqlite-vec + RRF + reranker) lands in
+Stories 2.2 → 2.6.
+
+### `parsePdf` — PDF → per-page text (unpdf-based)
+
+```ts
+import { parsePdf } from '@yiong/mcp-chinese-rag-toolkit';
+
+const { totalPages, pages } = await parsePdf('hr.pdf');
+//                                            ^ string path | Uint8Array | ArrayBuffer
+console.log(pages[0]?.pageNumber); // 1 — 1-indexed, matches Citation.page
+console.log(pages[0]?.text);
+```
+
+`parsePdf` does NOT swallow underlying errors (corrupt PDF, missing file,
+encrypted input). Callers wrap them into MCP envelopes via `errors.create`
+when needed.
+
+### `chunk` — Markdown hierarchical chunker
+
+```ts
+import { chunk } from '@yiong/mcp-chinese-rag-toolkit';
+
+const chunks = await chunk(markdownText, {
+  chunkSize: 1000,        // characters; default 1000, range [100, 4000]
+  chunkOverlap: 200,      // characters; default 200, range [0, chunkSize)
+  source: 'handbook.md',
+});
+
+chunks[0]?.section; // e.g. "第一章 入职流程 > 1.1 试用期" — H1..H4 path
+```
+
+Markdown headings up to four levels are tracked into `chunk.section`
+(joined by ` > `). Chunks never span across a heading boundary; pure
+text input leaves `section` undefined.
+
+### `chunkPdfPages` — PDF → `Chunk[]` end-to-end
+
+```ts
+import { parsePdf, chunkPdfPages } from '@yiong/mcp-chinese-rag-toolkit';
+
+const { pages } = await parsePdf('hr.pdf');
+const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
+// every chunk carries source + page; blank pages are skipped.
+```
+
+Indexing (jieba tokenizer + FTS5 + `bge-large-zh-v1.5` embedder + `vec0`)
+arrives in Story 2.2; hybrid search and reranking follow in Stories 2.4–2.5.
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).

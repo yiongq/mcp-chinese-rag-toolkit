@@ -6,6 +6,8 @@ export const TOOLKIT_NAME = 'mcp-chinese-rag-toolkit' as const;
 
 export type ToolkitName = typeof TOOLKIT_NAME;
 
+export type { Chunk, ChunkOptions, ParsePdfResult, PdfPage } from './rag/index.js';
+export { chunk, chunkPdfPages, parsePdf } from './rag/index.js';
 export type {
   McpServerConfig,
   McpServerHandle,
