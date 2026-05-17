@@ -17,6 +17,8 @@ import type {
 /** Default top-K — mirrors Story 2.4 hybrid RRF (top-30 each side before fusion). */
 const DEFAULT_TOP_K = 30;
 
+const REQUIRED_TABLES = ['docs', 'docs_fts', 'docs_vec', 'meta'] as const;
+
 interface DocRow {
   docId: number;
   content: string;
@@ -50,7 +52,61 @@ function readEmbeddingDim(db: Database.Database): number {
       'Missing meta.embedding_dim — the .db file was not initialized via buildSchema(); call openIndex() with readonly=false at least once before opening read-only.',
     );
   }
-  return Number(row.value);
+  const dim = Number(row.value);
+  if (!Number.isInteger(dim) || dim < 1) {
+    throw new Error(`Corrupted meta.embedding_dim: expected positive integer, got "${row.value}"`);
+  }
+  return dim;
+}
+
+function assertSchemaPresent(db: Database.Database): void {
+  const present = new Set(
+    db
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type IN ('table','view')",
+      )
+      .all()
+      .map((r) => r.name),
+  );
+  const missing = REQUIRED_TABLES.filter((t) => !present.has(t));
+  if (missing.length > 0) {
+    throw new Error(
+      `RAG index schema incomplete: missing table(s) ${missing.join(', ')}. ` +
+        'Open the .db file once in writable mode (openIndex without readonly) to initialize the schema.',
+    );
+  }
+}
+
+function assertPositiveIntegerTopK(topK: number): void {
+  if (!Number.isInteger(topK) || topK < 1) {
+    throw new Error(`Invalid topK: expected positive integer, got ${String(topK)}`);
+  }
+}
+
+function assertEmbeddingShape(value: Float32Array, expectedDim: number, context: string): void {
+  if (!(value instanceof Float32Array) || value.length !== expectedDim) {
+    const actualLen = value instanceof Float32Array ? value.length : 'non-Float32Array';
+    throw new Error(
+      `Embedding dimension mismatch${context}: expected Float32Array length ${expectedDim}, got ${actualLen}`,
+    );
+  }
+  // sqlite-vec 0.1.x reads the entire backing buffer when binding a typed-array
+  // BLOB; subviews (byteOffset != 0 or shorter than the buffer) corrupt the
+  // payload. Reject the misuse explicitly rather than letting it become a
+  // silent data bug at query time.
+  if (value.byteOffset !== 0 || value.byteLength !== value.buffer.byteLength) {
+    throw new Error(
+      `Embedding must own its underlying buffer${context}: copy via \`new Float32Array(view)\` before passing.`,
+    );
+  }
+  for (let i = 0; i < value.length; i += 1) {
+    const n = value[i];
+    if (n === undefined || !Number.isFinite(n)) {
+      throw new Error(
+        `Embedding contains non-finite value at index ${i}${context}: ${String(n)} — check the embedder output.`,
+      );
+    }
+  }
 }
 
 /**
@@ -60,21 +116,33 @@ function readEmbeddingDim(db: Database.Database): number {
  *
  * Pass `':memory:'` for an ephemeral in-process database — useful for tests
  * and for the Story 2.5 latency-harness.
+ *
+ * Throws (and closes the underlying connection) when:
+ * - the file path is unreachable or extension load fails;
+ * - `readonly: true` is passed against a file whose schema is incomplete;
+ * - `embeddingDim` disagrees with the dimension persisted in a pre-existing index.
  */
 export function openIndex(filePath: string, opts: OpenIndexOptions = {}): IndexHandle {
   const readonly = opts.readonly ?? false;
   const db = new Database(filePath, readonly ? { readonly: true } : {});
-  sqliteVec.load(db);
+  try {
+    sqliteVec.load(db);
 
-  if (!readonly) {
-    const schemaOpts: SchemaOptions = {};
-    if (opts.embeddingDim !== undefined) schemaOpts.embeddingDim = opts.embeddingDim;
-    if (opts.indexVersion !== undefined) schemaOpts.indexVersion = opts.indexVersion;
-    buildSchema(db, schemaOpts);
+    if (!readonly) {
+      const schemaOpts: SchemaOptions = {};
+      if (opts.embeddingDim !== undefined) schemaOpts.embeddingDim = opts.embeddingDim;
+      if (opts.indexVersion !== undefined) schemaOpts.indexVersion = opts.indexVersion;
+      buildSchema(db, schemaOpts);
+    } else {
+      assertSchemaPresent(db);
+    }
+
+    const embeddingDim = readEmbeddingDim(db);
+    return makeHandle(db, embeddingDim);
+  } catch (err) {
+    if (db.open) db.close();
+    throw err;
   }
-
-  const embeddingDim = readEmbeddingDim(db);
-  return makeHandle(db, embeddingDim);
 }
 
 function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
@@ -95,16 +163,19 @@ function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
   const insertBatch = db.transaction((rows: ChunkRow[]): void => {
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
-      if (row === undefined) continue;
+      if (row === undefined) {
+        throw new Error(`indexChunks rows[${i}] is undefined — sparse arrays are not supported.`);
+      }
       const { chunk, embedding } = row;
-      if (!(embedding instanceof Float32Array) || embedding.length !== embeddingDim) {
-        const actualLen = embedding instanceof Float32Array ? embedding.length : 'non-Float32Array';
+      if (chunk.content.length === 0) {
         throw new Error(
-          `Embedding dimension mismatch at row ${i} (source=${chunk.source ?? '<none>'}, page=${
-            chunk.page ?? '<none>'
-          }): expected Float32Array length ${embeddingDim}, got ${actualLen}`,
+          `indexChunks rows[${i}] has empty chunk.content — FTS5 would index an unreachable row.`,
         );
       }
+      const ctx = ` at row ${i} (source=${chunk.source ?? '<none>'}, page=${
+        chunk.page ?? '<none>'
+      })`;
+      assertEmbeddingShape(embedding, embeddingDim, ctx);
       const result = insertDocs.run(
         chunk.content,
         chunk.source ?? null,
@@ -152,6 +223,9 @@ function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
 
   return {
     indexChunks(rows: ChunkRow[]): IndexStats {
+      if (rows.length === 0) {
+        return { inserted: 0, durationMs: 0 };
+      }
       const start = Date.now();
       insertBatch(rows);
       return { inserted: rows.length, durationMs: Date.now() - start };
@@ -159,13 +233,14 @@ function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
 
     ftsSearch(query: string, opts: SearchOptions = {}): FtsHit[] {
       if (query.length === 0) return [];
+      const topK = opts.topK ?? DEFAULT_TOP_K;
+      assertPositiveIntegerTopK(topK);
       const tokenized = tokenize(query);
       if (tokenized.length === 0) return [];
       // FTS5 phrase mode — escape embedded quotes by doubling, then wrap.
       // This lets the SQL `MATCH` parser treat the entire tokenized string
       // as a phrase, side-stepping FTS5 operator characters like `*` `(` `)`.
       const matchExpr = `"${tokenized.replace(/"/g, '""')}"`;
-      const topK = opts.topK ?? DEFAULT_TOP_K;
       const rows = ftsStmt.all(matchExpr, topK);
       return rows.map((row, i) => ({
         docId: row.docId,
@@ -176,14 +251,9 @@ function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
     },
 
     vecSearch(queryEmbedding: Float32Array, opts: SearchOptions = {}): VecHit[] {
-      if (!(queryEmbedding instanceof Float32Array) || queryEmbedding.length !== embeddingDim) {
-        const actualLen =
-          queryEmbedding instanceof Float32Array ? queryEmbedding.length : 'non-Float32Array';
-        throw new Error(
-          `Embedding dimension mismatch: expected Float32Array length ${embeddingDim}, got ${actualLen}`,
-        );
-      }
+      assertEmbeddingShape(queryEmbedding, embeddingDim, '');
       const topK = opts.topK ?? DEFAULT_TOP_K;
+      assertPositiveIntegerTopK(topK);
       const rows = vecStmt.all(queryEmbedding, topK);
       return rows.map((row) => ({
         docId: row.docId,

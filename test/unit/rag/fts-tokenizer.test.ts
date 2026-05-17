@@ -48,4 +48,23 @@ describe('fts-tokenizer (jieba pre-tokenize)', () => {
     // Trimmed Chinese tokens still present.
     expect(/试用期/.test(result)).toBe(true);
   });
+
+  it('strips NUL bytes and ASCII control characters before tokenizing', () => {
+    const dirty = '试\u0000用\u0001期\u001F管\u007F理';
+    const result = tokenize(dirty);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: assertion validates the sanitizer
+    expect(result).not.toMatch(/[\u0000-\u001F\u007F]/);
+    expect(/试|用|期|管|理/.test(result)).toBe(true);
+  });
+
+  it('returns empty string when input is only control characters', () => {
+    expect(tokenize('\u0000\u0001\u0002\u007F')).toBe('');
+  });
+
+  it('drops punctuation-only tokens so phrase queries stay valid', () => {
+    // Both ASCII and full-width Chinese punctuation should be filtered out.
+    const result = tokenize('请假*流程。。。差旅，报销');
+    expect(result).not.toMatch(/[*。，]/);
+    expect(/请假|流程|差旅|报销/.test(result)).toBe(true);
+  });
 });

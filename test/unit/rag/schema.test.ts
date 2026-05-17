@@ -83,4 +83,51 @@ describe('buildSchema', () => {
       .get('index_version');
     expect(second?.value).toBe('first-version');
   });
+
+  it('rejects invalid embeddingDim values fail-fast', () => {
+    for (const bad of [0, -1, 1.5, Number.NaN, 100_000]) {
+      expect(() => {
+        const fresh = new Database(':memory:');
+        sqliteVec.load(fresh);
+        try {
+          buildSchema(fresh, { embeddingDim: bad });
+        } finally {
+          fresh.close();
+        }
+      }).toThrow(/Invalid embeddingDim/);
+    }
+  });
+
+  it('throws when reopening with a different embeddingDim (docs_vec is DDL-locked)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rag-schema-dim-'));
+    const filePath = join(dir, 'dim.db');
+    const first = new Database(filePath);
+    sqliteVec.load(first);
+    try {
+      buildSchema(first, { embeddingDim: 1024 });
+      first.close();
+
+      const second = new Database(filePath);
+      sqliteVec.load(second);
+      try {
+        expect(() => buildSchema(second, { embeddingDim: 768 })).toThrow(/embeddingDim mismatch/);
+      } finally {
+        second.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('writes empty-string placeholders for embedding_model and tokenizer_version', () => {
+    buildSchema(db);
+    const rows = db
+      .prepare<[], { key: string; value: string }>(
+        "SELECT key, value FROM meta WHERE key IN ('embedding_model', 'tokenizer_version')",
+      )
+      .all();
+    const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    expect(byKey.embedding_model).toBe('');
+    expect(byKey.tokenizer_version).toBe('');
+  });
 });

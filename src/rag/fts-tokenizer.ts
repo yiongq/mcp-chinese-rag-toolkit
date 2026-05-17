@@ -11,6 +11,18 @@ import { dict } from '@node-rs/jieba/dict';
  */
 const jieba = Jieba.withDict(dict);
 
+// Control characters and NUL bytes break FTS5's MATCH parser (and would leak
+// through phrase quoting). Strip them at the entry boundary instead of trying
+// to escape downstream. Stripping control chars is the whole point of this
+// regex — `noControlCharactersInRegex` does not apply here.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional sanitizer
+const CONTROL_CHAR_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+// A token consisting entirely of punctuation / symbols / whitespace contributes
+// noise to FTS5 phrase queries (jieba occasionally emits these for delimiters
+// like "。", "?", "*"). They never participate in meaningful BM25 ranking.
+const PUNCTUATION_ONLY_RE = /^[\s\p{P}\p{S}]+$/u;
+
 /**
  * Tokenizes Chinese (or mixed CJK + Latin) input into a space-joined token
  * string suitable for FTS5's default `unicode61` tokenizer. The output is
@@ -22,8 +34,11 @@ const jieba = Jieba.withDict(dict);
  * - `cut(text, false)` disables HMM unknown-word discovery for **deterministic**
  *   indexing output (HMM bias is useful for OOV recall in query expansion,
  *   not for stable BM25 ranking).
- * - Whitespace-only tokens are stripped — jieba occasionally emits them and
- *   they would otherwise corrupt FTS5 phrase queries.
+ * - NUL bytes and ASCII control characters are stripped before tokenizing —
+ *   FTS5 / better-sqlite3 binding behaviour around `\0` is platform-dependent
+ *   and easier to neutralize upstream.
+ * - Whitespace-only and punctuation-only tokens are dropped so phrase queries
+ *   built from the output never degenerate into FTS5 parse errors.
  * - No Latin lowercase / diacritic folding: FTS5's `unicode61 remove_diacritics 1`
  *   already handles those at index/query time.
  * - No stopword filter — FTS5 BM25 IDF downweights frequent terms automatically;
@@ -33,6 +48,10 @@ export function tokenize(text: string): string {
   if (text.length === 0) {
     return '';
   }
-  const tokens = jieba.cut(text, false);
-  return tokens.filter((t) => t.trim().length > 0).join(' ');
+  const sanitized = text.replace(CONTROL_CHAR_RE, '');
+  if (sanitized.length === 0) {
+    return '';
+  }
+  const tokens = jieba.cut(sanitized, false);
+  return tokens.filter((t) => t.trim().length > 0 && !PUNCTUATION_ONLY_RE.test(t)).join(' ');
 }
