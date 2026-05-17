@@ -541,3 +541,79 @@ export interface HarnessResult {
   /** Raw per-call latency array (warm runs only) — for histograms / debug. */
   samples: number[];
 }
+
+// ---------------------------------------------------------------------------
+// Story 2.6 — L0 Tool-Result LRU Cache + Contextual Retrieval types
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for `withLruCache`. `indexVersion` is REQUIRED — it is the
+ * primary cache-invalidation signal (changes when the underlying SQLite
+ * index is rebuilt; see Story 2.2 §schema invariants and
+ * `IndexHandle.getIndexVersion()`).
+ *
+ * Omitting `cache` on the parent factory (`createMcpServer`) is equivalent
+ * to `enabled: false`; setting `enabled: false` explicitly is the supported
+ * way to *force* cache off when an `indexVersion` is otherwise available
+ * (unit tests / experiments / Phase 2 hot-reload diagnostics).
+ */
+export interface CacheOptions {
+  /** Maximum entries per server. @default 500 (architecture §缓存策略 L628) */
+  max?: number;
+  /** TTL in ms. @default 60 * 60 * 1000 (1h, FR16) */
+  ttlMs?: number;
+  /** REQUIRED — typically `IndexHandle.getIndexVersion()` at startup time. */
+  indexVersion: string;
+  /** Set false in unit tests / experiments. @default true */
+  enabled?: boolean;
+}
+
+/** Status injected at `structuredContent._meta.cache` on every cached
+ *  tool result — `'hit'` when served from cache, `'miss'` when freshly
+ *  computed. The field is ALWAYS present after passing through
+ *  `withLruCache`, so callers (eval / OTel / Inspector) can rely on a
+ *  binary contract instead of a tri-state truthy / missing check. */
+export type CacheStatus = 'hit' | 'miss';
+
+/** Dependencies bound by `withLruCache` (kept for the alternative
+ *  ergonomic factory shape — not consumed by `createMcpServer` directly;
+ *  see Story 2.6 AC3 §design rationale). */
+export interface WithLruCacheDeps {
+  toolName: string;
+  options: CacheOptions;
+}
+
+/** Options for `generateChunkContext` (Story 2.6 Contextual Retrieval,
+ *  FR15). Provider injection only — toolkit does NOT bind to a specific
+ *  LLM SDK; see Story 2.6 AC5 §design rationale. */
+export interface ContextualRetrievalOptions {
+  /** Source document the chunk was sliced from. Sent ONCE per indexing
+   *  batch with `cache_control: ephemeral`; subsequent chunks reuse the
+   *  cached prefix → ≤ 50% token cost vs uncached (FR15). */
+  fullDocument: string;
+  /** Target prefix length range (characters). @default { min: 50, max: 100 } */
+  prefixLength?: { min: number; max: number };
+  /** Cache key passed to provider for cache_control identity (e.g. doc
+   *  sha256). Default `'default'`. */
+  cacheKey?: string;
+}
+
+/** Provider abstraction injected into `generateChunkContext`. Mirrors
+ *  Anthropic / OpenAI / 豆包 chat completion shape so callers can plug in
+ *  any provider that supports prompt caching (Anthropic Phase 1 target;
+ *  others Phase 2 via provider adapter). The toolkit deliberately does
+ *  NOT depend on `@anthropic-ai/sdk` — caller-side wiring keeps bundle
+ *  size minimal and avoids locking consumers into a single vendor. */
+export interface LlmProvider {
+  /** Generate prefix text given a (system, user) message pair where the
+   *  system block carries `cache_control: { type: 'ephemeral' }` for the
+   *  full document. `cacheKey` is the stable identity used by callers to
+   *  group requests under the same cache_control entry (typically the
+   *  source document's sha256). */
+  generateChunkPrefix(args: {
+    fullDocument: string;
+    chunkContent: string;
+    cacheKey: string;
+    prefixLength: { min: number; max: number };
+  }): Promise<string>;
+}

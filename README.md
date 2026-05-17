@@ -580,11 +580,204 @@ Cross-platform baselines are NOT comparable (CI Linux x64 vs local
 macOS arm64 will skip the numeric diff and print `⚠️ env drift`
 instead).
 
-Story 2.6 will wrap the full `hybrid + rerank` pipeline in an LRU
-cache (`withLruCache`); cache hits will collapse the entire reranker
+Story 2.6 wraps the full `hybrid + rerank` pipeline in an LRU
+cache (`withLruCache`); cache hits collapse the entire reranker
 forward pass + hybrid query to a single dict lookup, knocking p50 down
-to ~0ms for warm queries. Story 2.7 then layers the eval framework on
-top to enforce `Hit Rate@5 ≥ 90%` as a CI gate.
+to ~0ms for warm queries. See §L0 Tool-Result Cache below. Story 2.7
+then layers the eval framework on top to enforce `Hit Rate@5 ≥ 90%` as
+a CI gate.
+
+## L0 Tool-Result Cache (Story 2.6+)
+
+`withLruCache(toolName, handler, opts)` wraps an MCP tool handler with a
+per-server in-memory LRU. The cache is **L0** — the *whole*
+`CallToolResult` envelope is keyed by `(toolName, indexVersion,
+canonicalize(args))`, so cache hits collapse the entire RAG pipeline
+(hybrid query + rerank + zod parse + JSON-RPC encode) to a single map
+lookup (~1µs path; tests assert end-to-end `< 5ms` over the in-process
+transport pair). One cache, one layer — MVP deliberately skips L1+
+(query-embedding cache, candidate-chunk cache, rerank-score cache);
+benchmark first, layer second.
+
+### Manual wrapping
+
+```ts
+import { withLruCache } from '@yiong/mcp-chinese-rag-toolkit';
+
+const cachedSearch = withLruCache('search_hr_docs', rawSearchHandler, {
+  indexVersion: handle.getIndexVersion(),
+  max: 500,                  // default 500
+  ttlMs: 60 * 60 * 1000,     // default 1 hour
+});
+```
+
+### One-line wiring via `createMcpServer`
+
+```ts
+import {
+  createMcpServer,
+  loadEmbedder,
+  loadReranker,
+  openIndex,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+const handle = openIndex('./data/hr-index.db', { readonly: true });
+
+const server = createMcpServer({
+  name: 'mcp-hr',
+  version: '0.1.0',
+  tools: [searchHrDocs],
+  cache: { indexVersion: handle.getIndexVersion() }, // 500 entries / 1h TTL defaults
+});
+
+await server.start();
+```
+
+Omit `cache` (or pass `cache: { enabled: false, indexVersion: '…' }`) to
+disable. Passing `cache: {}` without an `indexVersion` emits a single
+`console.warn` and falls back to cache-off (Epic 1 walking-skeleton
+parity).
+
+### Cache-bypass conditions
+
+| Trigger | Behaviour |
+|---|---|
+| `result.isError === true` | Never written (re-running may succeed; would lock user out of recovery) |
+| `result.structuredContent.confidence === 'low'` | Never written (dynamic state — eval threshold tuning, fixture churn) |
+| `args.env` present and `!== 'dev'` (e.g. `'prod'` / `'test'`) | Never written (mutate-style hints; caller explicit opt-out) |
+| `args.env === 'dev'` or missing | Normal cache behaviour |
+
+`NON_CACHEABLE_ARGS = new Set<string>(['env'])` is the **blacklist**;
+future additions (`'dryRun'`, `'force'`, …) APPEND ONLY to keep the
+contract stable.
+
+### `_meta.cache` field
+
+Every result that passes through `withLruCache` has
+`structuredContent._meta.cache: 'hit' | 'miss'` injected on the read
+path. Always present (not conditionally written) so eval / OTel /
+Inspector can rely on a binary contract instead of a truthy-or-missing
+check. The `_meta` namespace (underscore prefix) avoids collision with
+business fields.
+
+### Cache invalidation paths
+
+| Trigger | Behaviour |
+|---|---|
+| Rebuild index (`rm db && openIndex({ indexVersion: 'v2-…' })`) | New `indexVersion` produces new SHA-256 keys; old entries become unreachable + age out via TTL |
+| MCP server process restart (stdio per-session) | In-memory LRU disappears with the process |
+| Per-entry TTL expiry (1 h default) | `lru-cache@^11` lazy eviction on next get |
+| LRU capacity limit (500 default) | Built-in least-recently-used eviction |
+| Explicit `cache.clear()` admin tool | **Not supported** — Phase 2 design pass alongside OTel |
+
+### Anti-patterns (architecture L636-640)
+
+- ❌ Persisting the cache to SQLite — invalidation complexity ≫ benefit
+- ❌ Semantic-similarity hit ("请假怎么申请" ≡ "如何请假") — embeddings are
+  not free + drift across model versions
+- ❌ Stacking L1+ caches without benchmark data — MVP keeps one layer
+- ❌ Caching `isError` envelopes — would freeze recovery for the user
+- ❌ HTTP transport caching: the current `connectStreamableHttp`
+  rebuilds the server per request → cache is effectively no-op on HTTP.
+  **stdio path is fully effective**; Epic 4 Story 4.6 re-evaluates if
+  HTTP consumers report 100% miss rate.
+
+## Contextual Retrieval (Story 2.6+)
+
+FR15 wires Anthropic's [Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
+(2024-09 release; ~35% Hit Rate improvement reported when combined
+with BM25 + Reranker) into the toolkit's indexing path. The full
+source document is sent once with `cache_control: { type: 'ephemeral'
+}`; subsequent chunks reuse the cached prefix so token cost stays
+≤ 50% vs uncached (FR15 contract).
+
+### Generate prefixes during indexing
+
+```ts
+import {
+  generateChunkContext,
+  stitchPrefixedChunk,
+  type LlmProvider,
+} from '@yiong/mcp-chinese-rag-toolkit';
+
+// Caller-side: instantiate the SDK; toolkit deliberately does NOT
+// depend on @anthropic-ai/sdk so callers stay free to swap providers.
+// import Anthropic from '@anthropic-ai/sdk';
+// const client = new Anthropic();
+//
+// const anthropicProvider: LlmProvider = {
+//   async generateChunkPrefix({ fullDocument, chunkContent, cacheKey, prefixLength }) {
+//     const message = await client.messages.create({
+//       model: 'claude-haiku-4-5-20251001', // index-time cost-sensitive
+//       max_tokens: prefixLength.max + 20,   // buffer for truncation safety
+//       system: [
+//         {
+//           type: 'text',
+//           text: fullDocument,
+//           cache_control: { type: 'ephemeral', ttl: '1h' }, // ★ cache the doc
+//         },
+//         {
+//           type: 'text',
+//           text: `生成 ${prefixLength.min}-${prefixLength.max} 字的上下文 prefix`,
+//         },
+//       ],
+//       messages: [{ role: 'user', content: `片段：${chunkContent}\n\n直接输出 prefix：` }],
+//     });
+//     const block = message.content[0];
+//     return block.type === 'text' ? block.text : '';
+//   },
+// };
+
+for (const chunk of chunks) {
+  const prefix = await generateChunkContext(
+    chunk,
+    { fullDocument, cacheKey: docSha256 }, // ★ same cacheKey for the whole doc
+    anthropicProvider,
+  );
+  const prefixedChunk = stitchPrefixedChunk(chunk, prefix);
+  await handle.indexChunks([
+    { chunk: prefixedChunk, embedding: await embedder.embed(prefixedChunk.content) },
+  ]);
+}
+```
+
+### `cacheKey` is contract
+
+The caller MUST pass the same `cacheKey` for every chunk of one source
+document — otherwise the provider sees N independent requests and
+charges full token cost on each. Recommended:
+`cacheKey = path.basename(source) + ':' + contentSha256` (stable
+across CI re-runs).
+
+### Where `stitchPrefixedChunk` belongs in the pipeline
+
+```
+parse → chunk → generateChunkContext → stitchPrefixedChunk → embedder.embed → indexChunks
+                                       ▲
+                                       └── BEFORE embed/index so the prefix
+                                           participates in BOTH BM25 tokenization
+                                           AND the dense vector
+```
+
+### mcp-hr / mcp-modeling integration
+
+Epic 4 Story 4.1 `mcp-hr` `build-index.ts` is the first real consumer.
+The toolkit only provides the prompt template + provider abstraction
++ stitching helpers; SDK selection, API key handling, and per-doc
+sha256 computation happen caller-side (architecture §AI Agent 强制规则
+#4 — API keys never enter the toolkit).
+
+### Out of scope for this story
+
+- Real LLM end-to-end token-reduction validation (Epic 4 mcp-hr verifies
+  in real `client.messages.create` `cache_read_input_tokens` /
+  `cache_creation_input_tokens` fields)
+- RAG Hit Rate@K evaluation framework (Story 2.7 owner)
+- Vision-caption plugin for PDFs with images (Story 2.8 owner)
+
+**Next steps:** Story 2.7 layers the eval framework on top to enforce
+`Hit Rate@5 ≥ 90%` as a CI gate; Epic 4 mcp-hr wires this Contextual
+Retrieval + L0 cache pair into a real HR Q&A end-to-end demo.
 
 ## License
 

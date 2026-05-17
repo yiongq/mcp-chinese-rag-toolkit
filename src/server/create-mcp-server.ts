@@ -1,6 +1,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { z } from 'zod';
+import { withLruCache } from '../middleware/with-lru-cache.js';
 import { create as createError } from './errors.js';
 import type { ResourceDefinition } from './resource-provider.js';
 import { connectStdio, type StdioServerHandle } from './stdio.js';
@@ -14,6 +15,33 @@ export interface McpToolDefinition {
   handler: (args: unknown) => Promise<CallToolResult> | CallToolResult;
 }
 
+/**
+ * Story 2.6 — L0 tool-result LRU cache configuration. Supplying
+ * {@link McpServerCacheConfig.indexVersion} enables the cache; omitting
+ * it (or providing only `{}`) prints a single warning and falls back to
+ * cache-disabled behaviour (Epic 1 walking-skeleton parity).
+ *
+ * Per Story 2.6 §架构现实校正 #4: when `transport: 'http'`, the cache
+ * is currently per-request (each `connectStreamableHttp` request
+ * re-builds the server) — effectively a no-op until Epic 4 Story 4.6
+ * re-evaluates. Cache is fully effective on stdio (the mcp-hr /
+ * mcp-modeling default).
+ */
+export interface McpServerCacheConfig {
+  /** @default true when `indexVersion` is provided; false otherwise. */
+  enabled?: boolean;
+  /** @default 500 (architecture §缓存策略 L628). */
+  max?: number;
+  /** @default 60 * 60 * 1000 (1h, FR16). */
+  ttlMs?: number;
+  /**
+   * REQUIRED to enable cache. Typically `IndexHandle.getIndexVersion()`
+   * read at startup time so the value is stable for the server's
+   * lifetime (re-reading per call wastes 50-100µs × calls/sec).
+   */
+  indexVersion?: string;
+}
+
 export interface McpServerConfig {
   name: string;
   version: string;
@@ -25,6 +53,12 @@ export interface McpServerConfig {
   host?: string;
   /** Forwarded to stdio transport when applicable. Default true. */
   handleSignals?: boolean;
+  /**
+   * Story 2.6 — L0 tool-result LRU cache. Omit (or pass `{}` without
+   * `indexVersion`) to disable. Disabled by default to preserve Epic 1
+   * walking-skeleton behaviour for callers that haven't opted in.
+   */
+  cache?: McpServerCacheConfig;
 }
 
 export interface McpServerHandle {
@@ -108,7 +142,40 @@ function buildServer(config: McpServerConfig): McpServer {
   // when tool-builder helpers add server-side elicitation issuing logic.
   const server = new McpServer({ name: config.name, version: config.version });
 
+  // Story 2.6 — resolve L0 cache eligibility at build time. `cache: {}` with
+  // missing `indexVersion` warns once + disables; explicit `enabled: false`
+  // also disables (without warning). Either way the per-tool handler below
+  // chooses cache-wrap vs raw-handler statically — no per-call branching.
+  const rawCacheConfig = config.cache;
+  const explicitlyDisabled = rawCacheConfig?.enabled === false;
+  const indexVersion = rawCacheConfig?.indexVersion;
+  const cacheEnabled =
+    rawCacheConfig !== undefined &&
+    !explicitlyDisabled &&
+    typeof indexVersion === 'string' &&
+    indexVersion.length > 0;
+  if (rawCacheConfig !== undefined && !explicitlyDisabled && !cacheEnabled) {
+    console.warn('createMcpServer: cache.indexVersion not provided, cache disabled');
+  }
+
   for (const tool of config.tools ?? []) {
+    // Cache wraps the INNER handler so isError envelopes from `wrapHandler`'s
+    // fallback path can never re-enter cache via the read side (the wrap
+    // order is "cache inside, wrapHandler outside" — see Story 2.6 §wrap
+    // order). Throws from `tool.handler` propagate up through `withLruCache`
+    // unchanged and are converted to INTERNAL_ERROR by `wrapHandler`; the
+    // resulting isError envelope is rejected by `shouldSkipWrite` on the
+    // miss path so error state never sticks.
+    const innerHandler = cacheEnabled
+      ? withLruCache(tool.name, tool.handler, {
+          // biome-ignore lint/style/noNonNullAssertion: cacheEnabled guard above asserts indexVersion is a non-empty string.
+          indexVersion: indexVersion!,
+          max: rawCacheConfig?.max ?? 500,
+          ttlMs: rawCacheConfig?.ttlMs ?? 60 * 60 * 1000,
+          enabled: true,
+        })
+      : tool.handler;
+
     server.registerTool(
       tool.name,
       {
@@ -117,7 +184,7 @@ function buildServer(config: McpServerConfig): McpServer {
         // Cast required because SDK's union type isn't directly inferable from z.ZodTypeAny.
         inputSchema: tool.inputSchema as never,
       },
-      wrapHandler(tool) as never,
+      wrapHandler({ ...tool, handler: innerHandler }) as never,
     );
   }
 

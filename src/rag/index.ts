@@ -1,4 +1,10 @@
 export { chunk, chunkPdfPages } from './chunking.js';
+export {
+  DEFAULT_PREFIX_LENGTH,
+  generateChunkContext,
+  renderChunkContextPrompt,
+  stitchPrefixedChunk,
+} from './contextual-retrieval.js';
 export { loadEmbedder, writeEmbedderMeta } from './embedder.js';
 export { tokenize } from './fts-tokenizer.js';
 export { createHybridSearch } from './hybrid-search.js';
@@ -19,9 +25,12 @@ export { buildSchema } from './schema.js';
 export { openIndex } from './sqlite-store.js';
 export { JIEBA_VERSION, writeTokenizerMeta } from './tokenizer-meta.js';
 export type {
+  CacheOptions,
+  CacheStatus,
   Chunk,
   ChunkOptions,
   ChunkRow,
+  ContextualRetrievalOptions,
   Embedder,
   EmbedderOptions,
   FtsHit,
@@ -35,6 +44,7 @@ export type {
   IndexStats,
   LatencyHarnessOptions,
   LatencySnapshot,
+  LlmProvider,
   ManifestEntry,
   ModelManifest,
   OpenIndexOptions,
@@ -52,4 +62,5 @@ export type {
   SchemaOptions,
   SearchOptions,
   VecHit,
+  WithLruCacheDeps,
 } from './types.js';

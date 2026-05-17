@@ -6,10 +6,22 @@ export const TOOLKIT_NAME = 'mcp-chinese-rag-toolkit' as const;
 
 export type ToolkitName = typeof TOOLKIT_NAME;
 
+export type { ToolHandler } from './middleware/with-lru-cache.js';
+export {
+  canonicalize,
+  computeCacheKey,
+  injectCacheMeta,
+  NON_CACHEABLE_ARGS,
+  shouldSkipWrite,
+  withLruCache,
+} from './middleware/with-lru-cache.js';
 export type {
+  CacheOptions,
+  CacheStatus,
   Chunk,
   ChunkOptions,
   ChunkRow,
+  ContextualRetrievalOptions,
   Embedder,
   EmbedderOptions,
   FtsHit,
@@ -23,6 +35,7 @@ export type {
   IndexStats,
   LatencyHarnessOptions,
   LatencySnapshot,
+  LlmProvider,
   ManifestEntry,
   ModelManifest,
   OpenIndexOptions,
@@ -40,6 +53,7 @@ export type {
   SchemaOptions,
   SearchOptions,
   VecHit,
+  WithLruCacheDeps,
 } from './rag/index.js';
 export {
   BGE_LARGE_ZH_V1_5_MANIFEST,
@@ -50,6 +64,8 @@ export {
   configureTransformersEnv,
   createHybridSearch,
   createReranker,
+  DEFAULT_PREFIX_LENGTH,
+  generateChunkContext,
   JIEBA_VERSION,
   loadEmbedder,
   loadReranker,
@@ -58,9 +74,11 @@ export {
   openIndex,
   parsePdf,
   percentile,
+  renderChunkContextPrompt,
   resolveCacheDir,
   rrfFuse,
   runStdioLatencyHarness,
+  stitchPrefixedChunk,
   tokenize,
   verifyModelFiles,
   writeEmbedderMeta,
@@ -68,6 +86,7 @@ export {
   writeTokenizerMeta,
 } from './rag/index.js';
 export type {
+  McpServerCacheConfig,
   McpServerConfig,
   McpServerHandle,
   McpToolDefinition,
