@@ -943,6 +943,91 @@ still a first-class citizen.
 for PDFs with image-heavy pages; Story 2.9 ships the `create-mcp-rag` CLI that
 scaffolds a new MCP RAG package wired into this eval framework out of the box.
 
+## Vision Caption Plugin (FR20 / ADR-0008)
+
+Index PDF images as Chinese caption chunks via a caller-injected vision LLM.
+Runtime retrieval is unchanged — caption chunks live in the same
+`docs / docs_fts / docs_vec` tables as text chunks and flow through the
+unchanged hybrid + rerank pipeline.
+
+### Status
+
+Opt-in. **Default off.** The existing `rag-eval` CI gate (Hit Rate@5 ≥ 90 %) is
+unaffected because the 12-query toolkit self-eval never invokes the plugin.
+
+### Install
+
+```sh
+# Required peer (PNG encoding backend; ~30 MB native binary).
+pnpm add @napi-rs/canvas
+
+# Required: a vision LLM SDK + adapter (Anthropic Claude Haiku shown;
+# copy templates/anthropic-vision-provider.ts and fill in your key).
+pnpm add @anthropic-ai/sdk
+```
+
+The toolkit declares `@napi-rs/canvas` under `peerDependenciesMeta.optional`
+so consumers of pure-text PDF pipelines never pay the native binary cost.
+`withVisionCaption()` fails fast at factory time with an actionable
+`OptionalDependencyMissingError` if the peer is missing.
+
+### Quickstart
+
+```ts
+import { readFile } from 'node:fs/promises';
+import {
+  chunkPdfPages,
+  parsePdf,
+  withVisionCaption,
+} from '@yiong/mcp-chinese-rag-toolkit';
+import { createAnthropicVisionProvider } from './anthropic-vision-provider'; // your copy
+
+const pdfBytes = await readFile('./hr.pdf');
+const { pages } = await parsePdf(pdfBytes);
+const textChunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
+
+const plugin = withVisionCaption({
+  provider: createAnthropicVisionProvider({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+  }),
+  maxConcurrency: 3,
+});
+const captionChunks = await plugin.enrichPdf!(pages, {
+  source: 'hr.pdf',
+  pdfBytes,
+});
+
+const allChunks = [...textChunks, ...captionChunks];
+// ... continue to embedder + indexChunks as usual
+```
+
+### Cache
+
+Captions are cached in
+`<userCacheDir>/mcp-chinese-rag-toolkit/caption-cache/captions.db` (SQLite, keyed on
+`imageSha256 + promptSha256 + providerId + modelId`). Re-indexing the same
+PDF with the same prompt + provider + model costs zero LLM tokens.
+
+Delete the directory to force re-captioning (e.g. when switching provider or
+bumping the prompt template).
+
+### Cost & Latency
+
+See ADR-0008 §索引期成本估算 — 50-image PDF @ `maxConcurrency=3`:
+
+- 豆包视觉: ~¥25 / ~3 min
+- Claude Haiku: ~$0.5 / ~2 min
+
+First-time index cost only; subsequent re-indexes / CI re-runs go through the
+cache (zero LLM cost).
+
+### Scope guardrail
+
+This plugin ships zero vendor SDKs. Copy `templates/anthropic-vision-provider.ts`
+and adapt for 豆包 / 千问 VL / OpenAI as needed. The toolkit deliberately keeps
+the SDK choice in caller-land (mirrors Story 2.6 `LlmProvider` provider-injection
++ Story 2.7 `EvalSearchFn`).
+
 ## License
 
 MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).

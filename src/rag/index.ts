@@ -18,6 +18,7 @@ export {
 } from './model-loader.js';
 export { BGE_LARGE_ZH_V1_5_MANIFEST, BGE_RERANKER_V2_M3_MANIFEST } from './model-manifest.js';
 export { parsePdf } from './pdf-parser.js';
+export * from './plugins/index.js';
 export { createReranker, loadReranker } from './reranker.js';
 export { writeRerankerMeta } from './reranker-meta.js';
 export { rrfFuse } from './rrf.js';
