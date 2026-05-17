@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -9,12 +10,12 @@ import { buildSchema } from '../../../src/rag/schema.js';
 import type { ModelManifest } from '../../../src/rag/types.js';
 
 function uniqueTmp(prefix: string): string {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return path.join(tmpdir(), `${prefix}-${id}`);
+  return path.join(tmpdir(), `${prefix}-${randomUUID()}`);
 }
 
 const TINY_MANIFEST: ModelManifest = {
   modelId: 'test-org/tiny-fixture-model',
+  embeddingDim: 4,
   files: [
     {
       relativePath: 'config.json',
@@ -77,13 +78,14 @@ describe('loadEmbedder (stub pipeline)', () => {
       verifyHashes: false,
     });
     expect(embedder.modelId).toBe(TINY_MANIFEST.modelId);
+    // dim is sourced from manifest.embeddingDim at load time, NOT lazily on first embed.
+    expect(embedder.dim).toBe(TINY_MANIFEST.embeddingDim);
     const vec = await embedder.embed('hello');
     expect(vec).toBeInstanceOf(Float32Array);
-    expect(vec.length).toBe(4);
-    expect(embedder.dim).toBe(4);
+    expect(vec.length).toBe(TINY_MANIFEST.embeddingDim);
   });
 
-  it('memoises load() for the same (modelId, cacheDir, dtype) tuple', async () => {
+  it('memoises load() for the same effective options', async () => {
     const { loadEmbedder } = await import('../../../src/rag/embedder.js');
     const cacheDir = uniqueTmp('embedder-stub-singleton');
     const a = await loadEmbedder({
@@ -99,6 +101,33 @@ describe('loadEmbedder (stub pipeline)', () => {
     expect(a).toBe(b);
   });
 
+  it('does NOT share the cache when verifyHashes differs (H9)', async () => {
+    const { loadEmbedder } = await import('../../../src/rag/embedder.js');
+    const cacheDir = uniqueTmp('embedder-stub-keysplit');
+    const noVerify = await loadEmbedder({
+      manifest: TINY_MANIFEST,
+      cacheDir,
+      verifyHashes: false,
+    });
+    // Re-loading with verifyHashes: true would try a real verify against the
+    // tiny fixture (whose sha256 is all zeros) and fail — proving the cache
+    // key correctly distinguished the two configurations.
+    await expect(
+      loadEmbedder({
+        manifest: TINY_MANIFEST,
+        cacheDir,
+        verifyHashes: true,
+      }),
+    ).rejects.toThrow();
+    // The first embedder should still be reachable from the cache.
+    const noVerifyAgain = await loadEmbedder({
+      manifest: TINY_MANIFEST,
+      cacheDir,
+      verifyHashes: false,
+    });
+    expect(noVerifyAgain).toBe(noVerify);
+  });
+
   it('embed("") throws, embedBatch([]) returns []', async () => {
     const { loadEmbedder } = await import('../../../src/rag/embedder.js');
     const cacheDir = uniqueTmp('embedder-stub-edge');
@@ -109,6 +138,31 @@ describe('loadEmbedder (stub pipeline)', () => {
     });
     await expect(embedder.embed('')).rejects.toThrow(/non-empty/);
     await expect(embedder.embedBatch([])).resolves.toEqual([]);
+  });
+
+  it('embedBatch rejects null / non-string elements (M2)', async () => {
+    const { loadEmbedder } = await import('../../../src/rag/embedder.js');
+    const cacheDir = uniqueTmp('embedder-stub-typecheck');
+    const embedder = await loadEmbedder({
+      manifest: TINY_MANIFEST,
+      cacheDir,
+      verifyHashes: false,
+    });
+    await expect(embedder.embedBatch(['ok', null as unknown as string, 'also-ok'])).rejects.toThrow(
+      /must be a string/,
+    );
+  });
+
+  it('embedBatch rejects out-of-range batchSize (M3)', async () => {
+    const { loadEmbedder } = await import('../../../src/rag/embedder.js');
+    const cacheDir = uniqueTmp('embedder-stub-batchcap');
+    const embedder = await loadEmbedder({
+      manifest: TINY_MANIFEST,
+      cacheDir,
+      verifyHashes: false,
+    });
+    await expect(embedder.embedBatch(['a'], { batchSize: 0 })).rejects.toThrow(/batchSize/);
+    await expect(embedder.embedBatch(['a'], { batchSize: 1_000_000 })).rejects.toThrow(/batchSize/);
   });
 
   it('embedBatch shards by batchSize and concatenates results', async () => {
@@ -148,6 +202,38 @@ describe('writeEmbedderMeta', () => {
         .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')
         .get('embedding_model');
       expect(row?.value).toBe(TINY_MANIFEST.modelId);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('refuses to overwrite when a different modelId is already recorded (M7)', async () => {
+    const { loadEmbedder, writeEmbedderMeta, __resetEmbedderCacheForTests } = await import(
+      '../../../src/rag/embedder.js'
+    );
+    const cacheDir = uniqueTmp('embedder-stub-meta-mismatch');
+    const embedderA = await loadEmbedder({
+      manifest: TINY_MANIFEST,
+      cacheDir,
+      verifyHashes: false,
+    });
+
+    const db = new Database(':memory:');
+    sqliteVec.load(db);
+    buildSchema(db, { embeddingDim: 4 });
+    try {
+      writeEmbedderMeta(db, embedderA);
+
+      // Build a second embedder with a different modelId, then attempt to
+      // write — the guard must reject because the db's vec0 schema is locked
+      // to the first model's dim.
+      __resetEmbedderCacheForTests();
+      const embedderB = await loadEmbedder({
+        manifest: { ...TINY_MANIFEST, modelId: 'test-org/different-model' },
+        cacheDir: uniqueTmp('embedder-stub-meta-mismatch-b'),
+        verifyHashes: false,
+      });
+      expect(() => writeEmbedderMeta(db, embedderB)).toThrow(/refusing to overwrite/);
     } finally {
       db.close();
     }

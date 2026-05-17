@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, mkdirSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { lstat, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -57,9 +57,8 @@ const CACHE_SUBPATH = path.join('mcp-chinese-rag-toolkit', 'models');
  */
 export function resolveCacheDir(override?: string): string {
   if (override !== undefined && override !== '') {
-    const abs = path.resolve(override);
-    ensureDirSync(abs);
-    return abs;
+    // Caller owns the override sub-tree — do NOT mkdir (AC2: 直接返回 normalized absolute path，不创建目录).
+    return path.resolve(override);
   }
 
   const xdg = process.env.XDG_CACHE_HOME;
@@ -126,9 +125,14 @@ export async function verifyModelFiles(
     assertSafeRelativePath(entry.relativePath);
     const absPath = path.join(cacheDir, manifest.modelId, entry.relativePath);
 
-    let fileStat: Awaited<ReturnType<typeof stat>>;
+    // lstat (not stat) so symlinks under the cache directory are detected
+    // rather than silently followed — the cache dir is treated as untrusted
+    // input; an attacker (or a buggy migration) replacing a pinned file with
+    // a symlink to an arbitrary system file would otherwise pass verification
+    // while loading bytes from somewhere else entirely.
+    let fileStat: Awaited<ReturnType<typeof lstat>>;
     try {
-      fileStat = await stat(absPath);
+      fileStat = await lstat(absPath);
     } catch (err) {
       if (isErrnoNotFound(err)) {
         if (strict) {
@@ -143,7 +147,29 @@ export async function verifyModelFiles(
       throw err;
     }
 
+    if (fileStat.isSymbolicLink()) {
+      throw new ModelHashMismatchError(
+        `Model file rejected: ${entry.relativePath} is a symlink; cache directory must contain only regular files`,
+        {
+          file: entry.relativePath,
+          expected: entry.sha256,
+          actual: '<symlink>',
+        },
+      );
+    }
+
     if (fileStat.size !== entry.bytes) {
+      // In non-strict (pre-load opportunistic) mode a wrong byte length is most
+      // commonly a partial download from a previous interrupted run, not a
+      // tamper signal. Delete the stale artefact so transformers.js can refetch
+      // on the upcoming pipeline call — this avoids permanently bricking the
+      // cache after a network hiccup.
+      if (!strict) {
+        await unlink(absPath).catch(() => {
+          /* best-effort; if delete fails, post-load strict pass will surface it */
+        });
+        continue;
+      }
       throw new ModelHashMismatchError(
         `Model file byte length mismatch for ${entry.relativePath}: expected ${entry.bytes}, got ${fileStat.size}`,
         {
@@ -176,11 +202,23 @@ function assertSafeRelativePath(p: string): void {
       `Manifest entry rejected: relativePath must not be absolute (${p})`,
     );
   }
-  const segments = p.split(/[\\/]/);
-  if (segments.includes('..')) {
+  // Reject backslash explicitly regardless of host platform. On POSIX the
+  // split-on-`[\\/]` regex would happen to catch a `\` segment, but
+  // `path.join` on POSIX keeps the literal `\` (breaking lookup) while on
+  // Windows it normalises it (passing) — same code, divergent behaviour. Make
+  // the rejection explicit so the manifest authoring contract is single-source.
+  if (p.includes('\\')) {
     throw new ModelHashMismatchError(
-      `Manifest entry rejected: relativePath must not contain '..' segments (${p})`,
+      `Manifest entry rejected: relativePath must not contain backslash (${p})`,
     );
+  }
+  const segments = p.split('/');
+  for (const segment of segments) {
+    if (segment === '' || segment === '.' || segment === '..') {
+      throw new ModelHashMismatchError(
+        `Manifest entry rejected: relativePath must not contain empty, '.' or '..' segments (${p})`,
+      );
+    }
   }
   // Reject NUL and ASCII control characters (matches Story 2.2 fts-tokenizer guard).
   for (let i = 0; i < p.length; i += 1) {

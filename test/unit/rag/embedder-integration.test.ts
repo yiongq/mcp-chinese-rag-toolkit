@@ -1,32 +1,48 @@
+import { randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { loadEmbedder, writeEmbedderMeta } from '../../../src/rag/embedder.js';
 import { buildSchema } from '../../../src/rag/schema.js';
 
 function uniqueTmp(prefix: string): string {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return path.join(tmpdir(), `${prefix}-${id}`);
+  return path.join(tmpdir(), `${prefix}-${randomUUID()}`);
 }
 
 const SKIP_NETWORK = process.env.SKIP_MODEL_DOWNLOAD === '1';
 
+// Track tmp cache dirs across the describe so afterAll can sweep them.
+const tmpCacheDirs: string[] = [];
+
 describe.skipIf(SKIP_NETWORK)('loadEmbedder (real bge-large-zh-v1.5)', () => {
+  afterAll(() => {
+    // M5 — bge-large-zh-v1.5 fp32 is ~1.3 GB on disk; without explicit cleanup
+    // CI runners accumulate gigabytes of leaked tmp dirs across builds.
+    for (const d of tmpCacheDirs) {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   it('downloads, verifies hashes, produces 1024-dim L2-normalized vectors, and writes meta', {
     timeout: 600_000,
   }, async () => {
     const cacheDir = uniqueTmp('embedder-real');
+    tmpCacheDirs.push(cacheDir);
     const embedder = await loadEmbedder({ cacheDir });
     expect(embedder.modelId).toBe('Xenova/bge-large-zh-v1.5');
+
+    // H1: dim must reflect the manifest value (1024) immediately — not lazily
+    // after the first embed call.
+    expect(embedder.dim).toBe(1024);
 
     const vec = await embedder.embed('试用期多久');
     expect(vec).toBeInstanceOf(Float32Array);
     expect(vec.length).toBe(1024);
-    expect(embedder.dim).toBe(1024);
 
     let normSquared = 0;
     for (let i = 0; i < vec.length; i += 1) {

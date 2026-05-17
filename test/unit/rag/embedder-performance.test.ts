@@ -1,23 +1,33 @@
+import { randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { loadEmbedder } from '../../../src/rag/embedder.js';
 
 function uniqueTmp(prefix: string): string {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return path.join(tmpdir(), `${prefix}-${id}`);
+  return path.join(tmpdir(), `${prefix}-${randomUUID()}`);
 }
 
 const SKIP_NETWORK = process.env.SKIP_MODEL_DOWNLOAD === '1';
 
+const tmpCacheDirs: string[] = [];
+
 describe.skipIf(SKIP_NETWORK)('embedder performance bench', () => {
+  afterAll(() => {
+    for (const d of tmpCacheDirs) {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   it('reports P95 / batch speedup (warn-not-fail; Story 2.5 owns NFR1 gating)', {
     timeout: 600_000,
   }, async () => {
     const cacheDir = uniqueTmp('embedder-perf');
+    tmpCacheDirs.push(cacheDir);
     const embedder = await loadEmbedder({ cacheDir });
 
     // Warm-up + sample loop for single embed.

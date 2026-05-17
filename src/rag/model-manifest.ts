@@ -15,6 +15,7 @@ import type { ModelManifest } from './types.js';
  */
 export const BGE_LARGE_ZH_V1_5_MANIFEST: ModelManifest = {
   modelId: 'Xenova/bge-large-zh-v1.5',
+  embeddingDim: 1024,
   files: [
     {
       relativePath: 'config.json',

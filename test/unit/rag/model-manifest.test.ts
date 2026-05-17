@@ -6,8 +6,9 @@ import type { ManifestEntry, ModelManifest } from '../../../src/rag/types.js';
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 describe('BGE_LARGE_ZH_V1_5_MANIFEST', () => {
-  it('exposes the expected modelId and pinned file count', () => {
+  it('exposes the expected modelId, embeddingDim, and pinned file count', () => {
     expect(BGE_LARGE_ZH_V1_5_MANIFEST.modelId).toBe('Xenova/bge-large-zh-v1.5');
+    expect(BGE_LARGE_ZH_V1_5_MANIFEST.embeddingDim).toBe(1024);
     // Default dtype `fp32` loads 5 files (config + tokenizer triple + model.onnx);
     // `model_quantized.onnx` is intentionally absent — pinning it would break the
     // strict post-load verification for any non-q8 dtype.

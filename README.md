@@ -339,9 +339,10 @@ const batch = await embedder.embedBatch(['请假流程', '加班政策'], { batc
 ```
 
 `loadEmbedder` caches the underlying pipeline as a process-level singleton
-keyed by `(modelId, cacheDir, dtype)`, so subsequent calls return in <5 ms.
-Failed loads are evicted from the cache, so a re-run after fixing a
-tampered file just works.
+keyed by the manifest content hash, cache dir, and load options
+(`verifyHashes` / `allowRemoteModels`), so subsequent calls with the same
+configuration return in <5 ms. Failed loads are evicted from the cache, so a
+re-run after fixing a tampered file just works.
 
 ### `verifyModelFiles` + `ModelHashMismatchError` — supply-chain attestation
 

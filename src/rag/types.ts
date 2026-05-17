@@ -188,12 +188,18 @@ export interface ManifestEntry {
  * toolkit actually loads are pinned; extra files in the cache (README, full
  * PyTorch weights, alternative dtypes) are neither verified nor considered a
  * tamper signal.
+ *
+ * Tracking is always against the upstream `main` branch (the sha256 entries
+ * are the supply-chain boundary, so a per-revision pin is redundant).
+ * `embeddingDim` is the contract value for the model's vector dimension —
+ * `loadEmbedder` exposes it as `Embedder.dim` so the FR20 factory pattern
+ * works for non-1024-dim manifests too.
  */
 export interface ModelManifest {
   /** HF Hub repo id consumed by `pipeline('feature-extraction', modelId)`. */
   modelId: string;
-  /** Optional pinned git revision; defaults to 'main' tracking. */
-  revision?: string;
+  /** Vector dimension produced by the model (e.g. 1024 for bge-large-zh-v1.5, 768 for bge-base-zh, 512 for bge-small-zh). */
+  embeddingDim: number;
   /** Frozen list of files to verify. */
   files: readonly ManifestEntry[];
 }
@@ -204,6 +210,11 @@ export interface ModelManifest {
  * All fields are optional. `verifyHashes` should never be set to `false` in
  * production code paths — it exists for test fixtures that mock the pipeline
  * with synthetic models whose hashes are not under our control.
+ *
+ * Note: `dtype` is currently fixed at `'fp32'` because the default manifest
+ * only pins the fp32 ONNX file. Supporting `'q8'` / `'fp16'` would require
+ * pinning the corresponding alternative ONNX files in the manifest — see
+ * `BGE_LARGE_ZH_V1_5_MANIFEST` Dev Notes / Story 2.3 review H2 for context.
  */
 export interface EmbedderOptions {
   /**
@@ -214,8 +225,6 @@ export interface EmbedderOptions {
   manifest?: ModelManifest;
   /** Absolute path override; defaults to `<userCacheDir>/mcp-chinese-rag-toolkit/models`. */
   cacheDir?: string;
-  /** ONNX precision — `'fp32'` for production quality, `'q8'` for memory-constrained edge cases. @default 'fp32' */
-  dtype?: 'fp32' | 'q8' | 'fp16';
   /** Whether transformers.js may fetch missing files from HF Hub. Set false for fully offline / air-gapped runs. @default true */
   allowRemoteModels?: boolean;
   /** Hash-verification toggle — never set false in production. @default true */
@@ -236,9 +245,10 @@ export interface Embedder {
   /**
    * Batched variant; semantically equivalent to N sequential `embed` calls
    * but uses a single tokenization + ONNX forward when `batchSize > 1`.
+   * `batchSize` is clamped to `[1, 256]`; values outside the range throw.
    */
   embedBatch(texts: string[], opts?: { batchSize?: number }): Promise<Float32Array[]>;
-  /** 1024 for bge-large-zh-v1.5. */
+  /** Vector dimension. Sourced from `manifest.embeddingDim` at load time (1024 for bge-large-zh-v1.5). */
   readonly dim: number;
   /** Echo of the manifest's `modelId` — written to `meta.embedding_model` by {@link writeEmbedderMeta}. */
   readonly modelId: string;
