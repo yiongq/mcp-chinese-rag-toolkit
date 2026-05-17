@@ -96,6 +96,15 @@ export async function generateChunkContext(
     cacheKey,
     prefixLength,
   });
+  // Defensive: a faulty provider adapter (returning null / undefined / an
+  // image-block / a number) would otherwise crash `.trim()` with an
+  // opaque TypeError; surface an actionable message that names the
+  // failing surface so build-index scripts can isolate the bad chunk.
+  if (typeof prefix !== 'string') {
+    throw new TypeError(
+      `generateChunkContext: LlmProvider.generateChunkPrefix must return a string, got ${typeof prefix}`,
+    );
+  }
   return prefix.trim();
 }
 

@@ -143,9 +143,11 @@ function buildServer(config: McpServerConfig): McpServer {
   const server = new McpServer({ name: config.name, version: config.version });
 
   // Story 2.6 — resolve L0 cache eligibility at build time. `cache: {}` with
-  // missing `indexVersion` warns once + disables; explicit `enabled: false`
-  // also disables (without warning). Either way the per-tool handler below
-  // chooses cache-wrap vs raw-handler statically — no per-call branching.
+  // missing `indexVersion` disables; explicit `enabled: false` also disables.
+  // Either way the per-tool handler below chooses cache-wrap vs raw-handler
+  // statically — no per-call branching. Warning is emitted ONCE inside
+  // `createMcpServer` (HTTP transport re-invokes `buildServer` per request,
+  // so inlining a warn here would flood stderr).
   const rawCacheConfig = config.cache;
   const explicitlyDisabled = rawCacheConfig?.enabled === false;
   const indexVersion = rawCacheConfig?.indexVersion;
@@ -153,10 +155,7 @@ function buildServer(config: McpServerConfig): McpServer {
     rawCacheConfig !== undefined &&
     !explicitlyDisabled &&
     typeof indexVersion === 'string' &&
-    indexVersion.length > 0;
-  if (rawCacheConfig !== undefined && !explicitlyDisabled && !cacheEnabled) {
-    console.warn('createMcpServer: cache.indexVersion not provided, cache disabled');
-  }
+    indexVersion.trim().length > 0;
 
   for (const tool of config.tools ?? []) {
     // Cache wraps the INNER handler so isError envelopes from `wrapHandler`'s
@@ -246,6 +245,18 @@ function buildServer(config: McpServerConfig): McpServer {
 
 export function createMcpServer(config: McpServerConfig): McpServerHandle {
   validateConfig(config);
+
+  // Story 2.6 — emit cache config warning ONCE per server instance. Inlining
+  // this inside `buildServer` would re-fire per HTTP request (each request
+  // re-runs `buildServer`); the warning is a configuration hint that only
+  // makes sense at construction time.
+  const rawCacheConfig = config.cache;
+  if (rawCacheConfig !== undefined && rawCacheConfig.enabled !== false) {
+    const iv = rawCacheConfig.indexVersion;
+    if (typeof iv !== 'string' || iv.trim().length === 0) {
+      console.warn('createMcpServer: cache.indexVersion not provided, cache disabled');
+    }
+  }
 
   // Primary server instance — used for stdio transport and for in-process test wiring
   // via `handle.server`. HTTP transport intentionally uses fresh server instances per

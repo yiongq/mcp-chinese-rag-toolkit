@@ -118,6 +118,19 @@ describe('generateChunkContext', () => {
   it('default DEFAULT_PREFIX_LENGTH === { min: 50, max: 100 }', () => {
     expect(DEFAULT_PREFIX_LENGTH).toEqual({ min: 50, max: 100 });
   });
+
+  it('throws an actionable TypeError when provider returns a non-string (null / number / undefined)', async () => {
+    const badProviders = [
+      { generateChunkPrefix: vi.fn(async () => null as unknown as string) },
+      { generateChunkPrefix: vi.fn(async () => 42 as unknown as string) },
+      { generateChunkPrefix: vi.fn(async () => undefined as unknown as string) },
+    ];
+    for (const p of badProviders) {
+      await expect(generateChunkContext(makeChunk(), { fullDocument: 'DOC' }, p)).rejects.toThrow(
+        /LlmProvider.generateChunkPrefix must return a string/,
+      );
+    }
+  });
 });
 
 describe('stitchPrefixedChunk', () => {

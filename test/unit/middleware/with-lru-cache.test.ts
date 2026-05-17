@@ -223,14 +223,17 @@ describe('withLruCache runtime behavior', () => {
     expect(handler).toHaveBeenCalledTimes(3);
   });
 
-  it('enabled: false → returns original handler (no _meta.cache injection)', async () => {
+  it('enabled: false → returns original handler (zero-overhead pass-through)', async () => {
     const handler = vi.fn(async () => makeResult());
     const wrapped = withLruCache('t', handler, defaultOpts({ enabled: false }));
 
     const r1 = await wrapped({ q: 'a' });
     const r2 = await wrapped({ q: 'a' });
     expect(handler).toHaveBeenCalledTimes(2);
-    // raw handler bypass → no injected _meta.cache field
+    // Explicit `enabled: false` is "强制关闭" — semantically distinct from
+    // "cache miss"; we don't fabricate `_meta.cache` on a fully-disabled
+    // wrapper (spec §教训 10: `enabled: false` vs missing config are
+    // equivalent in effect but distinct in semantics).
     const sc1 = r1.structuredContent as Record<string, unknown>;
     expect(sc1._meta).toBeUndefined();
     expect(r2).toEqual(r1);
@@ -239,25 +242,94 @@ describe('withLruCache runtime behavior', () => {
   it('TTL eviction: entry expires after ttlMs and triggers re-computation', async () => {
     // lru-cache@^11 reads `performance.now()` directly, which Vitest fake
     // timers can desync from `setTimeout` clocks in subtle ways. Real
-    // timers + a very short TTL keep this fast (< 50ms) without flakiness.
+    // timers + generous margins (200ms TTL with 50ms hit window and 300ms
+    // eviction wait) keep this reliable on slow CI while completing
+    // in < 400ms locally.
     const handler = vi.fn(async () => makeResult());
-    const wrapped = withLruCache('t', handler, defaultOpts({ ttlMs: 20 }));
+    const wrapped = withLruCache('t', handler, defaultOpts({ ttlMs: 200 }));
 
     await wrapped({ q: 'x' });
     expect(handler).toHaveBeenCalledTimes(1);
 
     // Within TTL — hit
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     await wrapped({ q: 'x' });
     expect(handler).toHaveBeenCalledTimes(1);
 
     // Past TTL — miss again
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     await wrapped({ q: 'x' });
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
   it('NON_CACHEABLE_ARGS contains "env" (functional smoke)', () => {
     expect(NON_CACHEABLE_ARGS.has('env')).toBe(true);
+  });
+});
+
+describe('shouldSkipWrite defensive guards', () => {
+  it('does NOT skip when args.env is a non-string falsy (null / 0 / false / "")', () => {
+    // Spec intent: only an explicit non-dev STRING value triggers skip.
+    // null / 0 / false / '' are treated as "no env hint" not as "non-dev".
+    expect(shouldSkipWrite(makeResult(), { env: null })).toBe(false);
+    expect(shouldSkipWrite(makeResult(), { env: 0 })).toBe(false);
+    expect(shouldSkipWrite(makeResult(), { env: false })).toBe(false);
+    expect(shouldSkipWrite(makeResult(), { env: '' })).toBe(false);
+  });
+
+  it('skips on case/whitespace variants of "low" confidence', () => {
+    expect(shouldSkipWrite(makeResult({ structuredContent: { confidence: 'LOW' } }), {})).toBe(
+      true,
+    );
+    expect(shouldSkipWrite(makeResult({ structuredContent: { confidence: 'Low ' } }), {})).toBe(
+      true,
+    );
+    expect(shouldSkipWrite(makeResult({ structuredContent: { confidence: ' low' } }), {})).toBe(
+      true,
+    );
+  });
+
+  it('ignores confidence on non-plain-object structuredContent (array / primitive)', () => {
+    // Arrays and primitives have no `.confidence` semantic — must not crash
+    // and must not falsely trigger skip.
+    expect(
+      shouldSkipWrite(makeResult({ structuredContent: [{ hit: 1 }] as unknown as object }), {}),
+    ).toBe(false);
+  });
+
+  it('only reads OWN env property (immune to prototype pollution)', () => {
+    // Crafted: an args object whose own keys do NOT contain `env`, but
+    // whose prototype does. Implementation must use Object.hasOwn().
+    const polluted = Object.create({ env: 'prod' }) as Record<string, unknown>;
+    polluted.query = 'safe';
+    expect(shouldSkipWrite(makeResult(), polluted)).toBe(false);
+  });
+});
+
+describe('injectCacheMeta defensive guards', () => {
+  it('preserves array structuredContent verbatim and migrates _meta.cache to top-level', () => {
+    const arrSc = [{ id: 1 }, { id: 2 }] as unknown as Record<string, unknown>;
+    const r = { content: [{ type: 'text' as const, text: 'ok' }], structuredContent: arrSc };
+    const out = injectCacheMeta(r as CallToolResult, 'hit');
+    expect(Array.isArray(out.structuredContent)).toBe(true);
+    expect(out.structuredContent).toEqual([{ id: 1 }, { id: 2 }]);
+    expect((out as { _meta: { cache: string } })._meta.cache).toBe('hit');
+  });
+
+  it('drops a non-object _meta primitive instead of spreading character keys', () => {
+    const r = makeResult({
+      structuredContent: { foo: 'bar', _meta: 'not-an-object' as unknown as object },
+    });
+    const out = injectCacheMeta(r, 'miss');
+    const sc = out.structuredContent as Record<string, unknown>;
+    const meta = sc._meta as Record<string, unknown>;
+    // The bogus string must not be spread into numeric-keyed characters.
+    expect(meta).toEqual({ cache: 'miss' });
+  });
+});
+
+describe('canonicalize defensive guards', () => {
+  it('throws an actionable TypeError on BigInt args (instead of opaque JSON.stringify crash)', () => {
+    expect(() => canonicalize({ id: 1n })).toThrow(/BigInt values are not cacheable/);
   });
 });

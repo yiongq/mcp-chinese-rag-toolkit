@@ -36,6 +36,13 @@ export function canonicalize(args: unknown): string {
 
 function normalizeValue(v: unknown): unknown {
   if (typeof v === 'string') return v.trim().replace(/　/g, ' ');
+  // BigInt → JSON.stringify throws an opaque TypeError; surface a friendly,
+  // actionable error so caller knows to coerce to string before caching.
+  if (typeof v === 'bigint') {
+    throw new TypeError(
+      'canonicalize: BigInt values are not cacheable — coerce to string before passing as a tool arg',
+    );
+  }
   if (Array.isArray(v)) return v.map(normalizeValue);
   if (v !== null && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
     const obj = v as Record<string, unknown>;
@@ -81,13 +88,25 @@ export function computeCacheKey(toolName: string, indexVersion: string, args: un
  */
 export function shouldSkipWrite(result: CallToolResult, args: unknown): boolean {
   if (result.isError === true) return true;
-  const sc = result.structuredContent as { confidence?: string } | undefined;
-  if (sc !== undefined && sc !== null && sc.confidence === 'low') return true;
-  if (args !== null && typeof args === 'object') {
+  // Only treat plain-object structuredContent as confidence-bearing; arrays /
+  // primitives have no `.confidence` semantic. Trim + lowercase guards against
+  // benign casing/whitespace variations (`'LOW'`, `'low '`) that would
+  // otherwise wrongly cache a dynamic-confidence answer.
+  const sc = result.structuredContent;
+  if (sc !== null && typeof sc === 'object' && !Array.isArray(sc)) {
+    const confidence = (sc as { confidence?: unknown }).confidence;
+    if (typeof confidence === 'string' && confidence.trim().toLowerCase() === 'low') return true;
+  }
+  if (args !== null && typeof args === 'object' && !Array.isArray(args)) {
     const argsObj = args as Record<string, unknown>;
     for (const key of NON_CACHEABLE_ARGS) {
+      if (!Object.hasOwn(argsObj, key)) continue;
       const v = argsObj[key];
-      if (v !== undefined && v !== 'dev') return true;
+      // Only non-empty string values trigger skip — `env: null/0/false/''`
+      // are treated as "no environment hint" rather than "non-dev", matching
+      // the spec intent that NON_CACHEABLE_ARGS only fires when the caller
+      // explicitly names a meaningful non-dev environment string.
+      if (typeof v === 'string' && v.length > 0 && v !== 'dev') return true;
     }
   }
   return false;
@@ -106,15 +125,38 @@ export function shouldSkipWrite(result: CallToolResult, args: unknown): boolean 
  * missing check.
  */
 export function injectCacheMeta(result: CallToolResult, status: CacheStatus): CallToolResult {
-  const sc = (result.structuredContent ?? {}) as Record<string, unknown>;
-  const existingMeta = (sc._meta ?? {}) as Record<string, unknown>;
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    v !== null && typeof v === 'object' && !Array.isArray(v);
+  const rawSc = result.structuredContent;
+  // Plain-object (or undefined) structuredContent → inject into
+  // `structuredContent._meta.cache` (the documented contract location).
+  // For undefined we fabricate `{ _meta: { cache } }` to keep the
+  // "always-present" contract that eval/OTel rely on.
+  if (rawSc === undefined || isPlainObject(rawSc)) {
+    const sc = (rawSc ?? {}) as Record<string, unknown>;
+    const rawMeta = sc._meta;
+    // Guard `_meta` so non-object existing meta (string/number/array) isn't
+    // spread into character-indexed garbage — drop it and start fresh.
+    const existingMeta = isPlainObject(rawMeta) ? rawMeta : {};
+    return {
+      ...result,
+      structuredContent: {
+        ...sc,
+        _meta: { ...existingMeta, cache: status },
+      },
+    };
+  }
+  // structuredContent is an array or primitive — preserve verbatim and
+  // migrate the cache status to the result-level `_meta` (MCP allows
+  // `_meta` at the top of `CallToolResult`). This avoids corrupting
+  // array payloads (spreading `[a,b]` into `{0:a,1:b,_meta:...}` would
+  // silently change the wire type).
+  const rawTopMeta = (result as { _meta?: unknown })._meta;
+  const existingTopMeta = isPlainObject(rawTopMeta) ? rawTopMeta : {};
   return {
     ...result,
-    structuredContent: {
-      ...sc,
-      _meta: { ...existingMeta, cache: status },
-    },
-  };
+    _meta: { ...existingTopMeta, cache: status },
+  } as CallToolResult;
 }
 
 /**
