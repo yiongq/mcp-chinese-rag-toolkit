@@ -134,6 +134,58 @@ describe('chunk()', () => {
     await expect(chunk('hi', { chunkSize: 500, chunkOverlap: -1 })).rejects.toThrow(/chunkOverlap/);
   });
 
+  it('throws on NaN / non-finite / non-integer chunkSize or chunkOverlap', async () => {
+    await expect(chunk('hi', { chunkSize: Number.NaN })).rejects.toThrow(/chunkSize/);
+    await expect(chunk('hi', { chunkSize: Number.POSITIVE_INFINITY })).rejects.toThrow(/chunkSize/);
+    await expect(chunk('hi', { chunkSize: 1000.5 })).rejects.toThrow(/chunkSize/);
+    await expect(chunk('hi', { chunkOverlap: Number.NaN })).rejects.toThrow(/chunkOverlap/);
+    await expect(chunk('hi', { chunkSize: 1000, chunkOverlap: 100.5 })).rejects.toThrow(
+      /chunkOverlap/,
+    );
+  });
+
+  it('does not treat lines starting with # inside fenced code blocks as headings', async () => {
+    const md = [
+      '# 真标题',
+      '',
+      '```bash',
+      '# 这是 shell 注释，不应被识别为 H1',
+      'echo hi',
+      '```',
+      '',
+      '正文内容。',
+    ].join('\n');
+
+    const chunks = await chunk(md);
+
+    expect(chunks).not.toHaveLength(0);
+    for (const c of chunks) {
+      // The only legitimate heading is "真标题"; the code-block "# 这是 shell 注释"
+      // must not appear as a section breadcrumb.
+      expect(c.section).toBe('真标题');
+      expect(c.section).not.toContain('shell 注释');
+    }
+  });
+
+  it('handles tilde-fenced code blocks the same as backtick-fenced ones', async () => {
+    const md = [
+      '# 标题',
+      '',
+      '~~~',
+      '# fake heading inside tilde fence',
+      '~~~',
+      '',
+      '尾部正文。',
+    ].join('\n');
+
+    const chunks = await chunk(md);
+
+    expect(chunks).not.toHaveLength(0);
+    for (const c of chunks) {
+      expect(c.section).toBe('标题');
+    }
+  });
+
   it('propagates opts.source and opts.page to every produced chunk', async () => {
     const chunks = await chunk('# 标题\n\n正文内容。'.repeat(5), {
       source: 'hr.pdf',

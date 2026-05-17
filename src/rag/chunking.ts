@@ -31,14 +31,14 @@ export async function chunk(text: string, opts: ChunkOptions = {}): Promise<Chun
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK_SIZE;
   const chunkOverlap = opts.chunkOverlap ?? DEFAULT_CHUNK_OVERLAP;
 
-  if (chunkSize < MIN_CHUNK_SIZE || chunkSize > MAX_CHUNK_SIZE) {
+  if (!Number.isInteger(chunkSize) || chunkSize < MIN_CHUNK_SIZE || chunkSize > MAX_CHUNK_SIZE) {
     throw new Error(
-      `chunkSize must be between ${MIN_CHUNK_SIZE} and ${MAX_CHUNK_SIZE} (got ${chunkSize})`,
+      `chunkSize must be an integer between ${MIN_CHUNK_SIZE} and ${MAX_CHUNK_SIZE} (got ${chunkSize})`,
     );
   }
-  if (chunkOverlap < 0 || chunkOverlap >= chunkSize) {
+  if (!Number.isInteger(chunkOverlap) || chunkOverlap < 0 || chunkOverlap >= chunkSize) {
     throw new Error(
-      `chunkOverlap must satisfy 0 <= overlap < chunkSize (got overlap=${chunkOverlap}, size=${chunkSize})`,
+      `chunkOverlap must be an integer satisfying 0 <= overlap < chunkSize (got overlap=${chunkOverlap}, size=${chunkSize})`,
     );
   }
 
@@ -78,9 +78,12 @@ export async function chunkPdfPages(
 function parseSections(text: string): SectionRegion[] {
   const lines = text.split('\n');
   const headingRe = /^(#{1,4})\s+(.+?)\s*$/;
+  // CommonMark fenced code blocks: ``` or ~~~ (3+ of either, same char closes).
+  const fenceRe = /^(`{3,}|~{3,})/;
   const stack: Array<{ level: number; title: string }> = [];
   const regions: SectionRegion[] = [];
   let buffer: string[] = [];
+  let fence: string | null = null;
 
   const currentSection = (): string | undefined =>
     stack.length > 0 ? stack.map((h) => h.title).join(' > ') : undefined;
@@ -94,6 +97,21 @@ function parseSections(text: string): SectionRegion[] {
   };
 
   for (const line of lines) {
+    const fenceMatch = fenceRe.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1] as string;
+      if (fence === null) {
+        fence = marker[0] as string;
+      } else if (marker[0] === fence) {
+        fence = null;
+      }
+      buffer.push(line);
+      continue;
+    }
+    if (fence !== null) {
+      buffer.push(line);
+      continue;
+    }
     const m = headingRe.exec(line);
     if (m) {
       // Flush pending content under the section that was active BEFORE this

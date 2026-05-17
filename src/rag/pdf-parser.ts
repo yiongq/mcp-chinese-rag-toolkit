@@ -18,6 +18,13 @@ export async function parsePdf(input: string | Uint8Array | ArrayBuffer): Promis
   const bytes = await toUint8Array(input);
   const pdf = await getDocumentProxy(bytes);
   const { totalPages, text: pages } = await extractText(pdf, { mergePages: false });
+  // Enforce the post-condition declared on `ParsePdfResult` so 1-indexed
+  // pageNumber values can never silently desync from PDF metadata.
+  if (!Array.isArray(pages) || pages.length !== totalPages) {
+    throw new Error(
+      `parsePdf: unpdf returned pages.length=${Array.isArray(pages) ? pages.length : 'non-array'} but totalPages=${totalPages}`,
+    );
+  }
   return {
     totalPages,
     pages: pages.map((text, i) => ({ pageNumber: i + 1, text })),
