@@ -99,6 +99,35 @@ describe('loadEvalSet', () => {
     expect(() => loadEvalSet(p)).toThrow(/page must be a positive integer/);
   });
 
+  it('fails fast on duplicate map keys (uniqueKeys: true)', () => {
+    // Two `expected:` blocks under the same query would silently last-wins by
+    // default; for a CI gate that decides merge eligibility we must surface
+    // the typo immediately. Review fix M4.
+    const body =
+      'version: v1\nqueries:\n  - query: a\n    expected:\n      - source: x\n    expected:\n      - source: y\n';
+    const p = writeYaml('dup-keys.yml', body);
+    expect(() => loadEvalSet(p)).toThrow(/YAML parse errors/);
+  });
+
+  it('treats empty / whitespace-only inline `reason:` as absent and falls back to comment', () => {
+    // Review fix M5 — an inline `reason: ""` should not silently override the
+    // comment-based reason and defeat AI Agent Rule #9.
+    const body = `version: v1\nqueries:\n  # reason: comment-version\n  - query: a\n    reason: ''\n    expected:\n      - source: bench-fixture.md\n        page: 1\n`;
+    const p = writeYaml('empty-inline-reason.yml', body);
+    const set = loadEvalSet(p);
+    expect(set.queries[0]?.reason).toBe('comment-version');
+  });
+
+  it('recovers item[0] reason from sequence-level commentBefore when item-level comment is unrelated', () => {
+    // Review fix M6 — if the user puts an unrelated comment immediately before
+    // the first item, the seq-level `# reason:` between `queries:` and the
+    // first list entry must still be picked up rather than silently dropped.
+    const body = `version: v1\nqueries:\n  # reason: seq-level\n  # not a reason note\n  - query: a\n    expected:\n      - source: x\n`;
+    const p = writeYaml('seq-reason.yml', body);
+    const set = loadEvalSet(p);
+    expect(set.queries[0]?.reason).toBe('seq-level');
+  });
+
   it('extracts `# reason:` comments from queries', () => {
     const body = `version: v1\nqueries:\n  # reason: BM25 sanity\n  - query: 差旅\n    expected:\n      - source: bench-fixture.md\n        page: 1\n  # not-reason: ignored\n  # reason: 同义改写\n  - query: 实习\n    expected:\n      - source: bench-fixture.md\n        page: 2\n`;
     const p = writeYaml('reasons.yml', body);
@@ -336,5 +365,67 @@ describe('runEval', () => {
     const summary = await runEval(set, { searchFn: sf });
     expect(summary.perQuery[0]?.category).toBe('leave-policy');
     expect(summary.perQuery[0]?.reason).toBe('because');
+  });
+
+  it('truncates searchFn results to topK before scoring (Hit Rate@K contract)', async () => {
+    // Review fix H1 — a provider returning > topK rows must NOT inflate Hit Rate.
+    // Here the EXPECTED source lands at rank 10 but topK=5, so it should MISS.
+    const set: EvalSet = {
+      version: 'v',
+      queries: [{ query: 'q', expected: [{ source: 'target.md' }] }],
+    };
+    const sf: EvalSearchFn = async () => [
+      ...Array.from({ length: 9 }, (_, i) => ({ source: `noise-${i}.md` })),
+      { source: 'target.md' }, // rank 10
+    ];
+    const summary = await runEval(set, { searchFn: sf, topK: 5 });
+    expect(summary.hitRate).toBe(0);
+    expect(summary.perQuery[0]?.topResults).toHaveLength(5);
+    expect(summary.perQuery[0]?.hitRank).toBeUndefined();
+  });
+
+  it('records searchFn throw on the per-query row and continues with remaining queries', async () => {
+    // Review fix M8 — one failing query must not abort the whole eval.
+    const set: EvalSet = {
+      version: 'v',
+      queries: [
+        { query: 'q1', expected: [{ source: 'a.md' }] },
+        { query: 'q2-bad', expected: [{ source: 'b.md' }] },
+        { query: 'q3', expected: [{ source: 'c.md' }] },
+      ],
+    };
+    const sf: EvalSearchFn = async (q) => {
+      if (q === 'q2-bad') throw new Error('boom');
+      return [{ source: q === 'q1' ? 'a.md' : 'c.md' }];
+    };
+    const summary = await runEval(set, { searchFn: sf });
+    expect(summary.perQuery).toHaveLength(3);
+    expect(summary.perQuery[0]?.hitRank).toBe(1);
+    expect(summary.perQuery[1]?.error).toBe('boom');
+    expect(summary.perQuery[1]?.hitRank).toBeUndefined();
+    expect(summary.perQuery[2]?.hitRank).toBe(1);
+    expect(summary.hitRate).toBeCloseTo(2 / 3, 10);
+  });
+
+  it('records an error when searchFn returns a non-array (M9 shape validation)', async () => {
+    const set: EvalSet = {
+      version: 'v',
+      queries: [{ query: 'q', expected: [{ source: 'a.md' }] }],
+    };
+    const sf = (async () => null) as unknown as EvalSearchFn;
+    const summary = await runEval(set, { searchFn: sf });
+    expect(summary.perQuery[0]?.error).toMatch(/returned non-array/);
+    expect(summary.hitRate).toBe(0);
+  });
+
+  it('records an error when a searchFn row is missing the required `source` field', async () => {
+    const set: EvalSet = {
+      version: 'v',
+      queries: [{ query: 'q', expected: [{ source: 'a.md' }] }],
+    };
+    const sf = (async () => [{ page: 1 }]) as unknown as EvalSearchFn;
+    const summary = await runEval(set, { searchFn: sf });
+    expect(summary.perQuery[0]?.error).toMatch(/result\[0\] without a string 'source'/);
+    expect(summary.hitRate).toBe(0);
   });
 });

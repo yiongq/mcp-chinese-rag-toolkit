@@ -21,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { EvalSearchFn, EvalSearchResult } from '../src/eval/index.js';
 import {
+  DEFAULT_EVAL_TOP_K,
   emitGitHubActionsAnnotation,
   loadEvalSet,
   passesGate,
@@ -159,12 +160,22 @@ async function buildToolkitSearchFn(): Promise<{
   const rerank = createReranker({ reranker, defaultOpts: { topK: 5 } });
 
   const searchFn: EvalSearchFn = async (query, opts) => {
-    const topK = opts?.topK ?? 5;
+    const topK = opts?.topK ?? DEFAULT_EVAL_TOP_K;
     const hybrid = await hybridSearch(query, { topK: Math.max(topK * 2, 10) });
     const reranked = await rerank(query, hybrid, { topK });
-    const results: EvalSearchResult[] = reranked.map((r) => {
+    const results: EvalSearchResult[] = reranked.map((r, i) => {
+      // The toolkit contract (EvalSearchResult.source) requires a string;
+      // silently substituting 'unknown' on a missing source would mask a
+      // pipeline bug and make CI debugging impossible. Fail loudly with the
+      // chunk index so the operator can find the offending row.
+      if (typeof r.chunk.source !== 'string') {
+        throw new Error(
+          `run-eval: reranked[${i}] for query="${query}" has no string 'source' on chunk; ` +
+            'indexing pipeline must populate source — check Story 2.1 chunking output.',
+        );
+      }
       const out: EvalSearchResult = {
-        source: r.chunk.source ?? 'unknown',
+        source: r.chunk.source,
         rerankScore: r.rerankScore,
       };
       if (r.chunk.page !== undefined) out.page = r.chunk.page;
@@ -208,7 +219,15 @@ async function main(): Promise<number> {
   const { searchFn, dispose } = await buildToolkitSearchFn();
   try {
     process.stdout.write('run-eval: running searchFn over fixture (loads BGE models)…\n');
-    const summary = await runEval(evalSet, { searchFn, topK: 5 });
+    // strict: true — every eval-set.yml query declares an explicit `page`, so
+    // page-level matching is the assertion the CI gate must enforce. Without
+    // strict, ANY chunk from `bench-fixture.md` would score hit on every
+    // query (single-file fixture), reducing the gate to a tautology.
+    const summary = await runEval(evalSet, {
+      searchFn,
+      topK: DEFAULT_EVAL_TOP_K,
+      strict: true,
+    });
     const { reportPath, summaryPath } = writeArtifacts(summary, { outDir: outDirAbs });
     process.stdout.write(`run-eval: wrote ${summaryPath}\n`);
     process.stdout.write(`run-eval: wrote ${reportPath}\n`);
@@ -223,7 +242,15 @@ async function main(): Promise<number> {
 
     return passesGate(summary, threshold) ? 0 : 1;
   } finally {
-    await dispose();
+    // Isolate dispose failure so it cannot mask the primary error from the
+    // try block — surface it on stderr but do not throw from finally.
+    try {
+      await dispose();
+    } catch (disposeErr) {
+      process.stderr.write(
+        `run-eval: dispose() failed: ${disposeErr instanceof Error ? (disposeErr.stack ?? disposeErr.message) : String(disposeErr)}\n`,
+      );
+    }
   }
 }
 

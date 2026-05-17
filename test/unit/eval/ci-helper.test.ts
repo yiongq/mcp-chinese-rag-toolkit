@@ -195,6 +195,50 @@ describe('renderMarkdownReport', () => {
     const md = renderMarkdownReport(s);
     expect(md).toMatch(/\| 1 \| orphan \| \*\*MISS\*\* \| - \|/);
   });
+
+  it('escapes backticks in query / reason cells so they do not break the code span', () => {
+    // Review fix M10 — Top-1 Source is wrapped in `…`, so a backtick anywhere
+    // in the cell content must be escaped or the markdown table corrupts.
+    const s = summary({
+      perQuery: [
+        row({
+          query: 'tick `q`',
+          reason: 'reason with `back` tick',
+          hitRank: 1,
+          reciprocalRank: 1,
+          topResults: [{ source: 'a`b.md' }],
+        }),
+      ],
+      totalQueries: 1,
+      hitRate: 1,
+      mrr: 1,
+    });
+    const md = renderMarkdownReport(s);
+    expect(md).toContain('tick \\`q\\`');
+    expect(md).toContain('reason with \\`back\\` tick');
+    expect(md).toContain('`a\\`b.md`');
+  });
+
+  it('renders ERROR rows with the error message in the reason column', () => {
+    // Review fix M8 — a query whose searchFn threw must be visibly distinct
+    // from a clean MISS so the reviewer immediately sees "this query crashed,
+    // not just missed".
+    const s = summary({
+      perQuery: [
+        row({
+          query: 'bad query',
+          error: 'searchFn threw: boom',
+          topResults: [],
+        }),
+      ],
+      totalQueries: 1,
+      hitRate: 0,
+      mrr: 0,
+    });
+    const md = renderMarkdownReport(s);
+    expect(md).toContain('**ERROR**');
+    expect(md).toContain('searchFn threw: boom');
+  });
 });
 
 describe('passesGate', () => {

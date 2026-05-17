@@ -97,7 +97,15 @@ export function renderMarkdownReport(summary: EvalSummary): string {
   lines.push('| # | Query | Hit Rank | Top-1 Source | rerankScore | distance | ftsRank | Reason |');
   lines.push('|---:|---|---:|---|---:|---:|---:|---|');
   summary.perQuery.forEach((r, i) => {
-    const hitRank = r.hitRank !== undefined ? String(r.hitRank) : '**MISS**';
+    // Errored queries surface as `**ERROR**` in the Hit Rank column so the
+    // reviewer immediately sees they did not run to completion (vs MISS,
+    // which means the pipeline ran but no expected source landed in top-K).
+    const hitRank =
+      r.error !== undefined
+        ? '**ERROR**'
+        : r.hitRank !== undefined
+          ? String(r.hitRank)
+          : '**MISS**';
     const top1 = r.topResults[0];
     const top1Src = top1
       ? `\`${escapeMarkdown(top1.source)}${top1.page !== undefined ? `#${top1.page}` : ''}\``
@@ -105,7 +113,8 @@ export function renderMarkdownReport(summary: EvalSummary): string {
     const rerankScore = top1?.rerankScore !== undefined ? top1.rerankScore.toFixed(4) : '-';
     const distance = top1?.distance !== undefined ? top1.distance.toFixed(4) : '-';
     const ftsRank = top1?.ftsRank !== undefined ? String(top1.ftsRank) : '-';
-    const reason = r.reason !== undefined ? escapeMarkdown(r.reason) : '-';
+    const reasonOrError = r.error !== undefined ? `⚠️ ${r.error}` : r.reason;
+    const reason = reasonOrError !== undefined ? escapeMarkdown(reasonOrError) : '-';
     lines.push(
       `| ${i + 1} | ${escapeMarkdown(r.query)} | ${hitRank} | ${top1Src} | ${rerankScore} | ${distance} | ${ftsRank} | ${reason} |`,
     );
@@ -115,9 +124,18 @@ export function renderMarkdownReport(summary: EvalSummary): string {
   return lines.join('\n');
 }
 
-/** Minimal markdown-table-cell escaping: `|` → `\|`, newlines → ` `. */
+/**
+ * Minimal markdown-table-cell escaping. Handles the three characters that
+ * would otherwise corrupt a GitHub-flavoured markdown table:
+ *   - `|`     → `\|`   (column separator)
+ *   - newline → ` `    (row terminator)
+ *   - backtick → `\``  (code-span opener; matters because top-1 source is
+ *                       wrapped in `` `...` ``, and a reason / query that
+ *                       contains a backtick would otherwise break the span
+ *                       and split the cell across columns)
+ */
 function escapeMarkdown(s: string): string {
-  return s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return s.replace(/\|/g, '\\|').replace(/`/g, '\\`').replace(/\n/g, ' ');
 }
 
 /**

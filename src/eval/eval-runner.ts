@@ -56,7 +56,17 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
     );
   }
 
-  const doc = parseDocument(raw);
+  // `uniqueKeys: true` makes yaml@2 fail-fast on duplicate map keys (default is
+  // last-wins, which would silently drop a typo like two `expected:` blocks on
+  // the same query — a real footgun for a CI gate that decides merge eligibility).
+  const doc = parseDocument(raw, { uniqueKeys: true });
+  if (doc.errors.length > 0) {
+    const errSummary = doc.errors.map((e) => e.message).join('; ');
+    throw new Error(
+      `loadEvalSet: ${absPath} has YAML parse errors: ${errSummary}. ` +
+        'Common causes: duplicate keys, bad indentation, unresolved anchors.',
+    );
+  }
   const data = doc.toJS() as unknown;
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
     throw new Error(
@@ -122,7 +132,11 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
       out.category = item.category;
     }
     // Inline `reason` wins; fall back to extracted leading `# reason:` comment.
-    const inlineReason = typeof item.reason === 'string' ? item.reason : undefined;
+    // Empty / whitespace-only inline reason is treated as absent so it does
+    // not silently override the comment fallback and defeat AI Agent Rule #9.
+    const rawInline = typeof item.reason === 'string' ? item.reason : undefined;
+    const inlineReason =
+      rawInline !== undefined && rawInline.trim().length > 0 ? rawInline : undefined;
     const commentReason = commentReasons[i];
     const reason = inlineReason ?? commentReason;
     if (reason !== undefined) out.reason = reason;
@@ -183,8 +197,16 @@ function extractReasonComments(doc: Document): Array<string | undefined> {
       out.push(undefined);
       continue;
     }
-    const cb = i === 0 ? (item.commentBefore ?? seqCommentBefore) : item.commentBefore;
-    out.push(pickReasonLine(cb));
+    // First item: scan BOTH item.commentBefore AND the sequence-level comment
+    // for a `# reason:` line; prefer item-level but fall back to seq-level so
+    // an unrelated comment immediately before item[0] does not silently drop
+    // a reason that sits between `queries:` and the first list item.
+    const itemReason = pickReasonLine(item.commentBefore);
+    if (i === 0 && itemReason === undefined) {
+      out.push(pickReasonLine(seqCommentBefore));
+    } else {
+      out.push(itemReason);
+    }
   }
   return out;
 }
@@ -244,17 +266,54 @@ export async function runEval(evalSet: EvalSet, opts: EvalRunnerOptions): Promis
 
   const perQuery: EvalQueryResult[] = [];
   for (const q of evalSet.queries) {
-    const topResults: EvalSearchResult[] = await opts.searchFn(q.query, { topK });
-    const { hitRank, reciprocalRank } = scoreQuery(q, topResults, {
-      strict: opts.strict ?? false,
-    });
     const row: EvalQueryResult = {
       query: q.query,
-      topResults,
-      reciprocalRank,
+      topResults: [],
+      reciprocalRank: 0,
     };
     if (q.category !== undefined) row.category = q.category;
     if (q.reason !== undefined) row.reason = q.reason;
+
+    let rawResults: EvalSearchResult[];
+    try {
+      rawResults = await opts.searchFn(q.query, { topK });
+    } catch (err) {
+      // searchFn threw: record the error on the row and keep going so the
+      // remaining queries still produce a per-query record. CI reviewer needs
+      // to see WHICH query failed, not just an opaque process exit (FR42).
+      row.error = err instanceof Error ? (err.message ?? String(err)) : String(err);
+      perQuery.push(row);
+      continue;
+    }
+    if (!Array.isArray(rawResults)) {
+      row.error = `runEval: searchFn for query="${q.query}" returned non-array (got ${typeof rawResults})`;
+      perQuery.push(row);
+      continue;
+    }
+    // Validate every entry has the REQUIRED `source` string before scoring;
+    // a missing source upstream means the provider has a contract bug and
+    // silently treating the row as MISS would hide that from CI.
+    for (let i = 0; i < rawResults.length; i += 1) {
+      const r = rawResults[i];
+      if (r === null || typeof r !== 'object' || typeof r.source !== 'string') {
+        row.error = `runEval: searchFn for query="${q.query}" returned result[${i}] without a string 'source' field`;
+        break;
+      }
+    }
+    if (row.error !== undefined) {
+      perQuery.push(row);
+      continue;
+    }
+
+    // Enforce the Hit Rate@K contract: hits beyond rank K MUST NOT count.
+    // Providers that return more than topK rows (e.g. a debug overlay) would
+    // otherwise inflate the metric and turn NFR14 into a tautology.
+    const topResults = rawResults.slice(0, topK);
+    const { hitRank, reciprocalRank } = scoreQuery(q, topResults, {
+      strict: opts.strict ?? false,
+    });
+    row.topResults = topResults;
+    row.reciprocalRank = reciprocalRank;
     if (hitRank !== undefined) row.hitRank = hitRank;
     perQuery.push(row);
   }

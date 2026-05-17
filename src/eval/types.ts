@@ -92,6 +92,13 @@ export interface EvalQueryResult {
   topResults: EvalSearchResult[];
   /** Reciprocal Rank ∈ [0, 1] for this query (1/hitRank or 0). */
   reciprocalRank: number;
+  /**
+   * Error message captured when `searchFn` threw or returned an invalid shape
+   * for this query. Present only on failure; the query counts as MISS for Hit
+   * Rate / MRR purposes. Keeps the eval running (FR42 — partial artifact still
+   * uploaded so CI reviewer can see WHICH query crashed without losing the rest).
+   */
+  error?: string;
 }
 
 /** Aggregate eval-set summary, written to summary.json (FR40). */
