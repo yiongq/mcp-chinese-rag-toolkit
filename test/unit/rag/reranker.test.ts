@@ -289,16 +289,15 @@ function makeHybridFixture(): HybridHit[] {
 }
 
 describe('createReranker (stub-by-injection)', () => {
-  it('factory itself is side-effect-free — does not invoke reranker.rank', () => {
+  it('factory itself is side-effect-free — does not invoke reranker.rank', async () => {
     const reranker = makeStubReranker('stub', () => 0.5);
     const spy = vi.spyOn(reranker, 'rank');
     // The dynamic import keeps module-level singletons isolated across tests.
     // (The createReranker factory does NOT touch the singleton; this is a
     // belt-and-suspenders guarantee for the "no I/O at factory time" claim.)
-    void import('../../../src/rag/reranker.js').then(({ createReranker }) => {
-      createReranker({ reranker });
-      expect(spy).not.toHaveBeenCalled();
-    });
+    const { createReranker } = await import('../../../src/rag/reranker.js');
+    createReranker({ reranker });
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('validates defaultOpts at factory time (topK / batchSize / maxLength)', async () => {
@@ -358,6 +357,17 @@ describe('createReranker (stub-by-injection)', () => {
     const fixture = makeHybridFixture();
     const result = await rerank('q', fixture, { topK: Number.POSITIVE_INFINITY });
     expect(result.length).toBe(fixture.length);
+  });
+
+  it('accepts defaultOpts.topK = Infinity (regression: was rejected by redundant ceiling check)', async () => {
+    const { createReranker } = await import('../../../src/rag/reranker.js');
+    const reranker = makeStubReranker('stub', () => 0.5);
+    expect(() =>
+      createReranker({ reranker, defaultOpts: { topK: Number.POSITIVE_INFINITY } }),
+    ).not.toThrow();
+    const rerank = createReranker({ reranker, defaultOpts: { topK: Number.POSITIVE_INFINITY } });
+    const result = await rerank('q', makeHybridFixture());
+    expect(result.length).toBe(12);
   });
 
   it('rerank empty candidates short-circuits to []', async () => {

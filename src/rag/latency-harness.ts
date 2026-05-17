@@ -68,13 +68,22 @@ export function percentile(samples: number[], p: number): number {
   if (typeof p !== 'number' || !Number.isFinite(p) || p < 0 || p > 1) {
     throw new Error(`percentile: p must be a finite number in [0, 1], got ${String(p)}`);
   }
+  // Reject NaN / ±Infinity samples — they corrupt the sort comparator and
+  // propagate through the linear-interpolation arithmetic into the snapshot
+  // (where JSON.stringify silently turns NaN/Infinity into `null`).
+  for (let i = 0; i < samples.length; i += 1) {
+    const v = samples[i];
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      throw new Error(`percentile: samples[${i}] must be a finite number, got ${String(v)}`);
+    }
+  }
   const sorted = [...samples].sort((a, b) => a - b);
   const n = sorted.length;
   if (n === 1) {
     // Single-element fast path so we never index past the array.
     const only = sorted[0];
-    if (only === undefined || !Number.isFinite(only)) {
-      throw new Error('percentile: sample is not a finite number');
+    if (only === undefined) {
+      throw new Error('percentile: internal indexing error');
     }
     return only;
   }
@@ -201,34 +210,44 @@ export async function runStdioLatencyHarness(
     );
   }
 
-  const bundle = await opts.buildHarnessTool();
-  // Override the tool's outward-facing name so callers can register a real
-  // production tool and still measure it as `search-fixture` (or whatever
-  // `toolName` the caller picks). This keeps the snapshot.toolName field
-  // useful for cross-experiment comparison.
-  const registeredToolName = bundle.tool.name;
-
-  const server = new McpServer({
-    name: 'mcp-rag-latency-harness',
-    version: '0.0.0',
-  });
-  server.registerTool(
-    registeredToolName,
-    {
-      description: bundle.tool.description,
-      // Cast required because SDK's union type isn't directly inferable from z.ZodObject — see create-mcp-server.ts:118.
-      inputSchema: bundle.tool.inputSchema as never,
-    },
-    bundle.tool.handler as never,
-  );
-
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'mcp-rag-latency-harness-client', version: '0.0.0' });
-
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  // Resource lifecycle: bundle (sqlite db / ONNX session) → server → client.
+  // Build + connect happen inside try so any partial-init failure (e.g.,
+  // buildHarnessTool resolves but server.connect throws) still cleans up.
+  let bundle: HarnessToolBundle | undefined;
+  let server: McpServer | undefined;
+  let client: Client | undefined;
+  let serverConnected = false;
+  let clientConnected = false;
 
   try {
+    bundle = await opts.buildHarnessTool();
+    // Override the tool's outward-facing name so callers can register a real
+    // production tool and still measure it as `search-fixture` (or whatever
+    // `toolName` the caller picks). This keeps the snapshot.toolName field
+    // useful for cross-experiment comparison.
+    const registeredToolName = bundle.tool.name;
+
+    server = new McpServer({
+      name: 'mcp-rag-latency-harness',
+      version: '0.0.0',
+    });
+    server.registerTool(
+      registeredToolName,
+      {
+        description: bundle.tool.description,
+        // Cast required because SDK's union type isn't directly inferable from z.ZodObject — see create-mcp-server.ts:118.
+        inputSchema: bundle.tool.inputSchema as never,
+      },
+      bundle.tool.handler as never,
+    );
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    client = new Client({ name: 'mcp-rag-latency-harness-client', version: '0.0.0' });
+
+    await server.connect(serverTransport);
+    serverConnected = true;
+    await client.connect(clientTransport);
+    clientConnected = true;
     // The MCP SDK wraps tool-handler exceptions into a successful JSON-RPC
     // response with `isError: true` instead of rejecting the call. The
     // harness MUST reject on these — partial baselines built from error
@@ -294,15 +313,24 @@ export async function runStdioLatencyHarness(
   } finally {
     // Tear down regardless of success / failure so subsequent harness runs in
     // the same process get a clean server pair. dispose() runs LAST so the
-    // tool can still service in-flight calls during transport close.
-    await client.close().catch(() => {
-      // Best-effort — never mask the original error.
-    });
-    await server.close().catch(() => {
-      // Best-effort.
-    });
-    if (bundle.dispose) {
-      await bundle.dispose();
+    // tool can still service in-flight calls during transport close. Every
+    // cleanup step is best-effort — a throwing dispose() must NOT mask the
+    // original error from the try block (otherwise tool-handler failures get
+    // replaced by misleading "close failed" stack traces).
+    if (clientConnected && client) {
+      await client.close().catch(() => {
+        /* best-effort */
+      });
+    }
+    if (serverConnected && server) {
+      await server.close().catch(() => {
+        /* best-effort */
+      });
+    }
+    if (bundle?.dispose) {
+      await Promise.resolve(bundle.dispose()).catch(() => {
+        /* best-effort */
+      });
     }
   }
 }

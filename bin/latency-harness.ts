@@ -19,7 +19,8 @@
  * annotation when running in CI.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,25 +49,55 @@ interface CliArgs {
   warmupRuns?: number;
 }
 
+function parseInteger(flag: string, raw: string): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`latency-harness: ${flag} must be a positive integer, got ${raw}`);
+  }
+  return n;
+}
+
 function parseArgs(argv: readonly string[]): CliArgs {
   const out: CliArgs = { write: false };
+  const numericFlags = new Set(['--measure-runs', '--warmup-runs']);
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    if (arg === undefined) continue;
     if (arg === '--write') {
       out.write = true;
       continue;
     }
-    if (arg === '--measure-runs' || arg === '--warmup-runs') {
-      const next = argv[i + 1];
-      if (!next) throw new Error(`latency-harness: ${arg} requires a numeric value`);
-      const n = Number(next);
-      if (!Number.isInteger(n) || n < 1) {
-        throw new Error(`latency-harness: ${arg} must be a positive integer, got ${next}`);
+    // Support the `--flag=value` form alongside the `--flag value` form.
+    const eqIdx = arg.indexOf('=');
+    if (eqIdx !== -1) {
+      const flag = arg.slice(0, eqIdx);
+      const value = arg.slice(eqIdx + 1);
+      if (!numericFlags.has(flag)) {
+        throw new Error(`latency-harness: unknown flag ${flag}`);
       }
+      if (value === '') {
+        throw new Error(`latency-harness: ${flag}= requires a value`);
+      }
+      const n = parseInteger(flag, value);
+      if (flag === '--measure-runs') out.measureRuns = n;
+      else out.warmupRuns = n;
+      continue;
+    }
+    if (numericFlags.has(arg)) {
+      const next = argv[i + 1];
+      // Reject `--measure-runs --write` (next looks like another flag) — the
+      // user almost certainly forgot the value, and silently consuming `--write`
+      // as a numeric arg would drop the write intent on the floor.
+      if (!next || next.startsWith('--')) {
+        throw new Error(`latency-harness: ${arg} requires a numeric value`);
+      }
+      const n = parseInteger(arg, next);
       if (arg === '--measure-runs') out.measureRuns = n;
       else out.warmupRuns = n;
       i += 1;
+      continue;
     }
+    throw new Error(`latency-harness: unknown argument ${arg}`);
   }
   return out;
 }
@@ -191,22 +222,74 @@ function resolveEnvironment(): CliEnvironment {
   return { baselinePath, latestPath, toolkitVersion: pkg.version ?? '0.0.0' };
 }
 
+const baselineEnvironmentSchema = z.object({
+  node: z.string(),
+  platform: z.string(),
+  arch: z.string(),
+  toolkitVersion: z.string(),
+  rerankerModelId: z.string(),
+  embedderModelId: z.string(),
+  jiebaVersion: z.string(),
+});
+const baselineSchema = z.object({
+  timestamp: z.string(),
+  toolName: z.string(),
+  warmupRuns: z.number().int().nonnegative(),
+  measureRuns: z.number().int().positive(),
+  coldStartMs: z.number(),
+  p50Ms: z.number().finite(),
+  p95Ms: z.number().finite(),
+  p99Ms: z.number().finite(),
+  meanMs: z.number().finite(),
+  minMs: z.number().finite(),
+  maxMs: z.number().finite(),
+  environment: baselineEnvironmentSchema,
+});
+
+/**
+ * Read baseline.json from disk.
+ *
+ * Returns `undefined` ONLY when the file is missing (first-run case).
+ * THROWS on corrupt JSON or schema mismatch — silently substituting
+ * "no baseline" for a broken contract file would let regressions slip
+ * through without the operator noticing.
+ */
 function readBaseline(baselinePath: string): LatencySnapshot | undefined {
   if (!existsSync(baselinePath)) return undefined;
+  const raw = readFileSync(baselinePath, 'utf8');
+  let parsed: unknown;
   try {
-    const raw = readFileSync(baselinePath, 'utf8');
-    return JSON.parse(raw) as LatencySnapshot;
+    parsed = JSON.parse(raw);
   } catch (err) {
-    process.stderr.write(
-      `latency-harness: failed to parse baseline.json (${err instanceof Error ? err.message : String(err)})\n`,
+    throw new Error(
+      `latency-harness: bench/baseline.json is not valid JSON (${err instanceof Error ? err.message : String(err)}). ` +
+        'Delete the file and re-seed with `pnpm bench -- --write` after investigating the corruption.',
     );
-    return undefined;
   }
+  const result = baselineSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(
+      `latency-harness: bench/baseline.json fails LatencySnapshot schema (${result.error.message}). ` +
+        'Either the file is corrupt or the schema has evolved; re-seed via `pnpm bench -- --write` after review.',
+    );
+  }
+  return result.data as LatencySnapshot;
 }
 
 function ensureDir(filePath: string): void {
   const dir = path.dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+}
+
+/**
+ * Write a contract file atomically — never leave a half-written
+ * `baseline.json` / `latest.json` if the process is interrupted mid-write.
+ * Same idiom used by package managers / configuration tools.
+ */
+function writeFileAtomic(filePath: string, contents: string): void {
+  const tmpPath = `${filePath}.${randomUUID()}.tmp`;
+  writeFileSync(tmpPath, contents, 'utf8');
+  renameSync(tmpPath, filePath);
 }
 
 function formatMs(value: number): string {
@@ -227,30 +310,78 @@ function reportSnapshot(snapshot: LatencySnapshot): void {
   );
 }
 
+/** NFR1 hard ceiling — stdio P95 must stay below this value. */
+const NFR1_P95_CEILING_MS = 200;
+/** Relative regression threshold beyond the baseline. */
+const REGRESSION_THRESHOLD_MS = 50;
+/** Improvement threshold prompting baseline refresh suggestion. */
+const IMPROVEMENT_THRESHOLD_MS = -20;
+
+function emitAnnotation(message: string): void {
+  process.stdout.write(`${message}\n`);
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    process.stdout.write(`::warning::${message}\n`);
+  }
+}
+
 function reportDiff(baseline: LatencySnapshot | undefined, current: LatencySnapshot): void {
+  // Absolute NFR1 check first — fires regardless of baseline availability so a
+  // missing baseline cannot mask a P95 already over the 200ms ceiling.
+  if (current.p95Ms > NFR1_P95_CEILING_MS) {
+    emitAnnotation(
+      `⚠️ NFR1 breach: current P95 ${formatMs(current.p95Ms)} > ${NFR1_P95_CEILING_MS}ms ceiling`,
+    );
+  }
+
   if (!baseline) {
     process.stdout.write(
       'latency-harness: no bench/baseline.json on disk — run `pnpm bench -- --write` to seed one.\n',
     );
     return;
   }
-  const envMismatch =
-    baseline.environment.platform !== current.environment.platform ||
-    baseline.environment.arch !== current.environment.arch;
-  if (envMismatch) {
+
+  // Drift is only meaningful when the run + baseline share the same
+  // measurement substrate. Mismatched platform / arch / runtime / model
+  // identity all invalidate the comparison; report each one explicitly so
+  // operators know why no number is shown.
+  const envDrift: string[] = [];
+  if (baseline.environment.platform !== current.environment.platform) {
+    envDrift.push(`platform ${baseline.environment.platform} → ${current.environment.platform}`);
+  }
+  if (baseline.environment.arch !== current.environment.arch) {
+    envDrift.push(`arch ${baseline.environment.arch} → ${current.environment.arch}`);
+  }
+  if (baseline.environment.node !== current.environment.node) {
+    envDrift.push(`node ${baseline.environment.node} → ${current.environment.node}`);
+  }
+  if (baseline.environment.rerankerModelId !== current.environment.rerankerModelId) {
+    envDrift.push(
+      `reranker ${baseline.environment.rerankerModelId} → ${current.environment.rerankerModelId}`,
+    );
+  }
+  if (baseline.environment.embedderModelId !== current.environment.embedderModelId) {
+    envDrift.push(
+      `embedder ${baseline.environment.embedderModelId} → ${current.environment.embedderModelId}`,
+    );
+  }
+  if (baseline.environment.jiebaVersion !== current.environment.jiebaVersion) {
+    envDrift.push(
+      `jieba ${baseline.environment.jiebaVersion} → ${current.environment.jiebaVersion}`,
+    );
+  }
+  if (envDrift.length > 0) {
     process.stdout.write(
-      `⚠️ baseline measured on ${baseline.environment.platform}/${baseline.environment.arch} but currently on ${current.environment.platform}/${current.environment.arch} — drift not comparable\n`,
+      `⚠️ baseline environment drift — drift not comparable: ${envDrift.join(', ')}\n`,
     );
     return;
   }
+
   const drift = current.p95Ms - baseline.p95Ms;
-  if (drift > 50) {
-    const line = `⚠️ P95 regression: ${formatMs(baseline.p95Ms)} → ${formatMs(current.p95Ms)} (+${formatMs(drift)})`;
-    process.stdout.write(`${line}\n`);
-    if (process.env.GITHUB_ACTIONS === 'true') {
-      process.stdout.write(`::warning::${line}\n`);
-    }
-  } else if (drift < -20) {
+  if (drift > REGRESSION_THRESHOLD_MS) {
+    emitAnnotation(
+      `⚠️ P95 regression: ${formatMs(baseline.p95Ms)} → ${formatMs(current.p95Ms)} (+${formatMs(drift)})`,
+    );
+  } else if (drift < IMPROVEMENT_THRESHOLD_MS) {
     process.stdout.write(
       `✨ P95 improvement: ${formatMs(baseline.p95Ms)} → ${formatMs(current.p95Ms)} (-${formatMs(Math.abs(drift))}). Consider 'pnpm bench -- --write' if intended.\n`,
     );
@@ -283,7 +414,7 @@ async function main(): Promise<void> {
   // Always write latest.json (gitignored) so CI artifact upload + local diff
   // tooling have something to consume.
   ensureDir(env.latestPath);
-  writeFileSync(env.latestPath, `${JSON.stringify(result.snapshot, null, 2)}\n`, 'utf8');
+  writeFileAtomic(env.latestPath, `${JSON.stringify(result.snapshot, null, 2)}\n`);
   process.stdout.write(`latency-harness: wrote ${path.relative(process.cwd(), env.latestPath)}\n`);
 
   const baseline = readBaseline(env.baselinePath);
@@ -291,7 +422,7 @@ async function main(): Promise<void> {
 
   if (args.write) {
     ensureDir(env.baselinePath);
-    writeFileSync(env.baselinePath, `${JSON.stringify(result.snapshot, null, 2)}\n`, 'utf8');
+    writeFileAtomic(env.baselinePath, `${JSON.stringify(result.snapshot, null, 2)}\n`);
     process.stdout.write(
       `\nlatency-harness: WROTE NEW BASELINE → ${path.relative(process.cwd(), env.baselinePath)}\n` +
         `  Please justify the bump in your PR description (regression? optimisation? hardware change?).\n`,

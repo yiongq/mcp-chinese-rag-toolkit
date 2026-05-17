@@ -468,7 +468,10 @@ export interface LatencyHarnessOptions {
   warmupRuns?: number;
   /** Number of measured tool calls. @default 100 */
   measureRuns?: number;
-  /** Fixture: query strings cycled through during measurement. */
+  /**
+   * Fixture: query strings cycled through during measurement.
+   * @default ['试用期', '加班', '请假', '差旅报销', '保密协议']
+   */
   queries?: string[];
   /**
    * Tool name to invoke. Default tool is a hybrid + rerank pipeline over an
@@ -490,7 +493,12 @@ export interface LatencySnapshot {
   warmupRuns: number;
   /** Number of measured runs. */
   measureRuns: number;
-  /** Cold start latency — ms from harness start to first warmup completion. */
+  /**
+   * Cold start latency — total elapsed time of the warmup loop (ms). When
+   * `warmupRuns === 0` this is approximately `0` (loop never ran) and the
+   * first measured sample carries the cold-start cost; treat the field as
+   * informational only in that case.
+   */
   coldStartMs: number;
   /** Warm-only P50 latency (ms). */
   p50Ms: number;

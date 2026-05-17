@@ -53,6 +53,18 @@ describe('percentile (NIST type 7 linear interpolation)', () => {
       /percentile: p must be a finite number/,
     );
   });
+
+  it('rejects samples containing NaN / Infinity (regression: was silently sorted)', () => {
+    expect(() => percentile([1, 2, Number.NaN, 4, 5], 0.5)).toThrow(
+      /samples\[2\] must be a finite number/,
+    );
+    expect(() => percentile([1, Number.POSITIVE_INFINITY, 3], 0.95)).toThrow(
+      /samples\[1\] must be a finite number/,
+    );
+    expect(() => percentile([Number.NEGATIVE_INFINITY], 0.5)).toThrow(
+      /samples\[0\] must be a finite number/,
+    );
+  });
 });
 
 // Pure sleep-based stub tool — never loads real models. Used to exercise the

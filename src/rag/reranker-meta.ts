@@ -52,8 +52,9 @@ export function writeRerankerMeta(db: Database.Database, reranker: Reranker): vo
     if (existing && existing.value !== '' && existing.value !== modelId) {
       throw new Error(
         `writeRerankerMeta: meta.reranker_model is already '${existing.value}' — ` +
-          `refusing to overwrite with '${modelId}'. Story 2.7 eval baseline depends on a stable reranker; ` +
-          'rebuild eval results with the new reranker or delete the .db file before proceeding.',
+          `refusing to overwrite with '${modelId}'. Reranker score cache + downstream ` +
+          'eval comparisons assume a stable reranker; rebuild via a fresh index or delete ' +
+          'the .db file before proceeding with a different reranker.',
       );
     }
     insert.run('reranker_model', modelId);

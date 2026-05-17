@@ -34,8 +34,6 @@ const DEFAULT_BATCH_SIZE = 32;
 const DEFAULT_MAX_LENGTH = 512;
 /** Default `createReranker` top-K — FR14 / Story 2.7 Hit Rate@5 contract. */
 const DEFAULT_TOP_K = 5;
-/** Shared upper bound on `RerankOptions.topK` (besides `Infinity`). */
-const MAX_OPTION_VALUE = 1000;
 
 /**
  * Module-level cache of in-flight + resolved rerankers. Mirrors `embedderCache`
@@ -201,7 +199,10 @@ function buildReranker(
         )(queries, {
           text_pair: sliceDocs,
           padding: true,
-          truncation: true,
+          // `'longest_first'` drops from the longer side of the (query, doc)
+          // pair — usually the document — matching FlagEmbedding's reference
+          // behaviour and what the public Reranker.rank JSDoc promises.
+          truncation: 'longest_first',
           max_length: maxLength,
           return_tensors: 'pt',
         });
@@ -243,14 +244,6 @@ function buildReranker(
   };
 }
 
-function assertBoundedPositiveInteger(value: number, field: string): void {
-  if (!Number.isInteger(value) || value < 1 || value > MAX_OPTION_VALUE) {
-    throw new Error(
-      `createReranker: ${field} must be an integer in [1, ${MAX_OPTION_VALUE}], got ${String(value)}`,
-    );
-  }
-}
-
 /**
  * `topK` accepts `Infinity` for "return every reranked candidate", matching
  * `createHybridSearch.assertValidTopK`'s contract (Story 2.4 M5 lesson).
@@ -281,14 +274,13 @@ function assertValidMaxLength(value: number): void {
 }
 
 function validateDefaultOpts(opts: RerankOptions): void {
+  // Each field has exactly one validator — the prior dual-validation of
+  // topK (assertValidTopK + assertBoundedPositiveInteger) silently capped
+  // defaultOpts.topK at MAX_OPTION_VALUE while the per-call path had no
+  // such ceiling, producing an asymmetric contract for the same field.
   if (opts.topK !== undefined) assertValidTopK(opts.topK);
   if (opts.batchSize !== undefined) assertValidBatchSize(opts.batchSize);
   if (opts.maxLength !== undefined) assertValidMaxLength(opts.maxLength);
-  // perSourceTopK does not exist on RerankOptions; topK ceiling guard uses
-  // assertValidTopK above which accepts Infinity per Story 2.4 M5 lesson.
-  if (opts.topK !== undefined && opts.topK !== Number.POSITIVE_INFINITY) {
-    assertBoundedPositiveInteger(opts.topK, 'topK');
-  }
 }
 
 /**
