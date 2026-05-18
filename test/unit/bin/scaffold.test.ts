@@ -138,9 +138,36 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['a', 'b'])).toThrow(/unexpected extra positional argument/);
   });
 
-  it('accepts scoped npm-style project name', () => {
-    const opts = parseArgs(['@scope/my-proj']);
-    expect(opts.projectName).toBe('@scope/my-proj');
+  it('rejects scoped npm-style project name (cannot be a single directory)', () => {
+    expect(() => parseArgs(['@scope/my-proj'])).toThrow(/scoped names .* are not supported/);
+  });
+
+  it('rejects uppercase project names (npm forbids uppercase)', () => {
+    expect(() => parseArgs(['My-Cool-App'])).toThrow(/invalid project name/);
+  });
+
+  it('rejects Windows-reserved names (con, aux, nul, com1, lpt1)', () => {
+    for (const name of ['con', 'aux', 'nul', 'com1', 'lpt1']) {
+      expect(() => parseArgs([name])).toThrow(/Windows-reserved name/);
+    }
+  });
+
+  it('rejects "--" by itself as missing project name', () => {
+    expect(() => parseArgs(['--'])).toThrow(/missing <project-name>/);
+  });
+
+  it('treats "--" as end-of-flags, allowing dash-leading positional after it', () => {
+    // Even after `--`, a positional starting with `-` is still rejected by
+    // NPM_NAME_REGEX — the `--` separator only suppresses flag parsing.
+    expect(() => parseArgs(['--', '-weird'])).toThrow(/invalid project name/);
+  });
+
+  it('warns on duplicate --template flag (last value wins)', () => {
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const opts = parseArgs(['my', '--template', 'rag-basic', '--template', 'rag-basic']);
+    expect(opts.template).toBe('rag-basic');
+    expect(warnSpy.mock.calls.map((c) => String(c[0])).join('')).toMatch(/duplicate --template/);
+    warnSpy.mockRestore();
   });
 
   it('exposes SUPPORTED_TEMPLATES as a non-empty readonly tuple including rag-basic', () => {
@@ -307,7 +334,20 @@ describe('scaffoldProject', () => {
       readFileSync(path.join(workspace, 'token-test', 'package.json'), 'utf-8'),
     ) as { name: string; dependencies: Record<string, string> };
     expect(pkg.name).toBe('token-test');
-    expect(pkg.dependencies['@yiong/mcp-chinese-rag-toolkit']).toMatch(/^\^\d/);
+    // Accept either `^x.y.z` (real published version) or `latest` (placeholder
+    // 0.0.0 fallback) — Story 2.9 code-review fix H2.
+    expect(pkg.dependencies['@yiong/mcp-chinese-rag-toolkit']).toMatch(/^(\^\d|latest$)/);
+  });
+
+  it('substitutes __PACKAGE_MANAGER__ into scaffolded README per --package-manager choice', async () => {
+    const spawnImpl = vi.fn(async () => 0);
+    await scaffoldProject(makeOpts({ projectName: 'pm-token-test', packageManager: 'npm' }), {
+      spawnImpl,
+    });
+    const readme = readFileSync(path.join(workspace, 'pm-token-test', 'README.md'), 'utf-8');
+    expect(readme).toContain('npm install');
+    expect(readme).toContain('npm build-index');
+    expect(readme).not.toContain('__PACKAGE_MANAGER__');
   });
 
   it('substitutes __SCAFFOLD_DATE__ deterministically from the injected `now` clock', async () => {
@@ -383,5 +423,42 @@ describe('scaffoldProject', () => {
     const warnings = warnSpy.mock.calls.map((c) => String(c[0]));
     expect(warnings.some((w) => /git init exited with code 1/.test(w))).toBe(true);
     warnSpy.mockRestore();
+  });
+
+  it('warns (does not throw) when git commit exits non-zero (e.g. missing user.email)', async () => {
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const spawnImpl = vi.fn(async (cmd: string, args: readonly string[]) => {
+      if (cmd === 'git' && args[0] === 'commit') return 128;
+      return 0;
+    });
+    await scaffoldProject(makeOpts({ skipGitInit: false, projectName: 'commit-fail' }), {
+      spawnImpl,
+    });
+    const warnings = warnSpy.mock.calls.map((c) => String(c[0]));
+    expect(warnings.some((w) => /git commit exited with code 128/.test(w))).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('cleans up the partial target directory when install fails (so re-run works)', async () => {
+    const spawnImpl = vi.fn(async () => 1);
+    await expect(
+      scaffoldProject(makeOpts({ skipInstall: false, projectName: 'cleanup-test' }), {
+        spawnImpl,
+      }),
+    ).rejects.toBeInstanceOf(InstallFailedError);
+    // Partial dir must be gone — re-run should not hit "target dir exists".
+    expect(() => statSync(path.join(workspace, 'cleanup-test'))).toThrow(/ENOENT/);
+  });
+
+  it('cleans up the partial target directory when spawn rejects', async () => {
+    const spawnImpl = vi.fn(async () => {
+      throw new Error('spawn EACCES git');
+    });
+    await expect(
+      scaffoldProject(makeOpts({ skipInstall: false, projectName: 'cleanup-spawn' }), {
+        spawnImpl,
+      }),
+    ).rejects.toBeInstanceOf(InstallFailedError);
+    expect(() => statSync(path.join(workspace, 'cleanup-spawn'))).toThrow(/ENOENT/);
   });
 });

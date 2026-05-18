@@ -42,8 +42,20 @@ export const isEntrypoint: boolean = (() => {
     const moduleUrl = pathToFileURL(realpathSync(fileURLToPath(import.meta.url))).href;
     const entryUrl = pathToFileURL(realpathSync(entry)).href;
     return moduleUrl === entryUrl;
-  } catch {
-    return false;
+  } catch (err) {
+    // Surface the failure so a misconfigured launcher does not silently
+    // turn the CLI into a no-op. Fall back to a string-compare so the CLI
+    // still runs in the common case (no symlink involved).
+    process.stderr.write(
+      `create-mcp-rag: warning — could not resolve entrypoint via realpath (${err instanceof Error ? err.message : String(err)}); falling back to literal path compare\n`,
+    );
+    try {
+      const moduleUrl = import.meta.url;
+      const entryUrl = pathToFileURL(entry).href;
+      return moduleUrl === entryUrl;
+    } catch {
+      return false;
+    }
   }
 })();
 
@@ -70,11 +82,15 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
 
 if (isEntrypoint) {
   main()
-    .then((code) => process.exit(code))
+    .then((code) => {
+      // Use exitCode so the event loop drains buffered stderr writes before
+      // the process actually exits (matters for piped stderr, e.g. `2> err.log`).
+      process.exitCode = code;
+    })
     .catch((err: unknown) => {
       process.stderr.write(
         `create-mcp-rag: fatal ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
       );
-      process.exit(2);
+      process.exitCode = 2;
     });
 }

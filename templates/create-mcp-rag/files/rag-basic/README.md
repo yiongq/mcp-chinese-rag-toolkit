@@ -10,20 +10,20 @@ embedder + hybrid + rerank pipeline when you're ready.
 ## 1. Install
 
 ```sh
-pnpm install
+__PACKAGE_MANAGER__ install
 ```
 
 ## 2. Build the index
 
 ```sh
-pnpm build-index
+__PACKAGE_MANAGER__ build-index
 # → Indexed N chunks → data/index.db
 ```
 
 ## 3. Start the MCP server (stdio transport)
 
 ```sh
-pnpm start:stdio
+__PACKAGE_MANAGER__ start:stdio
 ```
 
 ## 4. Try it via MCP Inspector
@@ -31,7 +31,7 @@ pnpm start:stdio
 In a second terminal:
 
 ```sh
-npx @modelcontextprotocol/inspector pnpm start:stdio
+npx @modelcontextprotocol/inspector __PACKAGE_MANAGER__ start:stdio
 ```
 
 Call `search_docs` with `{ "query": "试用期工资" }` — you should see a chunk
@@ -80,14 +80,16 @@ methodology (query categories, Hit Rate@K, MRR interpretation).
 
 ## Wire into Claude Code / Cursor / VS Code
 
-Add to your MCP client config:
+After `__PACKAGE_MANAGER__ build` (or pointing at the built `dist/server.js`),
+add to your MCP client config. Adjust the `command` / `args` for your
+package manager (`pnpm -C <abs>`, `npm --prefix <abs> run`, `yarn --cwd <abs>`):
 
 ```json
 {
   "mcpServers": {
     "__PROJECT_NAME__": {
-      "command": "pnpm",
-      "args": ["-C", "/abs/path/to/__PROJECT_NAME__", "start:stdio"]
+      "command": "node",
+      "args": ["/abs/path/to/__PROJECT_NAME__/dist/server.js"]
     }
   }
 }

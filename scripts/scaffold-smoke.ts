@@ -23,11 +23,12 @@ const REQUIRED_FILES = [
 ];
 
 async function main(): Promise<void> {
-  const root = mkdtempSync(path.join(tmpdir(), 'create-mcp-rag-smoke-'));
   const originalCwd = process.cwd();
-  process.chdir(root);
-  const projectName = 'smoke-mcp-oa';
+  let root: string | null = null;
   try {
+    root = mkdtempSync(path.join(tmpdir(), 'create-mcp-rag-smoke-'));
+    process.chdir(root);
+    const projectName = 'smoke-mcp-oa';
     await scaffoldProject({
       projectName,
       template: 'rag-basic',
@@ -52,7 +53,7 @@ async function main(): Promise<void> {
       throw new Error(`package.json#name not replaced: ${pkg.name}`);
     }
     const toolkitDep = pkg.dependencies['@yiong/mcp-chinese-rag-toolkit'];
-    if (typeof toolkitDep !== 'string' || !/^\^\d/.test(toolkitDep)) {
+    if (typeof toolkitDep !== 'string' || !/^(\^\d|latest$)/.test(toolkitDep)) {
       throw new Error(`__TOOLKIT_VERSION__ not replaced (saw: ${toolkitDep})`);
     }
 
@@ -60,8 +61,14 @@ async function main(): Promise<void> {
       `smoke:scaffold OK — ${REQUIRED_FILES.length} files + 2 tokens verified at ${target}\n`,
     );
   } finally {
-    process.chdir(originalCwd);
-    rmSync(root, { recursive: true, force: true });
+    try {
+      process.chdir(originalCwd);
+    } catch {
+      // originalCwd may have been removed by an outer process; ignore.
+    }
+    if (root !== null) {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 }
 
@@ -69,5 +76,5 @@ main().catch((err: unknown) => {
   process.stderr.write(
     `smoke:scaffold FAIL: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
-  process.exit(1);
+  process.exitCode = 1;
 });
