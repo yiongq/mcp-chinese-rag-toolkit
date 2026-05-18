@@ -1,0 +1,24 @@
+{
+  "name": "__PROJECT_NAME__",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build-index": "tsx scripts/build-index.ts",
+    "start:stdio": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@yiong/mcp-chinese-rag-toolkit": "__TOOLKIT_VERSION__",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.10.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

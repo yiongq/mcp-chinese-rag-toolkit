@@ -39,9 +39,13 @@
     "bench",
     "bin",
     "templates",
+    "docs",
     "README.md",
     "CHANGELOG.md"
   ],
+  "bin": {
+    "create-mcp-rag": "./dist/cli/create-mcp-rag.js"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -57,6 +61,9 @@
     "inspector:smoke": "tsx scripts/inspector-smoke.ts",
     "manifest:fetch": "tsx scripts/fetch-model-manifest.ts",
     "smoke:native": "tsx scripts/smoke-native-deps.ts",
+    "smoke:scaffold": "tsx scripts/scaffold-smoke.ts",
+    "scaffold:demo": "tsx bin/create-mcp-rag.ts",
+    "docs:api": "typedoc",
     "vision:demo": "tsx bin/run-vision-caption-demo.ts"
   },
   "devDependencies": {
@@ -66,7 +73,9 @@
     "@vitest/coverage-v8": "^3.2.4",
     "env-paths": "^3.0.0",
     "publint": "^0.3.21",
-    "tsdown": "^0.16.8"
+    "tsdown": "^0.16.8",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.4.0"
   },
   "keywords": [
     "mcp",

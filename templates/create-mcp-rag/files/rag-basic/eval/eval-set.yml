@@ -1,0 +1,26 @@
+# Story 2.7 EvalSet schema demo — 3 hello-world queries.
+# Replace with real queries from your own domain.
+# Every query SHOULD have a leading `# reason:` comment (AI Agent Rule #9)
+# explaining WHY the query matters.
+
+version: v1-__PROJECT_NAME__-hello-world
+description: Demo eval set for __PROJECT_NAME__. Replace with real domain queries.
+
+queries:
+  # reason: 直接命中"试用期工资"主关键词，验证 BM25 基础召回
+  - query: 试用期工资标准是多少
+    category: probation
+    expected:
+      - source: sample-doc.md
+
+  # reason: 验证同义/转写检索（"谁来发起"→"由直属主管发起"）
+  - query: 转正考核谁来发起
+    category: probation
+    expected:
+      - source: sample-doc.md
+
+  # reason: 数值类问题（提前几天）— 验证 jieba 分词对数字 + 单位的处理
+  - query: 试用期解除合同要提前几天通知
+    category: probation
+    expected:
+      - source: sample-doc.md

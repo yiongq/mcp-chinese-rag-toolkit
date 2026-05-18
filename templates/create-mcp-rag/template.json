@@ -1,0 +1,12 @@
+{
+  "name": "create-mcp-rag-templates",
+  "templates": [
+    {
+      "id": "rag-basic",
+      "displayName": "RAG Basic (hello-world MCP server with sample doc + FTS-only search)",
+      "description": "Minimal MCP RAG server scaffold. Uses mock embeddings + jieba/BM25 FTS5 search for instant hello-world. Switch to bge-large-zh-v1.5 by editing scripts/build-index.ts (see README).",
+      "minToolkitVersion": "^0.0.0",
+      "minNodeVersion": ">=20.0.0"
+    }
+  ]
+}

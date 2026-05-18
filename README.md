@@ -184,10 +184,10 @@ Invariants you can rely on:
 | --- | --- | --- |
 | ✅ Server factory + error envelope | Story 1.3 | `createMcpServer`, `errors` helpers |
 | ✅ Tool builder + Resource provider + instrumentation hooks | Story 1.4 | `defineTool`, `defineResources`, `withHooks` |
-| ADR + naming conventions migration | Story 1.5 | docs alignment, no API change |
-| Chinese RAG pipeline (parser → chunk → embed → BM25 + vec + RRF + rerank) | Epic 2 (Stories 2.1–2.7) | `rag/*` exports + eval CI gate |
-| Vision caption plugin | Epic 2 Story 2.8 | `rag/vision-caption` |
-| `create-mcp-rag` CLI + Documentation Set (FR49) | Epic 2 Story 2.9 | `bin/create-mcp-rag`, README/CHANGELOG/templates |
+| ✅ ADR + naming conventions migration | Story 1.5 | docs alignment, no API change |
+| ✅ Chinese RAG pipeline (parser → chunk → embed → BM25 + vec + RRF + rerank) | Epic 2 (Stories 2.1–2.7) | `rag/*` exports + eval CI gate |
+| ✅ Vision caption plugin | Epic 2 Story 2.8 | `rag/vision-caption` |
+| ✅ `create-mcp-rag` CLI + Documentation Set (FR49) — Epic 2 closer (9/9 done) | Epic 2 Story 2.9 | `bin/create-mcp-rag`, `docs/`, `templates/create-mcp-rag/` |
 
 See the umbrella roadmap in the repo root [`README.md`](../../README.md) for cross-package status.
 
@@ -1030,6 +1030,60 @@ This plugin ships zero vendor SDKs. Copy `templates/anthropic-vision-provider.ts
 and adapt for 豆包 / 千问 VL / OpenAI as needed. The toolkit deliberately keeps
 the SDK choice in caller-land (mirrors Story 2.6 `LlmProvider` provider-injection
 + Story 2.7 `EvalSearchFn`).
+
+## create-mcp-rag CLI (Story 2.9+)
+
+Scaffold a new MCP RAG server project in one command. Replaces the stale
+official `@modelcontextprotocol/create-server` (1+ year no updates) and
+makes FR18 / the J4 ("5-min hello-world") milestone concrete.
+
+### Quick start
+
+```sh
+npx -p @yiong/mcp-chinese-rag-toolkit create-mcp-rag my-mcp-oa
+cd my-mcp-oa
+pnpm build-index && pnpm start:stdio
+```
+
+> The CLI is exposed via this package's `bin` field, so `npx -p` tells
+> npx which package to fetch. The installed binary is also on `$PATH`
+> via `node_modules/.bin/create-mcp-rag`.
+
+### Options
+
+| Flag | Default | Description |
+|---|---|---|
+| `--template <id>` | `rag-basic` | Template id (see `SUPPORTED_TEMPLATES`) |
+| `--package-manager <pm>` | auto-detect → `pnpm` | `pnpm` / `npm` / `yarn` |
+| `--skip-install` | false | Skip dependency installation |
+| `--no-git-init` | false | Skip `git init` + initial commit |
+| `-h`, `--help` | — | Print help |
+| `-v`, `--version` | — | Print CLI version (= toolkit version) |
+
+### What you get
+
+- `package.json` with toolkit + MCP SDK + zod + better-sqlite3 deps wired
+- `src/server.ts` with `createMcpServer` + a demo `search_docs` tool
+- `data/sample-doc.md` (Chinese HR sample, 200-300 chars) + `eval/eval-set.yml` (3 queries, real Story 2.7 schema)
+- End-to-end runnable in <5 minutes (FTS5-only hello-world; switch to
+  real bge-large-zh-v1.5 embedder by editing `scripts/build-index.ts`)
+
+See [docs/QUICKSTART.md](./docs/QUICKSTART.md) for the full walkthrough,
+and [docs/SCAFFOLD_GUIDE.md](./docs/SCAFFOLD_GUIDE.md) for the CLI
+reference + how to contribute new templates.
+
+## Documentation Set (FR49)
+
+| Doc | Purpose |
+|---|---|
+| [README.md](./README.md) (this file) | API reference + design rationale per story |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | 5-min hello-world via `create-mcp-rag` CLI |
+| [docs/EVAL_GUIDE.md](./docs/EVAL_GUIDE.md) | Methodology for writing your own eval set |
+| [docs/SCAFFOLD_GUIDE.md](./docs/SCAFFOLD_GUIDE.md) | CLI options + template anatomy + contributing |
+| [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Auto-generated from TS declarations (TypeDoc → `docs/api/`) |
+
+Regenerate the API reference: `pnpm docs:api` (output is committed to
+the repo so GitHub UI / npm UI render it without a docs server).
 
 ## License
 
