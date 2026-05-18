@@ -413,4 +413,166 @@ describe('withVisionCaption — enrichPdf core path', () => {
     expect(chunks).toHaveLength(0);
     expect(provider.caption).not.toHaveBeenCalled();
   });
+
+  it('rejects extracted image whose data.length mismatches width*height*channels', async () => {
+    // 10x10x4 should be 400 bytes; supply 100 → validation catches it
+    // BEFORE any provider call.
+    extractImagesMock.mockResolvedValueOnce([
+      { data: new Uint8ClampedArray(100), width: 10, height: 10, channels: 4 as const, key: 'k' },
+    ]);
+    const provider = makeProvider();
+    const plugin = withVisionCaption({ provider, cacheDir });
+    await expect(
+      plugin.enrichPdf?.(makePages(1), { source: 'x.pdf', pdfBytes: makePdfBytes() }),
+    ).rejects.toThrow(/data\.length .* does not match width\*height\*channels/);
+    expect(provider.caption).not.toHaveBeenCalled();
+  });
+
+  it('dedupes images by `image.key` so a logo on every page hits the cache once', async () => {
+    const shared = { ...makeImage(99), key: 'shared-logo' };
+    extractImagesMock
+      .mockResolvedValueOnce([shared])
+      .mockResolvedValueOnce([shared])
+      .mockResolvedValueOnce([shared]);
+    const provider = makeProvider();
+    const plugin = withVisionCaption({ provider, cacheDir });
+    const chunks = await plugin.enrichPdf?.(makePages(3), {
+      source: 'header-logo.pdf',
+      pdfBytes: makePdfBytes(),
+    });
+    expect(chunks).toHaveLength(3);
+    // First occurrence calls the provider, subsequent pages hit the
+    // cache row that was just written → exactly 1 provider invocation
+    // even though there are 3 caption chunks (one per page).
+    expect(provider.caption).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors HTTP Retry-After header when classifying 429 backoff', async () => {
+    extractImagesMock.mockResolvedValueOnce([makeImage(123)]);
+    let calls = 0;
+    const provider = makeProvider(async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw Object.assign(new Error('rate-limited'), {
+          statusCode: 429,
+          // Use retryAfterMs (millisecond form) so the test does not
+          // burn real time — readRetryAfterMs accepts both the seconds
+          // form (Retry-After header) and the millisecond form.
+          retryAfterMs: 10,
+        });
+      }
+      return '重试 after honored';
+    });
+    const plugin = withVisionCaption({
+      provider,
+      cacheDir,
+      maxRetries: 1,
+      timeoutMs: 200,
+    });
+    const start = Date.now();
+    const chunks = await plugin.enrichPdf?.(makePages(1), {
+      source: 'rate-limit.pdf',
+      pdfBytes: makePdfBytes(),
+    });
+    const elapsed = Date.now() - start;
+    expect(chunks).toHaveLength(1);
+    expect(provider.caption).toHaveBeenCalledTimes(2);
+    // Without Retry-After we'd wait RETRY_BACKOFFS_MS[0] = 500ms; with
+    // it we wait ~10ms. Anything under 200ms is unambiguously the
+    // hinted path.
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  it('retries empty caption from provider (treats as transient quirk)', async () => {
+    extractImagesMock.mockResolvedValueOnce([makeImage(77)]);
+    let calls = 0;
+    const provider = makeProvider(async () => {
+      calls += 1;
+      return calls === 1 ? '' : '终于有内容了';
+    });
+    const plugin = withVisionCaption({ provider, cacheDir, maxRetries: 1 });
+    const chunks = await plugin.enrichPdf?.(makePages(1), {
+      source: 'blank.pdf',
+      pdfBytes: makePdfBytes(),
+    });
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.content).toBe('终于有内容了');
+    expect(provider.caption).toHaveBeenCalledTimes(2);
+  }, 10_000);
+
+  it('safety-net aborts when provider hangs past timeoutMs * 1.5', async () => {
+    extractImagesMock.mockResolvedValueOnce([makeImage(88)]);
+    const provider = makeProvider(
+      () =>
+        new Promise<string>(() => {
+          // Never resolves — simulates a misbehaving SDK that ignores
+          // its timeoutMs argument. Without the safety net the plugin
+          // would hang indefinitely.
+        }),
+    );
+    const plugin = withVisionCaption({
+      provider,
+      cacheDir,
+      maxRetries: 0,
+      timeoutMs: 100,
+      onFailure: 'fail-index',
+    });
+    await expect(
+      plugin.enrichPdf?.(makePages(1), { source: 'hang.pdf', pdfBytes: makePdfBytes() }),
+    ).rejects.toBeInstanceOf(VisionCaptionFailedError);
+  }, 10_000);
+
+  it('slices ctx.pdfBytes when it is a non-zero-offset buffer view', async () => {
+    extractImagesMock.mockResolvedValueOnce([makeImage(5)]);
+    const provider = makeProvider();
+    const plugin = withVisionCaption({ provider, cacheDir });
+    // Underlying buffer is larger than the view; view starts at +4.
+    const parent = new Uint8Array(64);
+    for (let i = 0; i < parent.length; i += 1) parent[i] = i & 0xff;
+    const view = parent.subarray(4, 20);
+    await plugin.enrichPdf?.(makePages(1), { source: 'view.pdf', pdfBytes: view });
+    // The first arg to extractImages must be a fresh, contiguous Uint8Array
+    // (byteOffset = 0) — not the offset view that would mis-point PDF.js.
+    const passedBytes = extractImagesMock.mock.calls[0]?.[0] as Uint8Array;
+    expect(passedBytes).toBeInstanceOf(Uint8Array);
+    expect(passedBytes.byteOffset).toBe(0);
+    expect(passedBytes.byteLength).toBe(16);
+  });
+});
+
+describe('withVisionCaption — canvas peer recovery', () => {
+  let cacheDir: string;
+  beforeEach(() => {
+    extractImagesMock.mockReset();
+    cacheDir = mkdtempSync(path.join(tmpdir(), 'vision-caption-cache-'));
+  });
+  afterEach(() => {
+    __setCanvasImporterForTests(null);
+    rmSync(cacheDir, { recursive: true, force: true });
+  });
+
+  it('retries the canvas importer on the next enrichPdf call after a failed import', async () => {
+    extractImagesMock.mockResolvedValue([makeImage(1)]);
+    let attempt = 0;
+    __setCanvasImporterForTests(async () => {
+      attempt += 1;
+      if (attempt === 1) {
+        throw new Error('simulated missing peer');
+      }
+      return stubCanvasModule;
+    });
+    const provider = makeProvider();
+    const plugin = withVisionCaption({ provider, cacheDir });
+    await expect(
+      plugin.enrichPdf?.(makePages(1), { source: 'x.pdf', pdfBytes: makePdfBytes() }),
+    ).rejects.toThrow(/@napi-rs\/canvas/);
+    // Second call must re-attempt the importer (would hang forever on
+    // the cached rejected promise otherwise).
+    const chunks = await plugin.enrichPdf?.(makePages(1), {
+      source: 'x.pdf',
+      pdfBytes: makePdfBytes(),
+    });
+    expect(chunks).toHaveLength(1);
+    expect(attempt).toBe(2);
+  });
 });

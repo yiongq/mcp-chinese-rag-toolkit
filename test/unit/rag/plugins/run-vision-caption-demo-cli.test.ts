@@ -14,6 +14,11 @@ describe('run-vision-caption-demo CLI — parseArgs', () => {
     expect(() => parseArgs(['--foo'])).toThrow(/non-empty path/);
   });
 
+  it('rejects single-dash flag forms (e.g. -h, -x) instead of treating as path', () => {
+    expect(() => parseArgs(['-h'])).toThrow(/non-empty path/);
+    expect(() => parseArgs(['-x'])).toThrow(/non-empty path/);
+  });
+
   it('returns the supplied pdfPath when valid', () => {
     expect(parseArgs(['./sample.pdf'])).toEqual({ pdfPath: './sample.pdf' });
   });
@@ -48,6 +53,21 @@ describe('run-vision-caption-demo CLI — main env-validation', () => {
     try {
       const code = await main(['./does-not-matter.pdf']);
       expect(code).toBe(1);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it('returns 1 (not a rejected Promise) when parseArgs throws past the env check', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-fake';
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      // Empty argv triggers parseArgs throw; without the main() try/catch
+      // this would reject the Promise instead of returning 1.
+      const code = await main([]);
+      expect(code).toBe(1);
+      const messages = stderr.mock.calls.map((c) => String(c[0])).join('');
+      expect(messages).toMatch(/expected sample PDF path/);
     } finally {
       stderr.mockRestore();
     }

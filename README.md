@@ -959,6 +959,9 @@ unaffected because the 12-query toolkit self-eval never invokes the plugin.
 
 ```sh
 # Required peer (PNG encoding backend; ~30 MB native binary).
+# pnpm 8+ with the default `auto-install-peers=true` will already pull
+# this in when `@yiong/mcp-chinese-rag-toolkit` is added; running the
+# command below explicitly is the cross-package-manager safe form.
 pnpm add @napi-rs/canvas
 
 # Required: a vision LLM SDK + adapter (Anthropic Claude Haiku shown;

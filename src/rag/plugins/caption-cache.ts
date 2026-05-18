@@ -75,8 +75,25 @@ export function resolveDefaultCaptionCacheDir(): string {
     base = path.join(homedir(), '.cache');
   }
   const dir = path.join(base, CACHE_SUBPATH);
-  mkdirSync(dir, { recursive: true });
+  ensureDir(dir);
   return dir;
+}
+
+/**
+ * Wrap mkdirSync so EACCES / EROFS / ENOTDIR surfaces with the actual
+ * path instead of an opaque errno-only stack. Re-throws everything else
+ * verbatim.
+ */
+function ensureDir(dir: string): void {
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `caption-cache: failed to create cache directory '${dir}'. ` +
+        `Check filesystem permissions / read-only mount. Underlying error: ${detail}`,
+    );
+  }
 }
 
 /**
@@ -96,9 +113,15 @@ export function openCaptionCache(opts: CaptionCacheOptions): CaptionCache {
   if (typeof opts.cacheDir !== 'string' || opts.cacheDir === '') {
     throw new Error('openCaptionCache: opts.cacheDir must be a non-empty string');
   }
-  mkdirSync(opts.cacheDir, { recursive: true });
+  ensureDir(opts.cacheDir);
   const dbPath = path.join(opts.cacheDir, 'captions.db');
   const db = new Database(dbPath);
+  // WAL + a generous busy_timeout so two indexer processes (CLI users
+  // are encouraged to parallelize across PDFs) don't get SQLITE_BUSY
+  // when they upsert into the same captions.db. WAL is also fsync-cheap
+  // for the insert-heavy workload of a first-time index.
+  db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
   db.exec(`
     CREATE TABLE IF NOT EXISTS image_caption_cache (
       image_sha256  TEXT NOT NULL,
