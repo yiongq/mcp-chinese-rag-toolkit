@@ -1,8 +1,14 @@
 # @yiong/mcp-chinese-rag-toolkit
 
+[![npm version](https://img.shields.io/npm/v/@yiong/mcp-chinese-rag-toolkit.svg)](https://www.npmjs.com/package/@yiong/mcp-chinese-rag-toolkit)
+[![npm downloads](https://img.shields.io/npm/dm/@yiong/mcp-chinese-rag-toolkit.svg)](https://www.npmjs.com/package/@yiong/mcp-chinese-rag-toolkit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/yiongq/mcp-chinese-rag-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/yiongq/mcp-chinese-rag-toolkit/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
+
 > Reusable MCP server factory + Chinese RAG pipeline + eval framework for building production MCP servers in TypeScript.
 
-🚧 **0.1.x — server factory + tool / resource builders.** RAG pipeline lands in Epic 2.
+🚀 **v0.1.0 first public release.** Server factory + tool/resource builders + full Chinese RAG pipeline (FTS5+jieba / Hybrid Search RRF / BGE Reranker / Contextual Retrieval) all included.
 
 ## Install
 
