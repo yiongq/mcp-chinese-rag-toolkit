@@ -6,10 +6,9 @@
   "author": "yiong <gin280@gmail.com> (https://github.com/yiongq)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yiongq/mcp-chinese-rag-toolkit.git",
-    "directory": "packages/mcp-chinese-rag-toolkit"
+    "url": "git+https://github.com/yiongq/mcp-chinese-rag-toolkit.git"
   },
-  "homepage": "https://github.com/yiongq/mcp-chinese-rag-toolkit/tree/main/packages/mcp-chinese-rag-toolkit#readme",
+  "homepage": "https://github.com/yiongq/mcp-chinese-rag-toolkit#readme",
   "bugs": {
     "url": "https://github.com/yiongq/mcp-chinese-rag-toolkit/issues"
   },
