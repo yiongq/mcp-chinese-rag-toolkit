@@ -2,9 +2,9 @@
 
 ## 0.1.0 — 2026-05-23
 
-Initial public release. Standalone repo split out from the
-upstream-ai-edge monorepo (commit history preserved via
-`git filter-repo --subdirectory-filter`).
+Initial public release. Extracted from an upstream monorepo as a
+standalone package; full commit history preserved via
+`git filter-repo --subdirectory-filter`.
 
 What's in this release:
 
