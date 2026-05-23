@@ -46,8 +46,7 @@
     "create-mcp-rag": "./dist/cli/create-mcp-rag.js"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
