@@ -3,12 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parsePdf } from '../../../src/rag/pdf-parser.js';
 
-const SAMPLE_PDF = fileURLToPath(
-  new URL('../../../../../docs/employee-handbook.pdf', import.meta.url),
-);
+const SAMPLE_PDF = fileURLToPath(new URL('../../fixtures/sample.pdf', import.meta.url));
 
 describe('parsePdf', () => {
-  it('returns positive totalPages and pages.length === totalPages for the HR sample', async () => {
+  it('returns positive totalPages and pages.length === totalPages for the fixture', async () => {
     const result = await parsePdf(SAMPLE_PDF);
 
     expect(result.totalPages).toBeGreaterThan(0);
@@ -16,7 +14,7 @@ describe('parsePdf', () => {
     expect(result.pages.some((p) => p.text.length > 0)).toBe(true);
   });
 
-  it('parses the HR sample in well under the CI 15s budget (sanity gate)', async () => {
+  it('parses the fixture in well under the CI 15s budget (sanity gate)', async () => {
     const t0 = Date.now();
     const result = await parsePdf(SAMPLE_PDF);
     const elapsed = Date.now() - t0;
