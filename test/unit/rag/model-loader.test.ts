@@ -128,9 +128,9 @@ describe('resolveCacheDir', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
       const out = resolveCacheDir();
       createdDirs.push(out);
-      expect(out.endsWith(path.join('Library', 'Caches', 'mcp-chinese-rag-toolkit', 'models'))).toBe(
-        true,
-      );
+      expect(
+        out.endsWith(path.join('Library', 'Caches', 'mcp-chinese-rag-toolkit', 'models')),
+      ).toBe(true);
     });
 
     it('linux: picks `~/.cache/mcp-chinese-rag-toolkit/models`', () => {
@@ -155,7 +155,9 @@ describe('resolveCacheDir', () => {
       delete process.env.LOCALAPPDATA;
       const out = resolveCacheDir();
       createdDirs.push(out);
-      expect(out.endsWith(path.join('AppData', 'Local', 'mcp-chinese-rag-toolkit', 'models'))).toBe(true);
+      expect(out.endsWith(path.join('AppData', 'Local', 'mcp-chinese-rag-toolkit', 'models'))).toBe(
+        true,
+      );
     });
   });
 });
