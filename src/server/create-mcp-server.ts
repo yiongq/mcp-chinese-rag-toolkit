@@ -5,7 +5,11 @@ import { withLruCache } from '../middleware/with-lru-cache.js';
 import { create as createError } from './errors.js';
 import type { ResourceDefinition } from './resource-provider.js';
 import { connectStdio, type StdioServerHandle } from './stdio.js';
-import { connectStreamableHttp, type StreamableHttpHandle } from './streamable-http.js';
+import {
+  connectStreamableHttp,
+  type CorsOptions,
+  type StreamableHttpHandle,
+} from './streamable-http.js';
 import { selectTransport, type TransportKind } from './transport-factory.js';
 
 export interface McpToolDefinition {
@@ -22,10 +26,13 @@ export interface McpToolDefinition {
  * cache-disabled behaviour (Epic 1 walking-skeleton parity).
  *
  * Per Story 2.6 §架构现实校正 #4: when `transport: 'http'`, the cache
- * is currently per-request (each `connectStreamableHttp` request
- * re-builds the server) — effectively a no-op until Epic 4 Story 4.6
- * re-evaluates. Cache is fully effective on stdio (the mcp-hr /
- * mcp-modeling default).
+ * is per-request (each `connectStreamableHttp` request re-builds the
+ * server) — effectively a no-op. Story 4.6 re-evaluated this and
+ * RESOLVED to keep it a no-op by design: NFR34 mandates a stateless
+ * HTTP server, and a cross-request L0 cache would reintroduce shared
+ * mutable state. HTTP callers (mcp-hr) therefore intentionally omit
+ * `cache`. The cache stays fully effective on stdio (the mcp-hr /
+ * mcp-modeling default consumer).
  */
 export interface McpServerCacheConfig {
   /** @default true when `indexVersion` is provided; false otherwise. */
@@ -59,6 +66,12 @@ export interface McpServerConfig {
    * walking-skeleton behaviour for callers that haven't opted in.
    */
   cache?: McpServerCacheConfig;
+  /**
+   * Story 4.6 — CORS whitelist, forwarded to the HTTP transport. Ignored for
+   * `transport: 'stdio'` (stdio has no origin concept). Omit to disable CORS.
+   * See {@link CorsOptions}; mcp-hr passes `{ origins: ['chrome-extension://*'] }`.
+   */
+  cors?: CorsOptions;
 }
 
 export interface McpServerHandle {
@@ -291,6 +304,7 @@ export function createMcpServer(config: McpServerConfig): McpServerHandle {
         {
           port: config.port,
           ...(config.host !== undefined && { host: config.host }),
+          ...(config.cors !== undefined && { cors: config.cors }),
         },
       );
     }

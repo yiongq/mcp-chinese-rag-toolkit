@@ -46,6 +46,13 @@ import { z } from 'zod';
 
 const server = createMcpServer({
   name: 'my-mcp', version: '0.1.0', transport: 'http', port: 3000,
+  // Optional CORS whitelist (Story 4.6). Omit to disable CORS entirely.
+  // Each entry is matched by exact equality OR a scheme-anchored
+  // `scheme://*` wildcard (e.g. `chrome-extension://*` matches any
+  // extension id). The matched Origin is echoed back in
+  // `Access-Control-Allow-Origin` (never a bare `*`), and `OPTIONS`
+  // preflights are answered with 204 + the CORS headers.
+  cors: { origins: ['chrome-extension://*'] },
   tools: [{
     name: 'echo',
     description: 'Echo the message.',
@@ -59,6 +66,8 @@ const server = createMcpServer({
 await server.start();
 // POST http://127.0.0.1:3000/mcp
 ```
+
+When `cors` is omitted no `Access-Control-*` headers are emitted and `OPTIONS` returns `405` (pre-Story-4.6 behaviour). CORS is a no-op for `transport: 'stdio'`.
 
 ### Error envelope
 

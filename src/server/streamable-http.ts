@@ -10,6 +10,31 @@ import {
   type StreamableHTTPServerTransportOptions,
 } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
+/**
+ * CORS configuration for the Streamable HTTP transport (Story 4.6, NFR9 partial / AR-Ext-4).
+ *
+ * ADR-0006 assigns CORS to the HTTP server (toolkit) tier, not the client. When
+ * supplied, the transport echoes a request's `Origin` back in
+ * `Access-Control-Allow-Origin` (the specific origin, NOT a bare `*`, so only a
+ * whitelisted origin ever receives an ACAO header) and answers `OPTIONS`
+ * preflights with `204`. Note: `Access-Control-Allow-Credentials` is NOT sent,
+ * so cookie/credentialed cross-origin flows are not enabled — MCP over HTTP does
+ * not use them; echoing the specific origin is about strict whitelist semantics,
+ * not credentialed access. When omitted, no CORS headers are emitted and
+ * `OPTIONS` keeps its pre-Story-4.6 `405` behaviour (backward compatible).
+ */
+export interface CorsOptions {
+  /**
+   * Allowed origins. Each entry is matched against the request `Origin` header by:
+   *   - exact string equality (e.g. `https://app.example.com`), OR
+   *   - a `scheme://*` wildcard that matches any non-empty host of that scheme
+   *     (e.g. `chrome-extension://*` matches `chrome-extension://<any-extension-id>`).
+   * Wildcard matching is scheme-anchored — `chrome-extension://*` never matches
+   * `https://evil.com`. A bare-substring `includes` is intentionally NOT used.
+   */
+  origins: readonly string[];
+}
+
 export interface StreamableHttpOptions {
   port: number;
   host?: string;
@@ -22,6 +47,11 @@ export interface StreamableHttpOptions {
    * Pass an empty array to disable the check (not recommended).
    */
   allowedHosts?: readonly string[];
+  /**
+   * CORS whitelist. Omit to disable CORS entirely (no `Access-Control-*` headers;
+   * `OPTIONS` → 405). See {@link CorsOptions}.
+   */
+  cors?: CorsOptions;
 }
 
 export interface StreamableHttpHandle {
@@ -35,6 +65,50 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const PARSE_ERROR_CODE = -32700;
 const INVALID_REQUEST_CODE = -32600;
 const INTERNAL_ERROR_CODE = -32603;
+
+const CORS_WILDCARD_SUFFIX = '://*';
+const CORS_MAX_AGE_SECONDS = '86400';
+// Headers a Streamable HTTP MCP client may send. Used as the fallback when the
+// preflight omits `Access-Control-Request-Headers` (we echo that header verbatim
+// when present so we never under-allow a future SDK header).
+const CORS_DEFAULT_ALLOW_HEADERS =
+  'Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID';
+
+/**
+ * Match a request `Origin` against the configured whitelist. Returns true on an
+ * exact match or a scheme-anchored `scheme://*` wildcard match. The wildcard
+ * requires a non-empty host after `scheme://` so `chrome-extension://*` matches
+ * `chrome-extension://abc` but not the bare `chrome-extension://`.
+ */
+function matchOrigin(requestOrigin: string, patterns: readonly string[]): boolean {
+  for (const pattern of patterns) {
+    if (pattern === requestOrigin) return true;
+    if (pattern.endsWith(CORS_WILDCARD_SUFFIX)) {
+      const prefix = pattern.slice(0, pattern.length - 1); // drop trailing '*', keep 'scheme://'
+      if (requestOrigin.startsWith(prefix) && requestOrigin.length > prefix.length) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolve the `Access-Control-Allow-Origin` value to echo for this request, or
+ * `undefined` when CORS is disabled, the request carries no `Origin`, or the
+ * origin is not whitelisted. We echo the specific origin (never `*`) so the
+ * whitelist stays strict — only a listed origin gets an ACAO header. (No
+ * `Access-Control-Allow-Credentials` is sent, so credentialed flows stay off.)
+ */
+function resolveCorsOrigin(
+  req: IncomingMessage,
+  cors: CorsOptions | undefined,
+): string | undefined {
+  if (cors === undefined) return undefined;
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string' || origin.length === 0) return undefined;
+  return matchOrigin(origin, cors.origins) ? origin : undefined;
+}
 
 class HttpError extends Error {
   constructor(
@@ -135,6 +209,47 @@ export async function connectStreamableHttp(
 
     if (getPath(req) !== '/mcp') {
       writeJsonRpcError(res, 404, INVALID_REQUEST_CODE, 'Not Found');
+      return;
+    }
+
+    // CORS (Story 4.6): resolve the echo origin once, then set ACAO eagerly so it
+    // rides on EVERY /mcp response — preflight, JSON-RPC success, and error
+    // envelopes alike (a browser can only read an error body if ACAO is present).
+    // `setHeader` persists until the first write; the SDK transport's own
+    // `writeHead` merges with (never clears) headers we set here.
+    const corsOrigin = resolveCorsOrigin(req, options.cors);
+    // Vary on Origin for EVERY CORS-eligible response — match or not — so a shared
+    // cache can never replay a no-ACAO response to a whitelisted origin (or echo a
+    // whitelisted ACAO to a different origin). Emitting it only on the match path
+    // would cache non-matches without `Vary` and risk a cross-origin mismatch.
+    // (Story 4.6 code-review.)
+    if (options.cors !== undefined) {
+      res.setHeader('Vary', 'Origin');
+    }
+    if (corsOrigin !== undefined) {
+      res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    }
+
+    // OPTIONS preflight — only intercept when CORS is configured, otherwise fall
+    // through to the 405 branch (pre-Story-4.6 behaviour). A non-whitelisted /
+    // origin-less OPTIONS still returns 204 but WITHOUT ACAO, so the browser's
+    // own CORS check blocks it; the server never 500s on a stray preflight.
+    if (options.cors !== undefined && req.method === 'OPTIONS') {
+      if (corsOrigin !== undefined) {
+        const requested = req.headers['access-control-request-headers'];
+        const allowHeaders =
+          typeof requested === 'string' && requested.length > 0
+            ? requested
+            : CORS_DEFAULT_ALLOW_HEADERS;
+        res.writeHead(204, {
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': allowHeaders,
+          'Access-Control-Max-Age': CORS_MAX_AGE_SECONDS,
+        });
+      } else {
+        res.writeHead(204);
+      }
+      res.end();
       return;
     }
 

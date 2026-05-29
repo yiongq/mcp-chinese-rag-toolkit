@@ -124,6 +124,140 @@ describe('connectStreamableHttp — request validation', () => {
   });
 });
 
+describe('connectStreamableHttp — CORS (Story 4.6)', () => {
+  const VALID_JSONRPC = JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'initialize',
+    id: 1,
+    params: {
+      protocolVersion: '2025-03-26',
+      clientInfo: { name: 'cors-test', version: '0.0.0' },
+      capabilities: {},
+    },
+  });
+
+  it('echoes Access-Control-Allow-Origin for an exact-match whitelisted origin', async () => {
+    const handle = await start({ port: 38781, cors: { origins: ['https://app.example.com'] } });
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Origin: 'https://app.example.com',
+      },
+      body: VALID_JSONRPC,
+    });
+    await res.text();
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    // Never a bare '*' — credentialed-request-safe + strict whitelist semantics.
+    expect(res.headers.get('access-control-allow-origin')).not.toBe('*');
+    expect(res.headers.get('vary')).toBe('Origin');
+  });
+
+  it('matches chrome-extension://* wildcard against any extension id (scheme-anchored)', async () => {
+    const handle = await start({ port: 38782, cors: { origins: ['chrome-extension://*'] } });
+    for (const id of ['abc123', 'pqrstuvwxyz0123456789']) {
+      const origin = `chrome-extension://${id}`;
+      const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: origin },
+        body: VALID_JSONRPC,
+      });
+      await res.text();
+      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
+    }
+  });
+
+  it('does NOT echo ACAO for a non-whitelisted origin (server still responds, no 500)', async () => {
+    const handle = await start({ port: 38783, cors: { origins: ['chrome-extension://*'] } });
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://evil.com', Accept: 'application/json, text/event-stream' },
+      body: VALID_JSONRPC,
+    });
+    await res.text();
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+    // Vary: Origin rides on EVERY CORS-eligible response (even non-matches) so a
+    // shared cache can't replay this no-ACAO body to a whitelisted origin (review).
+    expect(res.headers.get('vary')).toBe('Origin');
+    // The request itself still succeeds at the HTTP layer (browser, not server, enforces CORS).
+    expect(res.status).toBe(200);
+  });
+
+  it('wildcard does NOT match a different scheme (no substring leak)', async () => {
+    const handle = await start({ port: 38784, cors: { origins: ['chrome-extension://*'] } });
+    // 'https://chrome-extension.evil.com' contains the literal substring but is a different scheme.
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://chrome-extension.evil.com' },
+      body: VALID_JSONRPC,
+    });
+    await res.text();
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('answers OPTIONS preflight from a whitelisted origin with 204 + CORS headers', async () => {
+    const handle = await start({ port: 38785, cors: { origins: ['chrome-extension://*'] } });
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'chrome-extension://abc123',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type, mcp-session-id',
+      },
+    });
+    await res.text();
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('chrome-extension://abc123');
+    expect(res.headers.get('access-control-allow-methods')).toContain('POST');
+    expect(res.headers.get('access-control-allow-methods')).toContain('OPTIONS');
+    // Echoes the requested headers verbatim so we never under-allow a future SDK header.
+    expect(res.headers.get('access-control-allow-headers')).toBe('content-type, mcp-session-id');
+    expect(res.headers.get('access-control-max-age')).toBe('86400');
+  });
+
+  it('OPTIONS from a non-whitelisted origin → 204 without ACAO (browser blocks)', async () => {
+    const handle = await start({ port: 38786, cors: { origins: ['chrome-extension://*'] } });
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://evil.com', 'Access-Control-Request-Method': 'POST' },
+    });
+    await res.text();
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('carries ACAO on error responses too (browser must read the error body)', async () => {
+    const handle = await start({ port: 38787, cors: { origins: ['chrome-extension://*'] } });
+    const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'chrome-extension://abc123' },
+      body: '{not valid json',
+    });
+    await res.text();
+    expect(res.status).toBe(400);
+    expect(res.headers.get('access-control-allow-origin')).toBe('chrome-extension://abc123');
+  });
+
+  it('without cors config: no ACAO header and OPTIONS still 405 (backward compat)', async () => {
+    const handle = await start({ port: 38788 });
+    const post = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'chrome-extension://abc123' },
+      body: VALID_JSONRPC,
+    });
+    await post.text();
+    expect(post.headers.get('access-control-allow-origin')).toBeNull();
+
+    const options = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+      method: 'OPTIONS',
+      headers: { Origin: 'chrome-extension://abc123' },
+    });
+    await options.text();
+    expect(options.status).toBe(405);
+  });
+});
+
 describe('connectStreamableHttp — concurrent requests', () => {
   it('handles concurrent requests without cross-talk (per-request server factory)', async () => {
     // Each request gets a fresh McpServer; the factory's responses should not
