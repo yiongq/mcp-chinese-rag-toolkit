@@ -36,6 +36,17 @@ describe('BGE_LARGE_ZH_V1_5_MANIFEST', () => {
     expect(first).toBeDefined();
   });
 
+  it('marks special_tokens_map.json optional (transformers.js v4.x skips it when tokenizer.json is present)', () => {
+    const entry = BGE_LARGE_ZH_V1_5_MANIFEST.files.find(
+      (f) => f.relativePath === 'special_tokens_map.json',
+    );
+    expect(entry?.optional).toBe(true);
+    // every other pinned file stays required (presence enforced under strict verify)
+    for (const f of BGE_LARGE_ZH_V1_5_MANIFEST.files) {
+      if (f.relativePath !== 'special_tokens_map.json') expect(f.optional ?? false).toBe(false);
+    }
+  });
+
   it('is structurally frozen via `as const` (compile-time mutation rejected)', () => {
     // Compile-time check only; never invoked to avoid runtime side-effects
     // (TypeScript `readonly` does not freeze the array at runtime).
@@ -85,6 +96,16 @@ describe('BGE_RERANKER_V2_M3_MANIFEST', () => {
       expect(entry.relativePath.startsWith('/')).toBe(false);
       expect(entry.relativePath.includes('..')).toBe(false);
       expect(entry.relativePath.includes('\\')).toBe(false);
+    }
+  });
+
+  it('marks special_tokens_map.json optional (transformers.js v4.x skips it when tokenizer.json is present)', () => {
+    const entry = BGE_RERANKER_V2_M3_MANIFEST.files.find(
+      (f) => f.relativePath === 'special_tokens_map.json',
+    );
+    expect(entry?.optional).toBe(true);
+    for (const f of BGE_RERANKER_V2_M3_MANIFEST.files) {
+      if (f.relativePath !== 'special_tokens_map.json') expect(f.optional ?? false).toBe(false);
     }
   });
 

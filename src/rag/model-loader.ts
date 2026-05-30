@@ -135,7 +135,9 @@ export async function verifyModelFiles(
       fileStat = await lstat(absPath);
     } catch (err) {
       if (isErrnoNotFound(err)) {
-        if (strict) {
+        // `optional` files (e.g. special_tokens_map.json) are not downloaded by
+        // transformers.js when redundant; a missing one is not a tamper signal.
+        if (strict && !entry.optional) {
           throw new ModelFileMissingError(`Model file missing: ${entry.relativePath}`, {
             file: entry.relativePath,
             expected: entry.sha256,

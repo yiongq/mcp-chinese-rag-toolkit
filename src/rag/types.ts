@@ -180,6 +180,14 @@ export interface ManifestEntry {
   sha256: string;
   /** Total file size in bytes — pre-flight check before streaming the full hash. */
   bytes: number;
+  /**
+   * When `true`, a *missing* file does not fail strict verification: transformers.js
+   * loads the model fine without it (e.g. `special_tokens_map.json` is redundant once
+   * `tokenizer.json` is present, so transformers.js v4.x never downloads it). The
+   * sha256 / byte-length pin is still enforced *if* the file is present in the cache —
+   * `optional` relaxes presence, never integrity. @default false
+   */
+  optional?: boolean;
 }
 
 /**

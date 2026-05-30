@@ -36,6 +36,9 @@ export const BGE_LARGE_ZH_V1_5_MANIFEST: ModelManifest = {
       relativePath: 'special_tokens_map.json',
       sha256: 'b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3',
       bytes: 125,
+      // transformers.js v4.x does not download this file when tokenizer.json is
+      // present — pin its hash for the cached case, but do not require presence.
+      optional: true,
     },
     {
       relativePath: 'onnx/model.onnx',
@@ -108,6 +111,9 @@ export const BGE_RERANKER_V2_M3_MANIFEST: ModelManifest = {
       relativePath: 'special_tokens_map.json',
       sha256: '8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835',
       bytes: 964,
+      // transformers.js v4.x does not download this file when tokenizer.json is
+      // present — pin its hash for the cached case, but do not require presence.
+      optional: true,
     },
     {
       relativePath: 'onnx/model_quantized.onnx',
