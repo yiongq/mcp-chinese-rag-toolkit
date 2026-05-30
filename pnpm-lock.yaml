@@ -50,7 +50,7 @@ importers:
         version: 0.17.4
       '@modelcontextprotocol/inspector':
         specifier: ^0.21.2
-        version: 0.21.2(@cfworker/json-schema@4.1.1)(@types/node@25.9.1)(typescript@5.6.1-rc)
+        version: 0.21.2(@cfworker/json-schema@4.1.1)(@types/node@25.9.1)(typescript@5.9.3)
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -65,13 +65,19 @@ importers:
         version: 0.3.21
       tsdown:
         specifier: ^0.16.8
-        version: 0.16.8(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(publint@0.3.21)(typescript@5.6.1-rc)
+        version: 0.16.8(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(publint@0.3.21)(typescript@5.9.3)
       typedoc:
         specifier: ^0.28.0
-        version: 0.28.19(typescript@5.6.1-rc)
+        version: 0.28.19(typescript@5.9.3)
       typedoc-plugin-markdown:
         specifier: ^4.4.0
-        version: 4.11.0(typedoc@0.28.19(typescript@5.6.1-rc))
+        version: 4.11.0(typedoc@0.28.19(typescript@5.9.3))
+      typescript:
+        specifier: ^5.9
+        version: 5.9.3
+      vitest:
+        specifier: ^3
+        version: 3.2.4(@types/node@25.9.1)(yaml@2.9.0)
 
 packages:
 
@@ -3128,6 +3134,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
 
@@ -3788,7 +3799,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@modelcontextprotocol/inspector@0.21.2(@cfworker/json-schema@4.1.1)(@types/node@25.9.1)(typescript@5.6.1-rc)':
+  '@modelcontextprotocol/inspector@0.21.2(@cfworker/json-schema@4.1.1)(@types/node@25.9.1)(typescript@5.9.3)':
     dependencies:
       '@modelcontextprotocol/inspector-cli': 0.21.2(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@modelcontextprotocol/inspector-client': 0.21.2(@cfworker/json-schema@4.1.1)
@@ -3799,7 +3810,7 @@ snapshots:
       open: 10.2.0
       shell-quote: 1.8.4
       spawn-rx: 5.1.2
-      ts-node: 10.9.2(@types/node@25.9.1)(typescript@5.6.1-rc)
+      ts-node: 10.9.2(@types/node@25.9.1)(typescript@5.9.3)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cfworker/json-schema'
@@ -5693,7 +5704,7 @@ snapshots:
       semver-compare: 1.0.0
       sprintf-js: 1.1.3
 
-  rolldown-plugin-dts@0.18.4(rolldown@1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.6.1-rc):
+  rolldown-plugin-dts@0.18.4(rolldown@1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.9.3):
     dependencies:
       '@babel/generator': 7.29.7
       '@babel/parser': 7.29.7
@@ -5706,7 +5717,7 @@ snapshots:
       obug: 2.1.1
       rolldown: 1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optionalDependencies:
-      typescript: 5.6.1-rc
+      typescript: 5.9.3
     transitivePeerDependencies:
       - oxc-resolver
 
@@ -6091,7 +6102,7 @@ snapshots:
 
   tree-kill@1.2.2: {}
 
-  ts-node@10.9.2(@types/node@25.9.1)(typescript@5.6.1-rc):
+  ts-node@10.9.2(@types/node@25.9.1)(typescript@5.9.3):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       '@tsconfig/node10': 1.0.12
@@ -6105,11 +6116,11 @@ snapshots:
       create-require: 1.1.1
       diff: 4.0.4
       make-error: 1.3.6
-      typescript: 5.6.1-rc
+      typescript: 5.9.3
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
 
-  tsdown@0.16.8(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(publint@0.3.21)(typescript@5.6.1-rc):
+  tsdown@0.16.8(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(publint@0.3.21)(typescript@5.9.3):
     dependencies:
       ansis: 4.3.0
       cac: 6.7.14
@@ -6119,7 +6130,7 @@ snapshots:
       hookable: 5.5.3
       obug: 2.1.1
       rolldown: 1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
-      rolldown-plugin-dts: 0.18.4(rolldown@1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.6.1-rc)
+      rolldown-plugin-dts: 0.18.4(rolldown@1.0.0-beta.52(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.9.3)
       semver: 7.8.1
       tinyexec: 1.2.3
       tinyglobby: 0.2.16
@@ -6128,7 +6139,7 @@ snapshots:
       unrun: 0.2.39
     optionalDependencies:
       publint: 0.3.21
-      typescript: 5.6.1-rc
+      typescript: 5.9.3
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -6152,20 +6163,22 @@ snapshots:
       media-typer: 1.1.0
       mime-types: 3.0.2
 
-  typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@5.6.1-rc)):
+  typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@5.9.3)):
     dependencies:
-      typedoc: 0.28.19(typescript@5.6.1-rc)
+      typedoc: 0.28.19(typescript@5.9.3)
 
-  typedoc@0.28.19(typescript@5.6.1-rc):
+  typedoc@0.28.19(typescript@5.9.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.2.0
       minimatch: 10.2.5
-      typescript: 5.6.1-rc
+      typescript: 5.9.3
       yaml: 2.9.0
 
   typescript@5.6.1-rc: {}
+
+  typescript@5.9.3: {}
 
   uc.micro@2.1.0: {}
 
