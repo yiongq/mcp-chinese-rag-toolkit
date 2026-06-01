@@ -270,7 +270,12 @@ async function runEnrichPdf(
   }
   const extractions = await Promise.all(
     validatedPages.map(async (pageNumber) => {
-      const images = await extractImages(ctx.pdfBytes, pageNumber);
+      // Fresh per-page copy of the bytes: pdf.js (via unpdf) transfers
+      // (detaches) the input ArrayBuffer to its worker on each call, so sharing
+      // `ctx.pdfBytes` across these concurrent per-page extractImages calls makes
+      // every call after the first throw `DataCloneError: Cannot transfer object
+      // of unsupported type`. `.slice()` hands each call its own buffer.
+      const images = await extractImages(ctx.pdfBytes.slice(), pageNumber);
       if (!Array.isArray(images)) {
         throw new Error(
           `enrichPdf: extractImages(page=${pageNumber}) returned a non-array (${typeof images})`,

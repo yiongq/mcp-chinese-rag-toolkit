@@ -237,10 +237,23 @@ function makeHandle(db: Database.Database, embeddingDim: number): IndexHandle {
       assertPositiveIntegerTopK(topK);
       const tokenized = tokenize(query);
       if (tokenized.length === 0) return [];
-      // FTS5 phrase mode — escape embedded quotes by doubling, then wrap.
-      // This lets the SQL `MATCH` parser treat the entire tokenized string
-      // as a phrase, side-stepping FTS5 operator characters like `*` `(` `)`.
-      const matchExpr = `"${tokenized.replace(/"/g, '""')}"`;
+      // OR-of-terms MATCH. Each jieba token is individually phrase-quoted (which
+      // escapes FTS5 operator characters like `*` `(` `)` — embedded quotes are
+      // doubled) and the tokens are joined with `OR`.
+      //
+      // The previous form wrapped the WHOLE tokenized string in one phrase quote
+      // (`"社保 公积金 谁 负责 办理"`), which made FTS5 require every token to
+      // appear verbatim AND contiguous in a document. Natural-language questions
+      // are almost never a contiguous substring of a chunk, so BM25 silently
+      // returned nothing and the vector channel carried every query (keyword
+      // recall was effectively dead). `OR` retrieves any document sharing ≥1
+      // query term and lets BM25 rank by term overlap / IDF — the conventional
+      // keyword-recall semantics, and what the hybrid + reranker pipeline expects.
+      const matchExpr = tokenized
+        .split(' ')
+        .filter((t) => t.length > 0)
+        .map((t) => `"${t.replace(/"/g, '""')}"`)
+        .join(' OR ');
       const rows = ftsStmt.all(matchExpr, topK);
       return rows.map((row, i) => ({
         docId: row.docId,
