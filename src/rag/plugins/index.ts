@@ -5,8 +5,10 @@ export type {
   CaptionCacheEntry,
   IndexingPlugin,
   IndexingPluginContext,
+  PageCaptionOptions,
   VisionCaptionOptions,
   VisionProvider,
 } from './types.js';
 export { OptionalDependencyMissingError, VisionCaptionFailedError } from './types.js';
+export { withPageCaption } from './with-page-caption.js';
 export { DEFAULT_VISION_PROMPT, withVisionCaption } from './with-vision-caption.js';

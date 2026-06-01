@@ -142,6 +142,79 @@ export interface VisionCaptionOptions {
 }
 
 /**
+ * Options for `withPageCaption`. Like {@link VisionCaptionOptions} but the
+ * unit of work is a WHOLE rendered page (via `unpdf.renderPageAsImage`),
+ * not each embedded image (`unpdf.extractImages`). Use this for slide-style /
+ * scanned / vector-flowchart PDFs where the meaningful content is the page as
+ * a whole and per-image extraction would emit one noisy caption per logo /
+ * decoration. Shares the same {@link VisionProvider}, caption cache, default
+ * prompt, retry + backoff, timeout safety net and concurrency cap as
+ * `withVisionCaption`.
+ */
+export interface PageCaptionOptions {
+  /** Caller-injected vision LLM. REQUIRED — toolkit ships zero vendor SDKs. */
+  provider: VisionProvider;
+  /** Concurrency cap across `provider.caption()` calls. @default 3 */
+  maxConcurrency?: number;
+  /**
+   * Caption SQLite cache directory. Shared with `withVisionCaption` — the
+   * rendered-page PNG bytes are the cache key, so the two plugins never
+   * collide. @default `<userCacheDir>/mcp-chinese-rag-toolkit/caption-cache`.
+   */
+  cacheDir?: string;
+  /**
+   * Override the default prompt template. The plugin hashes the FINAL
+   * rendered prompt for the cache key, so changing this string invalidates
+   * cached captions. @default see `DEFAULT_VISION_PROMPT`.
+   */
+  promptTemplate?: string;
+  /**
+   * Per-page retry count on transient errors (timeout / 5xx / 429).
+   * Exponential backoff `500ms / 1500ms / ...` @default 2
+   */
+  maxRetries?: number;
+  /** Per-page timeout in milliseconds passed to provider. @default 30000 */
+  timeoutMs?: number;
+  /**
+   * Per-page failure mode after retries exhausted.
+   *  - `'skip-page'` (default): warn + skip the page; index continues.
+   *  - `'fail-index'`: throw {@link VisionCaptionFailedError}; caller decides
+   *    recovery.
+   *
+   * Never silently swallows errors regardless of mode. @default 'skip-page'
+   */
+  onFailure?: 'skip-page' | 'fail-index';
+  /**
+   * When true, generated chunk `.section` is `'[图片描述]'`; when false,
+   * `.section` is `undefined` (caption blends transparently into the text
+   * stream). @default true
+   */
+  markSyntheticChunk?: boolean;
+  /**
+   * Render scale forwarded to `unpdf.renderPageAsImage`. 1.0 reproduces the
+   * page at its native PDF point size; bump (e.g. 2.0) for sharper OCR on
+   * dense slides at the cost of larger PNGs / more provider tokens.
+   * @default 1.0
+   */
+  scale?: number;
+  /**
+   * Predicate selecting which pages to render + caption. Receives each
+   * {@link PdfPage} and returns `true` to caption it. Overrides
+   * `minTextLength` when provided. @default selects pages whose trimmed text
+   * length is `< minTextLength` (i.e. image-only / title-only pages whose
+   * meaning lives in the rendered page, not the extracted text).
+   */
+  selectPage?: (page: PdfPage) => boolean;
+  /**
+   * Threshold for the DEFAULT page-selection predicate: a page is captioned
+   * when `page.text.trim().length < minTextLength`. Ignored when `selectPage`
+   * is supplied. The boilerplate copyright line repeated on every page (~65
+   * chars) means anything under ~90 carries no real text. @default 90
+   */
+  minTextLength?: number;
+}
+
+/**
  * Result row returned by `CaptionCache.get` / accepted by `.set`. Internal
  * cache record shape — exported for test-time introspection.
  */

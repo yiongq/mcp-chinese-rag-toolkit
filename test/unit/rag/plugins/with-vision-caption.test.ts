@@ -402,6 +402,27 @@ describe('withVisionCaption — enrichPdf core path', () => {
     expect(provider.caption).toHaveBeenCalledTimes(2);
   }, 10_000);
 
+  it('treats a transient network error (code under .cause) as retryable', async () => {
+    extractImagesMock.mockResolvedValueOnce([makeImage(81)]);
+    let calls = 0;
+    const provider = makeProvider(async () => {
+      calls += 1;
+      if (calls < 2) {
+        throw Object.assign(new Error('Connection error.'), {
+          cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+        });
+      }
+      return '网络重试成功';
+    });
+    const plugin = withVisionCaption({ provider, cacheDir, maxRetries: 2, timeoutMs: 200 });
+    const chunks = await plugin.enrichPdf?.(makePages(1), {
+      source: 'hr.pdf',
+      pdfBytes: makePdfBytes(),
+    });
+    expect(chunks).toHaveLength(1);
+    expect(provider.caption).toHaveBeenCalledTimes(2);
+  }, 10_000);
+
   it('returns empty result when a page has zero images', async () => {
     extractImagesMock.mockResolvedValueOnce([]);
     const provider = makeProvider();

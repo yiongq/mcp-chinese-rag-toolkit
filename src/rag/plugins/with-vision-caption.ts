@@ -7,49 +7,28 @@ import {
   resolveDefaultCaptionCacheDir,
   sha256Hex,
 } from './caption-cache.js';
-import { encodePng, ensureCanvasAvailable } from './png-encoder.js';
 import {
-  type IndexingPlugin,
-  type IndexingPluginContext,
-  VisionCaptionFailedError,
-  type VisionCaptionOptions,
-  type VisionProvider,
+  type CaptionEngineOptions,
+  captionPngWithCache,
+  DEFAULT_VISION_PROMPT,
+} from './caption-engine.js';
+import { encodePng, ensureCanvasAvailable } from './png-encoder.js';
+import type {
+  IndexingPlugin,
+  IndexingPluginContext,
+  VisionCaptionOptions,
+  VisionProvider,
 } from './types.js';
 
-/**
- * Default Chinese prompt template — taken verbatim from ADR-0008 §Caption
- * Prompt 模板. Callers can override via `opts.promptTemplate`; doing so
- * invalidates the caption cache (intentional, since different prompts
- * produce different captions).
- */
-export const DEFAULT_VISION_PROMPT =
-  '你是一个文档内容描述助手。请用中文 200-300 字描述这张图的核心信息。\n\n' +
-  '重点关注（按重要性排序）：\n' +
-  '1. 文字标注与数字（OCR-style 完整保留，不简化）\n' +
-  '2. 表格内容（按行列结构描述）\n' +
-  '3. 流程节点与连线方向\n' +
-  '4. 图表类型与数据趋势\n' +
-  '5. 关键 UI 元素位置与标签\n\n' +
-  '格式要求：\n' +
-  '- 不要写"这张图展示了..."类客套开头\n' +
-  '- 数字、专有名词、英文术语必须保留原文\n' +
-  '- 不要推测图外含义，只描述可见内容\n' +
-  '- 中文逗号/句号';
+// Re-export so existing import sites (`from './with-vision-caption.js'`) and the
+// public barrel keep resolving DEFAULT_VISION_PROMPT unchanged after it moved
+// to the shared caption engine.
+export { DEFAULT_VISION_PROMPT } from './caption-engine.js';
 
 const DEFAULT_MAX_CONCURRENCY = 3;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_LONGEST_EDGE = 1568;
-// Spec L66 anchors the first two values (500ms / 1500ms); subsequent
-// attempts grow as 500 * 3^attempt clamped at MAX_BACKOFF_MS so a caller
-// who sets `maxRetries > 2` actually sees exponential growth instead of
-// the array tail flat-lining at 1500ms.
-const RETRY_BACKOFFS_MS = [500, 1500];
-const MAX_BACKOFF_MS = 30_000;
-// Safety-net multiplier applied to provider's own timeoutMs. If a buggy
-// provider ignores its timeoutMs argument we still abort the await this
-// long after the call started (see captionWithRetry Promise.race).
-const TIMEOUT_SAFETY_MULTIPLIER = 1.5;
 
 /**
  * Internal resolved options bag — all defaults applied, all values
@@ -251,6 +230,13 @@ async function runEnrichPdf(
   }
   const promptSha256 = sha256Hex(opts.promptTemplate);
   const limit = pLimit(opts.maxConcurrency);
+  const engineOpts: CaptionEngineOptions = {
+    provider: opts.provider,
+    promptTemplate: opts.promptTemplate,
+    maxRetries: opts.maxRetries,
+    timeoutMs: opts.timeoutMs,
+    failIndex: opts.onFailure === 'fail-index',
+  };
 
   // Validate all pages upfront, then extract images in parallel (was
   // sequential, defeating the point of pLimit on multi-page PDFs).
@@ -312,7 +298,7 @@ async function runEnrichPdf(
   const jobs = dedupeKeys.map((k) => {
     const j = uniqueJobs.get(k) as QueuedJob;
     return limit(() =>
-      processImage(j.image, j.pageNumber, j.imageIndex, opts, cache, promptSha256),
+      processImage(j.image, j.pageNumber, j.imageIndex, opts, engineOpts, cache, promptSha256),
     );
   });
 
@@ -389,6 +375,7 @@ async function processImage(
   pageNumber: number,
   imageIndex: number,
   opts: ResolvedOptions,
+  engineOpts: CaptionEngineOptions,
   cache: CaptionCache,
   promptSha256: string,
 ): Promise<CaptionJobResult | null> {
@@ -399,207 +386,13 @@ async function processImage(
     image.channels,
     opts.maxLongestEdge,
   );
-  const imageSha256 = sha256Hex(pngBytes);
-  const cached = cache.get({
-    imageSha256,
+  const caption = await captionPngWithCache(
+    pngBytes,
+    engineOpts,
+    cache,
     promptSha256,
-    providerId: opts.provider.providerId,
-    modelId: opts.provider.modelId,
-  });
-  if (cached) {
-    return { caption: cached.captionText, page: pageNumber, imageIndex };
-  }
-  const caption = await captionWithRetry(pngBytes, opts, pageNumber, imageIndex);
-  if (caption === null) {
-    return null;
-  }
-  // Wrap cache.set: a failed write (disk full / SQLITE_BUSY / closed
-  // handle if outer ran finally early) must NOT discard a caption we
-  // already paid the provider for.
-  try {
-    cache.set({
-      captionText: caption,
-      imageSha256,
-      promptSha256,
-      providerId: opts.provider.providerId,
-      modelId: opts.provider.modelId,
-      createdAt: new Date().toISOString(),
-    });
-  } catch (cacheErr) {
-    process.stderr.write(
-      `[vision-caption] WARN: cache.set failed for page=${pageNumber} image=${imageIndex}; ` +
-        `caption returned but not persisted. Reason: ${
-          cacheErr instanceof Error ? cacheErr.message : String(cacheErr)
-        }\n`,
-    );
-  }
+    `page=${pageNumber} image=${imageIndex}`,
+  );
+  if (caption === null) return null;
   return { caption, page: pageNumber, imageIndex };
-}
-
-async function captionWithRetry(
-  pngBytes: Uint8Array,
-  opts: ResolvedOptions,
-  pageNumber: number,
-  imageIndex: number,
-): Promise<string | null> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= opts.maxRetries; attempt += 1) {
-    try {
-      const caption = await callWithTimeoutSafetyNet(opts, pngBytes);
-      // Empty / non-string responses are treated as a transient provider
-      // quirk (some vision LLMs occasionally return "" on near-blank
-      // images) rather than fatal — re-try the call, fall through to the
-      // retry/onFailure machinery if it persists.
-      if (typeof caption !== 'string' || caption === '') {
-        throw Object.assign(
-          new Error(
-            `captionWithRetry: provider returned non-string or empty caption for page=${pageNumber} image=${imageIndex}`,
-          ),
-          { __visionEmptyResponse: true },
-        );
-      }
-      return caption;
-    } catch (err) {
-      lastError = err;
-      const retryable = isRetryable(err);
-      if (!retryable || attempt === opts.maxRetries) {
-        if (opts.onFailure === 'fail-index') {
-          throw new VisionCaptionFailedError(
-            `vision-caption: captionWithRetry exhausted after ${attempt + 1} attempt(s) for page=${pageNumber} image=${imageIndex}`,
-            err,
-          );
-        }
-        process.stderr.write(
-          `[vision-caption] WARN: page=${pageNumber} image=${imageIndex} failed after ${attempt + 1} attempt(s); skipping. ` +
-            `Last error: ${err instanceof Error ? err.message : String(err)}\n`,
-        );
-        return null;
-      }
-      const backoff = computeBackoffMs(attempt, err);
-      if (backoff > 0) await sleep(backoff);
-    }
-  }
-  // Unreachable, but TypeScript needs a terminal statement.
-  /* c8 ignore next 3 */
-  if (opts.onFailure === 'fail-index') {
-    throw new VisionCaptionFailedError('vision-caption: retry loop exited unexpectedly', lastError);
-  }
-  return null;
-}
-
-/**
- * Toolkit-side safety net: even when a provider ignores its `timeoutMs`
- * argument we abort the await `timeoutMs * 1.5` ms after the call
- * started. Without this a misbehaving adapter could stall the entire
- * index. The thrown `AbortError` flows through `isRetryable` so the
- * retry machinery still kicks in.
- */
-function callWithTimeoutSafetyNet(opts: ResolvedOptions, pngBytes: Uint8Array): Promise<string> {
-  const safetyMs = Math.ceil(opts.timeoutMs * TIMEOUT_SAFETY_MULTIPLIER);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const safetyNet = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      const err = new Error(
-        `vision-caption: provider exceeded timeout safety net (${safetyMs} ms)`,
-      );
-      (err as Error & { name: string }).name = 'AbortError';
-      reject(err);
-    }, safetyMs);
-    // Avoid keeping the event loop alive purely for this timer.
-    timer?.unref?.();
-  });
-  const call = opts.provider.caption({
-    imagePng: pngBytes,
-    prompt: opts.promptTemplate,
-    timeoutMs: opts.timeoutMs,
-  });
-  return Promise.race([call, safetyNet]).finally(() => {
-    if (timer !== undefined) clearTimeout(timer);
-  }) as Promise<string>;
-}
-
-/**
- * Compute the wait before retry `attempt + 1`. Honors `Retry-After`
- * (seconds — the HTTP standard) or `retryAfterMs` (milliseconds — what
- * some SDK adapters surface) when the provider supplies it, clamped to
- * MAX_BACKOFF_MS so a hostile server cannot wedge the indexer for
- * minutes. Otherwise falls back to the canonical spec-anchored values
- * 500 / 1500ms for the first two attempts, then grows exponentially
- * (500 * 3^attempt) capped at MAX_BACKOFF_MS.
- */
-function computeBackoffMs(attempt: number, err: unknown): number {
-  const hint = readRetryAfterMs(err);
-  if (hint !== null) return Math.min(MAX_BACKOFF_MS, hint);
-  const explicit = RETRY_BACKOFFS_MS[attempt];
-  if (typeof explicit === 'number') return explicit;
-  const expo = Math.round(500 * 3 ** attempt);
-  return Math.min(MAX_BACKOFF_MS, expo);
-}
-
-function readRetryAfterMs(err: unknown): number | null {
-  if (err === null || typeof err !== 'object') return null;
-  const e = err as {
-    retryAfterMs?: unknown;
-    retryAfter?: unknown;
-    headers?: Record<string, unknown> | { get?: (k: string) => unknown };
-  };
-  if (typeof e.retryAfterMs === 'number' && Number.isFinite(e.retryAfterMs) && e.retryAfterMs > 0) {
-    return Math.ceil(e.retryAfterMs);
-  }
-  if (typeof e.retryAfter === 'number' && Number.isFinite(e.retryAfter) && e.retryAfter > 0) {
-    return Math.ceil(e.retryAfter * 1000);
-  }
-  const headers = e.headers;
-  let raw: unknown;
-  if (headers !== undefined && headers !== null) {
-    if (typeof (headers as { get?: unknown }).get === 'function') {
-      raw = (headers as { get: (k: string) => unknown }).get('retry-after');
-    } else if (typeof headers === 'object') {
-      const h = headers as Record<string, unknown>;
-      raw = h['retry-after'] ?? h['Retry-After'];
-    }
-  }
-  if (typeof raw === 'string') {
-    const n = Number.parseFloat(raw);
-    if (Number.isFinite(n) && n > 0) return Math.ceil(n * 1000);
-  } else if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
-    return Math.ceil(raw * 1000);
-  }
-  return null;
-}
-
-/**
- * Classify whether an error should trigger a retry. Retryable:
- *   - `AbortError` (timeout — toolkit safety net or provider's own)
- *   - HTTP 5xx
- *   - HTTP 429 (rate limit)
- *   - empty / non-string provider response (provider quirk, not a bug)
- *
- * Everything else (401 auth fail, 400 bad request, schema mismatch, …)
- * fails fast — re-attempting only wastes quota.
- */
-function isRetryable(err: unknown): boolean {
-  if (err === null || typeof err !== 'object') return false;
-  const e = err as {
-    name?: unknown;
-    statusCode?: unknown;
-    status?: unknown;
-    __visionEmptyResponse?: unknown;
-  };
-  if (e.__visionEmptyResponse === true) return true;
-  if (e.name === 'AbortError') return true;
-  const status =
-    typeof e.statusCode === 'number'
-      ? e.statusCode
-      : typeof e.status === 'number'
-        ? e.status
-        : undefined;
-  if (status === undefined) return false;
-  if (status === 429) return true;
-  if (status >= 500 && status < 600) return true;
-  return false;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
