@@ -8,7 +8,7 @@
 
 > **scoreQuery**(`query`, `topResults`, `opts?`): `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts:226](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts#L226)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts:226](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/eval-runner.ts#L226)
 
 Score a single query: returns hit rank (1-indexed, undefined = miss) +
 reciprocal rank. Pure function — easy to test without spinning up a

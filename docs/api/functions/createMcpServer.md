@@ -8,7 +8,7 @@
 
 > **createMcpServer**(`config`): [`McpServerHandle`](../interfaces/McpServerHandle.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:246](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L246)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:259](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L259)
 
 ## Parameters
 

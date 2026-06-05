@@ -8,7 +8,7 @@
 
 > **encodePng**(`pixels`, `width`, `height`, `channels`, `maxLongestEdge?`): `Promise`\<`Uint8Array`\<`ArrayBufferLike`\>\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/png-encoder.ts:80](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/png-encoder.ts#L80)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/png-encoder.ts:80](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/png-encoder.ts#L80)
 
 Encode a raw RGBA / RGB / Grayscale pixel buffer (as returned by
 `unpdf.extractImages`) to PNG bytes, optionally downsampling so

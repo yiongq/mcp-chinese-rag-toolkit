@@ -46,7 +46,7 @@ export function __setCanvasImporterForTests(fn: (() => Promise<CanvasModule>) | 
  *
  * Called at `withVisionCaption()` factory time so callers see a fail-fast
  * error at index start rather than partway through processing the first
- * image (Story 2.6 M1 actionable error + Story 2.7 教训 2 fail-fast).
+ * image.
  */
 export async function ensureCanvasAvailable(): Promise<CanvasModule> {
   if (canvasModule !== null) return canvasModule;

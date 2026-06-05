@@ -1,7 +1,7 @@
 /**
  * Reference Anthropic Claude vision provider — COPY THIS FILE INTO YOUR
  * OWN PROJECT and wire in `process.env.ANTHROPIC_API_KEY`. The toolkit
- * intentionally ships zero vendor SDK dependencies (see Story 2.6
+ * intentionally ships zero vendor SDK dependencies (see
  * `LlmProvider` for the same pattern); install Anthropic separately:
  *
  *   pnpm add @anthropic-ai/sdk

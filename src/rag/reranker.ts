@@ -32,7 +32,7 @@ const MIN_LENGTH = 16;
 const DEFAULT_BATCH_SIZE = 32;
 /** Default per-call `rank({ maxLength })`. */
 const DEFAULT_MAX_LENGTH = 512;
-/** Default `createReranker` top-K — FR14 / Story 2.7 Hit Rate@5 contract. */
+/** Default `createReranker` top-K —  / Hit Rate@5 contract. */
 const DEFAULT_TOP_K = 5;
 
 /**
@@ -63,7 +63,7 @@ function manifestFingerprint(manifest: ModelManifest): string {
   // Canonical JSON of the manifest so two structurally-different manifests with
   // the same modelId never collide on the cache key. Identical implementation
   // to embedder.ts:36-49 — intentionally not extracted into a shared helper to
-  // keep Story 2.3 / 2.5 module boundaries crisp (cache keys are per-loader).
+  // keep / 2.5 module boundaries crisp (cache keys are per-loader).
   const canonical = JSON.stringify({
     modelId: manifest.modelId,
     embeddingDim: manifest.embeddingDim,
@@ -184,7 +184,7 @@ function buildReranker(
       // session is a single shared resource and cannot serve concurrent
       // forwards; `Promise.all([batchA, batchB])` would only serialize them
       // behind an internal lock while doubling the queue overhead.
-      // (Story 2.4 H1 lesson applied symmetrically.)
+      //
       for (let i = 0; i < documents.length; i += batchSize) {
         const sliceDocs = documents.slice(i, i + batchSize);
         const queries: string[] = sliceDocs.map(() => query);
@@ -246,7 +246,7 @@ function buildReranker(
 
 /**
  * `topK` accepts `Infinity` for "return every reranked candidate", matching
- * `createHybridSearch.assertValidTopK`'s contract (Story 2.4 M5 lesson).
+ * `createHybridSearch.assertValidTopK`'s contract.
  */
 function assertValidTopK(value: number): void {
   if (value === Number.POSITIVE_INFINITY) return;
@@ -284,13 +284,13 @@ function validateDefaultOpts(opts: RerankOptions): void {
 }
 
 /**
- * Build a bound reranker that consumes `HybridHit[]` (Story 2.4 output),
+ * Build a bound reranker that consumes `HybridHit[]`,
  * invokes the cross-encoder over `(query, chunk.content)` pairs, sorts by
- * sigmoid score descending (tie-break: `docId` ascending — Story 2.4 H3
+ * sigmoid score descending (tie-break: `docId` ascending —
  * symbol-comparison lesson), and caps at `topK`.
  *
  * The factory itself is side-effect-free: it validates `defaultOpts` and
- * freezes a shallow clone (Story 2.4 M1 lesson). Errors thrown by
+ * freezes a shallow clone. Errors thrown by
  * `reranker.rank` propagate directly to the caller — error normalization
  * is the responsibility of the surrounding tool handler (per
  * `docs/conventions.md §2.4`).
@@ -343,7 +343,7 @@ export function createReranker(deps: RerankerDeps): RerankFn {
       if (b.rerankScore !== a.rerankScore) return b.rerankScore - a.rerankScore;
       // Tie-break via symbol comparison instead of subtraction — docId can come
       // straight from sqlite-vec / FTS5 ROWID and exceed Number.MAX_SAFE_INTEGER
-      // in pathological corpora (Story 2.4 H3 lesson applied symmetrically).
+      // in pathological corpora.
       if (a.docId < b.docId) return -1;
       if (a.docId > b.docId) return 1;
       return 0;

@@ -6,11 +6,11 @@
 
 # Interface: SchemaOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:69](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L69)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:69](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L69)
 
 Options for [buildSchema](../functions/buildSchema.md). Writes are idempotent: when called against
 an existing index, `embedding_dim` is overwritten (schema invariant) but
-`index_version` is preserved (Story 2.6 cache-key stability).
+`index_version` is preserved.
 
 ## Properties
 
@@ -18,7 +18,7 @@ an existing index, `embedding_dim` is overwritten (schema invariant) but
 
 > `optional` **embeddingDim?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:71](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L71)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:71](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L71)
 
 Vector dimension for `docs_vec` virtual table.
 
@@ -34,10 +34,10 @@ Vector dimension for `docs_vec` virtual table.
 
 > `optional` **indexVersion?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:76](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L76)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:76](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L76)
 
 Index version string written into `meta.index_version` when the row does
-not yet exist. Used by Story 2.6 cache key.
+not yet exist. Used by cache key.
 
 #### Default
 

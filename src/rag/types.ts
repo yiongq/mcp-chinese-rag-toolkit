@@ -58,20 +58,20 @@ export interface Chunk {
 }
 
 // ---------------------------------------------------------------------------
-// Story 2.2 — SQLite + sqlite-vec + jieba storage layer types
+// — SQLite + sqlite-vec + jieba storage layer types
 // ---------------------------------------------------------------------------
 
 /**
  * Options for {@link buildSchema}. Writes are idempotent: when called against
  * an existing index, `embedding_dim` is overwritten (schema invariant) but
- * `index_version` is preserved (Story 2.6 cache-key stability).
+ * `index_version` is preserved.
  */
 export interface SchemaOptions {
   /** Vector dimension for `docs_vec` virtual table. @default 1024 (bge-large-zh-v1.5) */
   embeddingDim?: number;
   /**
    * Index version string written into `meta.index_version` when the row does
-   * not yet exist. Used by Story 2.6 cache key. @default `'v1-' + Date.now().toString(36)`
+   * not yet exist. Used by cache key. @default `'v1-' + Date.now().toString(36)`
    */
   indexVersion?: string;
 }
@@ -79,7 +79,7 @@ export interface SchemaOptions {
 /**
  * Options for {@link openIndex}. When `readonly` is true the underlying
  * connection opens in read-only mode and `buildSchema` is skipped — useful
- * for query-only consumers (e.g. mcp-hr search path) that ship a prebuilt
+ * for query-only consumers (e.g. a downstream consumer package search path) that ship a prebuilt
  * `.db` inside the npm tarball.
  */
 export interface OpenIndexOptions {
@@ -108,7 +108,7 @@ export interface IndexStats {
 
 /** Shared options for the search primitives. */
 export interface SearchOptions {
-  /** @default 30 — sized for Story 2.4 hybrid RRF (top-30 each side). */
+  /** @default 30 — sized for hybrid RRF (top-30 each side). */
   topK?: number;
 }
 
@@ -116,7 +116,7 @@ export interface SearchOptions {
  * Result from {@link IndexHandle.ftsSearch}.
  *
  * `bm25Rank` is a 1-indexed position in the returned ordering (consumed by
- * Story 2.4 RRF `1/(k + rank)`); `bm25Score` is the FTS5-native `rank`
+ * RRF `1/(k + rank)`); `bm25Score` is the FTS5-native `rank`
  * column (negative-floor; closer to 0 = more relevant) and is passed
  * through verbatim for debugging / threshold filtering.
  */
@@ -129,8 +129,8 @@ export interface FtsHit {
 
 /**
  * Result from {@link IndexHandle.vecSearch}. `distance` is the sqlite-vec
- * default L2 distance (Story 2.3 may opt into cosine via L2-normalized
- * embeddings; see Story 2.2 Dev Notes §sqlite-vec distance 语义).
+ * default L2 distance (may opt into cosine via L2-normalized
+ * embeddings; see Dev Notes §sqlite-vec distance 语义).
  */
 export interface VecHit {
   docId: number;
@@ -141,10 +141,10 @@ export interface VecHit {
 /**
  * Storage handle returned by {@link openIndex}. Wraps a `better-sqlite3`
  * connection + `sqlite-vec` extension load + jieba pre-tokenization, and
- * exposes the five storage primitives consumed by Stories 2.3 / 2.4 / 2.6.
+ * exposes the five storage primitives consumed by .
  *
  * The `db` getter is an escape hatch for advanced use (per-chunk metadata
- * reads in Story 2.4, etc.); prefer the typed primitives whenever possible.
+ * reads in , etc.); prefer the typed primitives whenever possible.
  */
 export interface IndexHandle {
   /** Insert a batch of chunks. Wrapped in a single transaction (50–100× speedup vs autocommit). */
@@ -153,7 +153,7 @@ export interface IndexHandle {
   ftsSearch(query: string, opts?: SearchOptions): FtsHit[];
   /** KNN search over `docs_vec` (sqlite-vec L2 by default). */
   vecSearch(queryEmbedding: Float32Array, opts?: SearchOptions): VecHit[];
-  /** Returns `meta.index_version` (Story 2.6 cache key). */
+  /** Returns `meta.index_version`. */
   getIndexVersion(): string;
   /** Underlying `better-sqlite3` Database. Escape hatch — use the typed primitives first. */
   readonly db: Database.Database;
@@ -162,7 +162,7 @@ export interface IndexHandle {
 }
 
 // ---------------------------------------------------------------------------
-// Story 2.3 — bge-large-zh-v1.5 embedder + model hash verification types
+// — bge-large-zh-v1.5 embedder + model hash verification types
 // ---------------------------------------------------------------------------
 
 /**
@@ -200,7 +200,7 @@ export interface ManifestEntry {
  * Tracking is always against the upstream `main` branch (the sha256 entries
  * are the supply-chain boundary, so a per-revision pin is redundant).
  * `embeddingDim` is the contract value for the model's vector dimension —
- * `loadEmbedder` exposes it as `Embedder.dim` so the FR20 factory pattern
+ * `loadEmbedder` exposes it as `Embedder.dim` so the  factory pattern
  * works for non-1024-dim manifests too.
  */
 export interface ModelManifest {
@@ -222,7 +222,7 @@ export interface ModelManifest {
  * Note: `dtype` is currently fixed at `'fp32'` because the default manifest
  * only pins the fp32 ONNX file. Supporting `'q8'` / `'fp16'` would require
  * pinning the corresponding alternative ONNX files in the manifest — see
- * `BGE_LARGE_ZH_V1_5_MANIFEST` Dev Notes / Story 2.3 review H2 for context.
+ * `BGE_LARGE_ZH_V1_5_MANIFEST` Dev Notes / review H2 for context.
  */
 export interface EmbedderOptions {
   /**
@@ -245,7 +245,7 @@ export interface EmbedderOptions {
  * `embed` / `embedBatch` produce L2-normalized vectors (`Σ x_i² ≈ 1`)
  * suitable for direct insertion into a sqlite-vec `docs_vec` table opened
  * with {@link openIndex}. `dim` MUST equal `meta.embedding_dim`; mismatches
- * are caught by Story 2.2 `schema.ts` at index-open time.
+ * are caught by `schema.ts` at index-open time.
  */
 export interface Embedder {
   /** Compute a single L2-normalized embedding. `result.length === dim`. */
@@ -263,7 +263,7 @@ export interface Embedder {
 }
 
 // ---------------------------------------------------------------------------
-// Story 2.4 — Hybrid Search + Reciprocal Rank Fusion (RRF) types
+// — Hybrid Search + Reciprocal Rank Fusion (RRF) types
 // ---------------------------------------------------------------------------
 
 /**
@@ -317,7 +317,7 @@ export interface HybridSearchOptions {
 /**
  * A single fused hit returned by the bound hybrid-search function.
  *
- * Field semantics intentionally mirror the upstream Story 2.2 types:
+ * Field semantics intentionally mirror the upstream types:
  * `bm25Score` is the FTS5 native `rank` column (negative-floor, closer to
  * 0 = more relevant); `distance` is the sqlite-vec L2 distance (lower =
  * closer). Optional fields are `undefined` when the corresponding source
@@ -352,14 +352,14 @@ export interface HybridSearchDeps {
 export type HybridSearchFn = (query: string, opts?: HybridSearchOptions) => Promise<HybridHit[]>;
 
 // ---------------------------------------------------------------------------
-// Story 2.5 — BGE-Reranker (cross-encoder) + stdio P95 latency harness types
+// — BGE-Reranker (cross-encoder) + stdio P95 latency harness types
 // ---------------------------------------------------------------------------
 
 /**
  * Options for {@link loadReranker}.
  *
  * Mirrors {@link EmbedderOptions} field-for-field so callers wiring both
- * pipelines together (Epic 4 mcp-hr / mcp-modeling) get a uniform surface.
+ * pipelines together get a uniform surface.
  * `dtype` is currently fixed at `'q8'` (model_quantized.onnx) by the default
  * manifest — see `BGE_RERANKER_V2_M3_MANIFEST` JSDoc for the rationale.
  */
@@ -385,8 +385,8 @@ export interface RerankerOptions {
  * `score` is `sigmoid(logit)` — bge-reranker-v2-m3 is a single-class
  * sequence-classification model that emits one logit per `(query, doc)`
  * pair; `sigmoid` converts that into a `[0, 1]` relevance probability.
- * The FR25 / NFR17 `confidence: 'low'` threshold defaults to `< 0.5`
- * and is enforced at the tool handler layer (Epic 4 mcp-hr), not here.
+ * The  /  `confidence: 'low'` threshold defaults to `< 0.5`
+ * and is enforced at the tool handler layer, not here.
  */
 export interface RankedDocument {
   /** Position in the input `documents` array (0-indexed). */
@@ -448,8 +448,8 @@ export interface RerankOptions {
 /**
  * Reranked hit — extends `HybridHit` with `rerankScore` and re-orders
  * candidates by sigmoid relevance score. `rerankScore` is in `[0, 1]`;
- * FR25 / NFR17 `confidence: 'low'` threshold defaults to `< 0.5` and
- * is enforced at the tool handler layer (Epic 4 mcp-hr), not here.
+ *  /  `confidence: 'low'` threshold defaults to `< 0.5` and
+ * is enforced at the tool handler layer, not here.
  */
 export interface RerankedHit extends HybridHit {
   /** `sigmoid(cross-encoder logit)` ∈ `[0, 1]`. */
@@ -510,7 +510,7 @@ export interface LatencySnapshot {
   coldStartMs: number;
   /** Warm-only P50 latency (ms). */
   p50Ms: number;
-  /** Warm-only P95 latency (ms). NFR1: must stay < 200. */
+  /** Warm-only P95 latency (ms). : must stay < 200. */
   p95Ms: number;
   /** Warm-only P99 latency (ms). */
   p99Ms: number;
@@ -551,13 +551,13 @@ export interface HarnessResult {
 }
 
 // ---------------------------------------------------------------------------
-// Story 2.6 — L0 Tool-Result LRU Cache + Contextual Retrieval types
+// — L0 Tool-Result LRU Cache + Contextual Retrieval types
 // ---------------------------------------------------------------------------
 
 /**
  * Options for `withLruCache`. `indexVersion` is REQUIRED — it is the
  * primary cache-invalidation signal (changes when the underlying SQLite
- * index is rebuilt; see Story 2.2 §schema invariants and
+ * index is rebuilt; see §schema invariants and
  * `IndexHandle.getIndexVersion()`).
  *
  * Omitting `cache` on the parent factory (`createMcpServer`) is equivalent
@@ -568,7 +568,7 @@ export interface HarnessResult {
 export interface CacheOptions {
   /** Maximum entries per server. @default 500 (architecture §缓存策略 L628) */
   max?: number;
-  /** TTL in ms. @default 60 * 60 * 1000 (1h, FR16) */
+  /** TTL in ms. @default 60 * 60 * 1000 (1h) */
   ttlMs?: number;
   /** REQUIRED — typically `IndexHandle.getIndexVersion()` at startup time. */
   indexVersion: string;
@@ -585,19 +585,19 @@ export type CacheStatus = 'hit' | 'miss';
 
 /** Dependencies bound by `withLruCache` (kept for the alternative
  *  ergonomic factory shape — not consumed by `createMcpServer` directly;
- *  see Story 2.6 AC3 §design rationale). */
+ *  see AC3 §design rationale). */
 export interface WithLruCacheDeps {
   toolName: string;
   options: CacheOptions;
 }
 
-/** Options for `generateChunkContext` (Story 2.6 Contextual Retrieval,
- *  FR15). Provider injection only — toolkit does NOT bind to a specific
- *  LLM SDK; see Story 2.6 AC5 §design rationale. */
+/** Options for `generateChunkContext` (Contextual Retrieval,
+ *  ). Provider injection only — toolkit does NOT bind to a specific
+ *  LLM SDK; see AC5 §design rationale. */
 export interface ContextualRetrievalOptions {
   /** Source document the chunk was sliced from. Sent ONCE per indexing
    *  batch with `cache_control: ephemeral`; subsequent chunks reuse the
-   *  cached prefix → ≤ 50% token cost vs uncached (FR15). */
+   *  cached prefix → ≤ 50% token cost vs uncached. */
   fullDocument: string;
   /** Target prefix length range (characters). @default { min: 50, max: 100 } */
   prefixLength?: { min: number; max: number };

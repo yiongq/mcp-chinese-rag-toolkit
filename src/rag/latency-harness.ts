@@ -10,11 +10,11 @@ import type { HarnessResult, LatencyHarnessOptions, LatencySnapshot } from './ty
 
 /** Default warmup count — picked so the ONNX session is fully JIT'd before measurement starts. */
 const DEFAULT_WARMUP_RUNS = 5;
-/** Default measurement window — matches the story spec's "100 calls" baseline. */
+/** Default measurement window — matches the "100 calls" baseline. */
 const DEFAULT_MEASURE_RUNS = 100;
 /** Default tool name — matches `bench/baseline.json#toolName`. */
 const DEFAULT_TOOL_NAME = 'search-fixture';
-/** Default cycled query strings — mirrors the Story 2.4 HR fixture corpus. */
+/** Default cycled query strings — mirrors the HR fixture corpus. */
 const DEFAULT_QUERIES: readonly string[] = ['试用期', '加班', '请假', '差旅报销', '保密协议'];
 
 /** Tool definition supplied to {@link runStdioLatencyHarness} via `buildHarnessTool`. */
@@ -164,7 +164,7 @@ function buildSnapshot(args: {
  * Why in-process instead of spawning a subprocess:
  *   1. Cross-platform fork latency (30–300ms on Windows / Linux / macOS)
  *      would dominate cold-start measurement noise.
- *   2. NFR1 quantifies the toolkit + MCP SDK protocol layer; subprocess
+ *   2.  quantifies the toolkit + MCP SDK protocol layer; subprocess
  *      fork cost is unrelated to product latency.
  *   3. CI runners have unstable IPC overhead.
  *
@@ -173,8 +173,8 @@ function buildSnapshot(args: {
  * protocol layer (request/response correlation, schema validation) is
  * exercised end-to-end; the only thing skipped is stdio-frame
  * encoding/decoding (~1–3ms per call per the Latency Budget table).
- * For mcp-hr / mcp-modeling end-to-end stdio validation, run the
- * Epic 4 / 6 integration tests with the spawned-subprocess transport.
+ * For a downstream consumer package / a downstream consumer package end-to-end stdio validation, run the
+ * / 6 integration tests with the spawned-subprocess transport.
  *
  * @throws if `warmupRuns < 0`, `measureRuns < 1`, or `queries.length === 0`.
  * @throws if any tool call rejects (no partial / corrupted snapshots).
@@ -268,7 +268,7 @@ export async function runStdioLatencyHarness(
 
     // Warmup loop — first call cold-loads the ONNX session, subsequent calls
     // pin caches. We measure total elapsed time of all warmup calls combined
-    // (story spec rationale: cold-start is informational, not in NFR1).
+    // (cold-start is informational, not part of the measured budget).
     const coldStart = performance.now();
     for (let i = 0; i < warmupRuns; i += 1) {
       const q = queries[i % queries.length];

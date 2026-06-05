@@ -15,7 +15,7 @@ describe('toolkit self-contained eval-set.yml', () => {
     expect(set.queries).toHaveLength(12);
   });
 
-  it('every query has a non-empty reason (AI Agent Rule #9 strict)', () => {
+  it('every query has a non-empty reason', () => {
     const set = loadEvalSet(evalSetPath);
     const noReason = set.queries.filter(
       (q) => q.reason === undefined || q.reason.trim().length === 0,
@@ -23,7 +23,7 @@ describe('toolkit self-contained eval-set.yml', () => {
     expect(noReason).toEqual([]);
   });
 
-  it('every query has a kebab-case category (architecture L440 strict)', () => {
+  it('every query has a kebab-case category (strict)', () => {
     const set = loadEvalSet(evalSetPath);
     const noCategory = set.queries.filter((q) => q.category === undefined);
     expect(noCategory).toEqual([]);

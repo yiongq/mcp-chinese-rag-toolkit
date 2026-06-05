@@ -6,14 +6,14 @@
 
 # Interface: IndexHandle
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:149](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L149)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:149](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L149)
 
 Storage handle returned by [openIndex](../functions/openIndex.md). Wraps a `better-sqlite3`
 connection + `sqlite-vec` extension load + jieba pre-tokenization, and
-exposes the five storage primitives consumed by Stories 2.3 / 2.4 / 2.6.
+exposes the five storage primitives consumed by .
 
 The `db` getter is an escape hatch for advanced use (per-chunk metadata
-reads in Story 2.4, etc.); prefer the typed primitives whenever possible.
+reads in , etc.); prefer the typed primitives whenever possible.
 
 ## Properties
 
@@ -21,7 +21,7 @@ reads in Story 2.4, etc.); prefer the typed primitives whenever possible.
 
 > `readonly` **db**: `Database`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:159](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L159)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:159](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L159)
 
 Underlying `better-sqlite3` Database. Escape hatch — use the typed primitives first.
 
@@ -31,7 +31,7 @@ Underlying `better-sqlite3` Database. Escape hatch — use the typed primitives 
 
 > **close**(): `void`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:161](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L161)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:161](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L161)
 
 Closes the underlying connection. Idempotent.
 
@@ -45,7 +45,7 @@ Closes the underlying connection. Idempotent.
 
 > **ftsSearch**(`query`, `opts?`): [`FtsHit`](FtsHit.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:153](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L153)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:153](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L153)
 
 BM25 search over `docs_fts` using jieba-pretokenized query.
 
@@ -69,9 +69,9 @@ BM25 search over `docs_fts` using jieba-pretokenized query.
 
 > **getIndexVersion**(): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:157](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L157)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:157](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L157)
 
-Returns `meta.index_version` (Story 2.6 cache key).
+Returns `meta.index_version`.
 
 #### Returns
 
@@ -83,7 +83,7 @@ Returns `meta.index_version` (Story 2.6 cache key).
 
 > **indexChunks**(`rows`): [`IndexStats`](IndexStats.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:151](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L151)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:151](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L151)
 
 Insert a batch of chunks. Wrapped in a single transaction (50–100× speedup vs autocommit).
 
@@ -103,7 +103,7 @@ Insert a batch of chunks. Wrapped in a single transaction (50–100× speedup vs
 
 > **vecSearch**(`queryEmbedding`, `opts?`): [`VecHit`](VecHit.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:155](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L155)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:155](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L155)
 
 KNN search over `docs_vec` (sqlite-vec L2 by default).
 

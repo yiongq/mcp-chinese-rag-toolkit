@@ -6,7 +6,7 @@
 
 # Interface: LatencySnapshot
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:487](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L487)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:495](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L495)
 
 Snapshot returned by `runStdioLatencyHarness` — schema also written to
 `bench/baseline.json` by `bin/latency-harness.ts`.
@@ -17,7 +17,7 @@ Snapshot returned by `runStdioLatencyHarness` — schema also written to
 
 > **coldStartMs**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:502](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L502)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:510](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L510)
 
 Cold start latency — total elapsed time of the warmup loop (ms). When
 `warmupRuns === 0` this is approximately `0` (loop never ran) and the
@@ -30,7 +30,7 @@ informational only in that case.
 
 > **environment**: `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:520](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L520)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:528](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L528)
 
 Toolkit + reranker provenance — frozen into the snapshot so
 baseline.json regressions are debuggable years later without
@@ -84,7 +84,7 @@ Toolkit `package.json` version.
 
 > **maxMs**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:514](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L514)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:522](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L522)
 
 Max warm latency (ms).
 
@@ -94,7 +94,7 @@ Max warm latency (ms).
 
 > **meanMs**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:510](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L510)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:518](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L518)
 
 Mean warm latency (ms).
 
@@ -104,7 +104,7 @@ Mean warm latency (ms).
 
 > **measureRuns**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:495](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L495)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:503](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L503)
 
 Number of measured runs.
 
@@ -114,7 +114,7 @@ Number of measured runs.
 
 > **minMs**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:512](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L512)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:520](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L520)
 
 Min warm latency (ms).
 
@@ -124,7 +124,7 @@ Min warm latency (ms).
 
 > **p50Ms**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:504](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L504)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:512](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L512)
 
 Warm-only P50 latency (ms).
 
@@ -134,9 +134,9 @@ Warm-only P50 latency (ms).
 
 > **p95Ms**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:506](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L506)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:514](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L514)
 
-Warm-only P95 latency (ms). NFR1: must stay < 200.
+Warm-only P95 latency (ms). : must stay < 200.
 
 ***
 
@@ -144,7 +144,7 @@ Warm-only P95 latency (ms). NFR1: must stay < 200.
 
 > **p99Ms**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:508](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L508)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:516](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L516)
 
 Warm-only P99 latency (ms).
 
@@ -154,7 +154,7 @@ Warm-only P99 latency (ms).
 
 > **timestamp**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:489](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L489)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:497](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L497)
 
 ISO-8601 timestamp when the harness completed.
 
@@ -164,7 +164,7 @@ ISO-8601 timestamp when the harness completed.
 
 > **toolName**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:491](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L491)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:499](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L499)
 
 Tool name that was measured.
 
@@ -174,6 +174,6 @@ Tool name that was measured.
 
 > **warmupRuns**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:493](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L493)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:501](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L501)
 
 Number of warmup runs that completed successfully.

@@ -6,11 +6,11 @@
 
 # Interface: CacheOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:560](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L560)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:568](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L568)
 
 Options for `withLruCache`. `indexVersion` is REQUIRED — it is the
 primary cache-invalidation signal (changes when the underlying SQLite
-index is rebuilt; see Story 2.2 §schema invariants and
+index is rebuilt; see §schema invariants and
 `IndexHandle.getIndexVersion()`).
 
 Omitting `cache` on the parent factory (`createMcpServer`) is equivalent
@@ -24,7 +24,7 @@ way to *force* cache off when an `indexVersion` is otherwise available
 
 > `optional` **enabled?**: `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:568](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L568)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:576](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L576)
 
 Set false in unit tests / experiments.
 
@@ -40,7 +40,7 @@ true
 
 > **indexVersion**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:566](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L566)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:574](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L574)
 
 REQUIRED — typically `IndexHandle.getIndexVersion()` at startup time.
 
@@ -50,7 +50,7 @@ REQUIRED — typically `IndexHandle.getIndexVersion()` at startup time.
 
 > `optional` **max?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:562](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L562)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:570](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L570)
 
 Maximum entries per server.
 
@@ -66,12 +66,12 @@ Maximum entries per server.
 
 > `optional` **ttlMs?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:564](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L564)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:572](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L572)
 
 TTL in ms.
 
 #### Default
 
 ```ts
-60 * 60 * 1000 (1h, FR16)
+60 * 60 * 1000 (1h)
 ```

@@ -6,17 +6,17 @@
 
 # Interface: VisionProvider
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:62](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L62)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:62](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L62)
 
 Caller-injected vision LLM provider. Toolkit deliberately does NOT bind
 to `@anthropic-ai/sdk` / `openai` / 豆包 SDK / qwen SDK —
 `templates/anthropic-vision-provider.ts` is a reference adapter the
 caller copies + fills in their own API key.
 
-Mirrors Story 2.6 import('../types.js').LlmProvider (contextual
-retrieval) + Story 2.7 `EvalSearchFn` (eval framework) provider-injection
-patterns. Toolkit `dependencies` stays free of vendor SDKs (NFR36 npm
-package size guard + Story 2.6 教训 9).
+Mirrors import('../types.js').LlmProvider (contextual
+retrieval) + `EvalSearchFn` (eval framework) provider-injection
+patterns. Toolkit `dependencies` stays free of vendor SDKs ( npm
+package size guard + 教训 9).
 
 ## Properties
 
@@ -24,7 +24,7 @@ package size guard + Story 2.6 教训 9).
 
 > `readonly` **modelId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:73](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L73)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:73](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L73)
 
 Model identity (e.g. `'doubao-vision-pro-32k'`, `'claude-haiku-4-5'`).
 Written into cache key — model bumps invalidate cache.
@@ -35,7 +35,7 @@ Written into cache key — model bumps invalidate cache.
 
 > `readonly` **providerId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:68](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L68)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:68](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L68)
 
 Provider identity (kebab-case, e.g. `'doubao-vision'`, `'anthropic'`,
 `'qwen-vl'`, `'openai'`). Written into the caption cache key so
@@ -47,7 +47,7 @@ provider switches invalidate cached captions.
 
 > **caption**(`args`): `Promise`\<`string`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:84](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L84)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:84](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L84)
 
 Caption a single PNG-encoded image. MUST return a non-empty string
 (200-300 chars Chinese is the target; toolkit does not enforce length

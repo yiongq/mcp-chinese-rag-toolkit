@@ -6,7 +6,7 @@
 
 # Interface: ToolExample
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts#L10)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/tool-builder.ts#L10)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:10](htt
 
 > **description**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts#L11)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/tool-builder.ts#L11)
 
 ***
 
@@ -22,4 +22,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:11](htt
 
 > **input**: `Record`\<`string`, `unknown`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts#L12)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/tool-builder.ts#L12)

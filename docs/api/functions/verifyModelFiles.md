@@ -8,7 +8,7 @@
 
 > **verifyModelFiles**(`cacheDir`, `manifest`, `opts?`): `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:117](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L117)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:117](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L117)
 
 Verify that the cached files under `<cacheDir>/<manifest.modelId>/...`
 match the pinned hashes byte-for-byte.

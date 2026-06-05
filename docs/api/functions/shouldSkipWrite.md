@@ -8,7 +8,7 @@
 
 > **shouldSkipWrite**(`result`, `args`): `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:89](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts#L89)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:89](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/middleware/with-lru-cache.ts#L89)
 
 Decide whether the just-computed `result` is eligible for cache write.
 Returns `true` to SKIP write. Three orthogonal conditions (architecture
@@ -25,7 +25,7 @@ L632 / L680-686):
    value; missing `env` field is also allowed (interpreted as "no
    environment hint"). Strict `!== 'dev'` comparison guards against
    `args.env = NaN` / `undefined` falling through to a wrong branch
-   (Story 2.5 H2 lesson on strict-equality defenses).
+  .
 
 ## Parameters
 

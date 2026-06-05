@@ -6,7 +6,7 @@
 
 # Interface: RerankOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:431](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L431)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:439](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L439)
 
 Options for the bound rerank function returned by `createReranker`.
 
@@ -16,7 +16,7 @@ Options for the bound rerank function returned by `createReranker`.
 
 > `optional` **batchSize?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:435](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L435)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:443](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L443)
 
 Forwarded to `reranker.rank()`.
 
@@ -32,7 +32,7 @@ Forwarded to `reranker.rank()`.
 
 > `optional` **maxLength?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:437](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L437)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:445](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L445)
 
 Forwarded to `reranker.rank()`.
 
@@ -48,7 +48,7 @@ Forwarded to `reranker.rank()`.
 
 > `optional` **topK?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:433](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L433)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:441](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L441)
 
 Final reranked top-K cap. Accepts `Infinity` for "return every reranked hit".
 

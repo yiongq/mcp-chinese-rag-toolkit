@@ -6,7 +6,7 @@
 
 # Interface: HybridSearchOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:300](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L300)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:308](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L308)
 
 Options for the bound query function returned by `createHybridSearch`.
 
@@ -16,7 +16,7 @@ Options for the bound query function returned by `createHybridSearch`.
 
 > `optional` **perSourceTopK?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:302](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L302)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:310](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L310)
 
 Per-source candidate cap before RRF fusion (top-N from FTS, top-N from vec).
 
@@ -32,7 +32,7 @@ Per-source candidate cap before RRF fusion (top-N from FTS, top-N from vec).
 
 > `optional` **rrfK?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:306](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L306)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:314](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L314)
 
 RRF constant.
 
@@ -48,7 +48,7 @@ RRF constant.
 
 > `optional` **topK?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:304](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L304)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:312](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L312)
 
 Final fused top-K returned to the caller.
 

@@ -5,7 +5,7 @@
 // "here are the PNG bytes" — caption cache lookup/write, retry + exponential
 // backoff, per-call timeout safety net, transient-vs-fatal classification —
 // is identical and lives here so the semantically-critical retry policy has a
-// single source of truth (Story 2.8 教训 — keep the hard-won retry math DRY).
+// single source of truth.
 
 import type { CaptionCache } from './caption-cache.js';
 import { sha256Hex } from './caption-cache.js';
@@ -171,14 +171,15 @@ export async function captionWithRetry(
  * `AbortError` flows through `isRetryable` so the retry machinery still kicks
  * in.
  */
-function callWithTimeoutSafetyNet(opts: CaptionEngineOptions, pngBytes: Uint8Array): Promise<string> {
+function callWithTimeoutSafetyNet(
+  opts: CaptionEngineOptions,
+  pngBytes: Uint8Array,
+): Promise<string> {
   const safetyMs = Math.ceil(opts.timeoutMs * TIMEOUT_SAFETY_MULTIPLIER);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const safetyNet = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      const err = new Error(
-        `caption: provider exceeded timeout safety net (${safetyMs} ms)`,
-      );
+      const err = new Error(`caption: provider exceeded timeout safety net (${safetyMs} ms)`);
       (err as Error & { name: string }).name = 'AbortError';
       reject(err);
     }, safetyMs);

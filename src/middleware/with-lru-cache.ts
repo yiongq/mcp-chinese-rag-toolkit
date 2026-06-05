@@ -18,7 +18,7 @@ export const NON_CACHEABLE_ARGS = new Set<string>(['env']);
 export type ToolHandler = (args: unknown) => Promise<CallToolResult> | CallToolResult;
 
 /**
- * Canonicalize args for cache-key stability (architecture L630):
+ * Canonicalize args for cache-key stability:
  *
  * 1. JSON keys recursively sorted, so `{a:1,b:2}` ≡ `{b:2,a:1}`.
  * 2. String values trimmed + 全角空格 `'　'` → 半角 `' '`.
@@ -59,7 +59,7 @@ function normalizeValue(v: unknown): unknown {
 /**
  * `sha256(toolName + ':' + indexVersion + ':' + canonicalize(args))` as
  * lowercase hex. The `':'` delimiter is contract — switching to `'|'` /
- * `';'` / unicode separators would break Story 2.7 cross-version eval
+ * `';'` / unicode separators would break cross-version eval
  * replay (cache keys recorded in fixtures must match new computations).
  */
 export function computeCacheKey(toolName: string, indexVersion: string, args: unknown): string {
@@ -84,7 +84,7 @@ export function computeCacheKey(toolName: string, indexVersion: string, args: un
  *    value; missing `env` field is also allowed (interpreted as "no
  *    environment hint"). Strict `!== 'dev'` comparison guards against
  *    `args.env = NaN` / `undefined` falling through to a wrong branch
- *    (Story 2.5 H2 lesson on strict-equality defenses).
+ *   .
  */
 export function shouldSkipWrite(result: CallToolResult, args: unknown): boolean {
   if (result.isError === true) return true;
@@ -115,8 +115,8 @@ export function shouldSkipWrite(result: CallToolResult, args: unknown): boolean 
 /**
  * Inject `structuredContent._meta.cache = status` without mutating the
  * input result. The `_meta` namespace (underscore prefix) avoids
- * collision with business fields; other `_meta.*` entries (e.g. Story
- * 2.7 `_meta.indexVersion`) are owned by their respective writers.
+ * collision with business fields; other `_meta.*` entries (e.g.
+ * `_meta.indexVersion`) are owned by their respective writers.
  *
  * Always called on BOTH read and write paths, so the
  * `structuredContent._meta.cache` field is guaranteed present and

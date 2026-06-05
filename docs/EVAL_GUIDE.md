@@ -1,6 +1,6 @@
 # Eval Guide — Writing Eval Sets for Your Domain
 
-Story 2.7 introduced a YAML-driven eval framework that any toolkit consumer
+introduced a YAML-driven eval framework that any toolkit consumer
 can drive against their own corpus. This guide walks from **why eval
 matters** to a **5-step process** for writing your domain eval set, plus how
 to interpret the headline metrics and wire the gate into CI.
@@ -25,7 +25,7 @@ the build when `Hit Rate@5` falls below a threshold (default 0.9).
 
 ---
 
-## YAML eval-set schema (Story 2.7+)
+## YAML eval-set schema
 
 ```yaml
 version: v1-hello-world
@@ -179,7 +179,7 @@ longer matches) rather than a global regression.
 
 ## CI integration via `RAG_EVAL_HIT_RATE_MIN`
 
-The toolkit's `rag-eval` CI job (Story 2.7) is the reference wiring. In
+The toolkit's `rag-eval` CI job is the reference wiring. In
 your own project's CI (GitHub Actions snippet — not an eval-set YAML):
 
 ```yml
@@ -209,6 +209,6 @@ GitHub Actions can render the report inline via
   stable, human-meaningful label; bump it only when the eval set's
   *semantics* change (new categories, removed queries).
 - **Running eval against a tiny in-memory fixture only.** The toolkit's
-  own `bench/baseline.json` (Story 2.5) does this for latency; eval
+  own `bench/baseline.json` does this for latency; eval
   should run against a representative subset of the real corpus so
   retrieval characteristics match production.

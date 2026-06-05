@@ -6,7 +6,7 @@
 
 # Interface: RerankerDeps
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:452](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L452)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:460](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L460)
 
 Dependencies bound by `createReranker`.
 
@@ -16,7 +16,7 @@ Dependencies bound by `createReranker`.
 
 > `optional` **defaultOpts?**: [`RerankOptions`](RerankOptions.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:455](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L455)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:463](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L463)
 
 Optional default options applied when the per-call `opts` does not override.
 
@@ -26,4 +26,4 @@ Optional default options applied when the per-call `opts` does not override.
 
 > **reranker**: [`Reranker`](Reranker.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:453](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L453)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:461](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L461)

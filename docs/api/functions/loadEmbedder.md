@@ -8,7 +8,7 @@
 
 > **loadEmbedder**(`opts?`): `Promise`\<[`Embedder`](../interfaces/Embedder.md)\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/embedder.ts:71](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/embedder.ts#L71)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/embedder.ts:71](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/embedder.ts#L71)
 
 Resolve a fully-initialised [Embedder](../interfaces/Embedder.md) for the requested model.
 

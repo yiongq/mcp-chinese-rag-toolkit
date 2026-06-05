@@ -70,7 +70,7 @@ describe('buildSchema', () => {
     }).not.toThrow();
   });
 
-  it('preserves the existing index_version on a second call (avoids Story 2.6 cache drift)', () => {
+  it('preserves the existing index_version on a second call (avoids cache drift)', () => {
     buildSchema(db, { indexVersion: 'first-version' });
     const first = db
       .prepare<[string], { value: string }>('SELECT value FROM meta WHERE key = ?')

@@ -8,7 +8,7 @@
 
 > **CacheStatus** = `"hit"` \| `"miss"`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:576](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L576)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:584](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L584)
 
 Status injected at `structuredContent._meta.cache` on every cached
  tool result — `'hit'` when served from cache, `'miss'` when freshly

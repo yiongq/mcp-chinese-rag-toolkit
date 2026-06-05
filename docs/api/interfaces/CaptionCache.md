@@ -6,11 +6,11 @@
 
 # Interface: CaptionCache
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L38)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L38)
 
 Plugin-owned caption cache. Single underlying `better-sqlite3` handle;
 caller MUST invoke `close()` exactly once (see `with-vision-caption.ts`
-try/finally pattern, Story 2.5 教训 1).
+try/finally pattern 教训 1).
 
 ## Properties
 
@@ -18,7 +18,7 @@ try/finally pattern, Story 2.5 教训 1).
 
 > `readonly` **hash**: (`buf`) => `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:47](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L47)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:47](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L47)
 
 Compute SHA-256 hex digest. Re-exported on the cache instance so
 callers can hash before they decide whether to spend a provider call.
@@ -39,7 +39,7 @@ callers can hash before they decide whether to spend a provider call.
 
 > **close**(): `void`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:49](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L49)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:49](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L49)
 
 Close the underlying SQLite handle. Idempotent.
 
@@ -53,7 +53,7 @@ Close the underlying SQLite handle. Idempotent.
 
 > **get**(`args`): [`CaptionCacheEntry`](CaptionCacheEntry.md) \| `undefined`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:40](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L40)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:40](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L40)
 
 Look up a cached caption; returns `undefined` on miss.
 
@@ -73,7 +73,7 @@ Look up a cached caption; returns `undefined` on miss.
 
 > **set**(`entry`): `void`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:42](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L42)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:42](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L42)
 
 Persist (or replace) a caption row. Idempotent (`INSERT OR REPLACE`).
 

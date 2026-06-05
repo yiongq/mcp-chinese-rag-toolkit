@@ -6,11 +6,11 @@
 
 # Interface: EvalSearchResult
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L12)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L12)
 
 Result row returned by an evaluatable `searchFn`. Field naming mirrors
-Story 2.4 `HybridHit` / Story 2.5 `RerankedHit` (camelCase wire convention,
-architecture L555-562). All metric fields are optional — toolkit eval
+`HybridHit` / `RerankedHit` (camelCase wire convention). All metric fields
+are optional — toolkit eval
 reports `'n/a'` when missing, never throws (callers may simplify and only
 supply `rerankScore`).
 
@@ -20,7 +20,7 @@ supply `rerankScore`).
 
 > `optional` **content?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L20)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L20)
 
 Chunk content (informational; not used for Hit Rate scoring).
 
@@ -30,9 +30,9 @@ Chunk content (informational; not used for Hit Rate scoring).
 
 > `optional` **distance?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:24](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L24)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:24](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L24)
 
-sqlite-vec L2 distance; populated by Story 2.4 hybrid search vec branch.
+sqlite-vec L2 distance; populated by hybrid search vec branch.
 
 ***
 
@@ -40,9 +40,9 @@ sqlite-vec L2 distance; populated by Story 2.4 hybrid search vec branch.
 
 > `optional` **ftsRank?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:26](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L26)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:26](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L26)
 
-FTS5 BM25 rank (1-indexed); populated by Story 2.4 hybrid search FTS branch.
+FTS5 BM25 rank (1-indexed); populated by hybrid search FTS branch.
 
 ***
 
@@ -50,7 +50,7 @@ FTS5 BM25 rank (1-indexed); populated by Story 2.4 hybrid search FTS branch.
 
 > `optional` **page?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:16](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L16)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:16](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L16)
 
 1-indexed page number (mirrors PdfPage / Citation convention).
 
@@ -60,9 +60,9 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:16](https://gith
 
 > `optional` **rerankScore?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L22)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L22)
 
-bge-reranker-v2-m3 sigmoid score ∈ [0, 1]; populated by Story 2.5 reranker.
+bge-reranker-v2-m3 sigmoid score ∈ [0, 1]; populated by reranker.
 
 ***
 
@@ -70,9 +70,9 @@ bge-reranker-v2-m3 sigmoid score ∈ [0, 1]; populated by Story 2.5 reranker.
 
 > `optional` **section?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:18](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L18)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:18](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L18)
 
-Markdown heading path (Story 2.1 chunking convention).
+Markdown heading path.
 
 ***
 
@@ -80,6 +80,6 @@ Markdown heading path (Story 2.1 chunking convention).
 
 > **source**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:14](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/types.ts#L14)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/types.ts:14](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/types.ts#L14)
 
 Document source identifier (e.g. `'bench-fixture.md'`). REQUIRED.

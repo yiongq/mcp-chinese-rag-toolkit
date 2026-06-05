@@ -50,7 +50,7 @@ __PROJECT_NAME__/
 ├── data/
 │   └── sample-doc.md         # 200-300 字 Chinese HR sample (replace me)
 └── eval/
-    └── eval-set.yml          # 3 demo queries — Story 2.7 EvalSet schema
+    └── eval-set.yml          # 3 demo queries — EvalSet schema
 ```
 
 ## Switch to a real Chinese embedder
@@ -73,7 +73,7 @@ semantic vector search:
 
 ## Write your own eval set
 
-`eval/eval-set.yml` follows the same schema validated by Story 2.7's
+`eval/eval-set.yml` follows the same schema validated by 's
 `loadEvalSet`. Add more `queries` entries that mirror real user questions
 from your domain. See the toolkit `docs/EVAL_GUIDE.md` for the
 methodology (query categories, Hit Rate@K, MRR interpretation).
@@ -100,5 +100,5 @@ package manager (`pnpm -C <abs>`, `npm --prefix <abs> run`, `yarn --cwd <abs>`):
 - Drop your own PDFs / Markdown into `data/` and extend
   `scripts/build-index.ts` to call `parsePdf` + `chunkPdfPages`.
 - Add hybrid + rerank (`createHybridSearch` + `createReranker`).
-- Add the Story 2.8 `withVisionCaption` plugin for PDF-with-images RAG.
+- Add the `withVisionCaption` plugin for PDF-with-images RAG.
 - Pick a LICENSE (MIT / Apache-2.0 / proprietary) and commit it.

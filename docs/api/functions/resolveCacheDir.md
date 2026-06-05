@@ -8,7 +8,7 @@
 
 > **resolveCacheDir**(`override?`): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:58](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L58)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:58](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L58)
 
 Resolve the toolkit's per-user model cache directory.
 

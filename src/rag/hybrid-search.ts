@@ -10,7 +10,7 @@ import type {
 } from './types.js';
 
 /**
- * Per-source candidate cap default — sized to feed Story 2.5 reranker with
+ * Per-source candidate cap default — sized to feed reranker with
  * 60 unique candidates (worst-case 30+30, when the two sources are disjoint).
  */
 const DEFAULT_PER_SOURCE_TOP_K = 30;
@@ -55,7 +55,7 @@ function validateDefaultOpts(opts: HybridSearchOptions): void {
 }
 
 function readHandleEmbeddingDim(handle: HybridSearchDeps['handle']): number | undefined {
-  // The `meta` table is owned by Story 2.2 `buildSchema`; if a caller bypasses
+  // The `meta` table is owned by `buildSchema`; if a caller bypasses
   // `openIndex` we surface a friendlier message at factory time rather than
   // letting `vecSearch` throw on the first query.
   try {
@@ -71,8 +71,8 @@ function readHandleEmbeddingDim(handle: HybridSearchDeps['handle']): number | un
 }
 
 /**
- * Build a bound hybrid-search function from a Story 2.2 `IndexHandle` and a
- * Story 2.3 `Embedder`. The returned function runs `ftsSearch` (BM25 +
+ * Build a bound hybrid-search function from a `IndexHandle` and a
+ * `Embedder`. The returned function runs `ftsSearch` (BM25 +
  * jieba) and `embed(query) → vecSearch` (sqlite-vec) in parallel and fuses
  * the two ranked lists via Reciprocal Rank Fusion (`score = Σ 1/(k + rank)`,
  * default `k = 60`, Cormack 2009).
@@ -123,7 +123,7 @@ export function createHybridSearch(deps: HybridSearchDeps): HybridSearchFn {
     // event loop before the synchronous better-sqlite3 `ftsSearch` runs.
     // Inlining both expressions into the `Promise.all([...])` literal would
     // evaluate them left-to-right at call site, making FTS block embed —
-    // see Story 2.4 code-review M1 / AC11 sanity test.
+    // see code-review M1 / AC11 sanity test.
     const vecPromise = embedder
       .embed(query)
       .then((emb) => handle.vecSearch(emb, { topK: perSourceTopK }));

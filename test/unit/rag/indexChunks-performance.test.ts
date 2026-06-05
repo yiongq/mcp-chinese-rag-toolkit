@@ -7,11 +7,11 @@ const DIM = 1024;
 const N = 1000;
 
 /**
- * Story 2.2 — partial NFR3 sanity (SQLite write segment only).
+ * — partial  sanity (SQLite write segment only).
  *
- * NFR3 ("index 1k chunks < 30 s") covers chunking + embedding + FTS + vec
+ *  ("index 1k chunks < 30 s") covers chunking + embedding + FTS + vec
  * end-to-end. This test exercises **only** the SQLite write path: 1k chunks
- * with synthetic 1024-dim embeddings, single transaction. The Story 2.5
+ * with synthetic 1024-dim embeddings, single transaction. The
  * latency-harness owns the full end-to-end gate; if this micro-bench regresses
  * sharply we want to know early.
  */

@@ -64,11 +64,11 @@ describe('BGE_LARGE_ZH_V1_5_MANIFEST', () => {
 
 describe('BGE_RERANKER_V2_M3_MANIFEST', () => {
   it('exposes the canonical onnx-community modelId, sentinel embeddingDim=1, and 5 pinned files', () => {
-    // Why onnx-community/* instead of Xenova/* — see Story 2.5 §架构现实校正 #7:
+    // Why onnx-community/* instead of Xenova/* — see §架构现实校正 #7:
     // the Xenova fork was never published on HF Hub (401 to anonymous fetch).
     expect(BGE_RERANKER_V2_M3_MANIFEST.modelId).toBe('onnx-community/bge-reranker-v2-m3-ONNX');
     // `embeddingDim: 1` is a sentinel — bge-reranker outputs a single logit
-    // (sequence-classification), not a dense vector. See Story 2.5 Dev Notes §6.
+    // (sequence-classification), not a dense vector. See Dev Notes §6.
     expect(BGE_RERANKER_V2_M3_MANIFEST.embeddingDim).toBe(1);
     // Default dtype `q8` loads 5 files (config + tokenizer triple + model_quantized.onnx);
     // upstream fp32 weights split across model.onnx + model.onnx_data total

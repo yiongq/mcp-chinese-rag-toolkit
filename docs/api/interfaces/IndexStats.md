@@ -6,7 +6,7 @@
 
 # Interface: IndexStats
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:104](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L104)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:104](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L104)
 
 Result of a single [IndexHandle.indexChunks](IndexHandle.md#indexchunks) batch.
 
@@ -16,7 +16,7 @@ Result of a single [IndexHandle.indexChunks](IndexHandle.md#indexchunks) batch.
 
 > **durationMs**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:106](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L106)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:106](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L106)
 
 ***
 
@@ -24,4 +24,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:106](https://gith
 
 > **inserted**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:105](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L105)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:105](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L105)

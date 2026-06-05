@@ -6,7 +6,7 @@
 
 # Interface: Reranker
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:407](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L407)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:415](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L415)
 
 Result returned by [loadReranker](../functions/loadReranker.md).
 
@@ -30,7 +30,7 @@ more accurate at separating near-duplicate candidates.
 
 > `readonly` **modelId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:427](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L427)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:435](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L435)
 
 Echo of the manifest's `modelId` — written to `meta.reranker_model` by [writeRerankerMeta](../functions/writeRerankerMeta.md).
 
@@ -40,7 +40,7 @@ Echo of the manifest's `modelId` — written to `meta.reranker_model` by [writeR
 
 > **rank**(`query`, `documents`, `opts?`): `Promise`\<[`RankedDocument`](RankedDocument.md)[]\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:421](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L421)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:429](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L429)
 
 Score `documents` against `query`. Returns one entry per input document,
 in the SAME order (so caller can `documents[i] ←→ scores[i]`).

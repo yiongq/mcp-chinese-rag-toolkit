@@ -23,7 +23,7 @@ describe.skipIf(SKIP_NETWORK)('embedder performance bench', () => {
     }
   });
 
-  it('reports P95 / batch speedup (warn-not-fail; Story 2.5 owns NFR1 gating)', {
+  it('reports P95 / batch speedup (warn-not-fail; owns  gating)', {
     timeout: 600_000,
   }, async () => {
     const cacheDir = uniqueTmp('embedder-perf');

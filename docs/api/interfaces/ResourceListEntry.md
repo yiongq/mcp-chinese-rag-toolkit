@@ -6,7 +6,7 @@
 
 # Interface: ResourceListEntry
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:3](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L3)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:3](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L3)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:3]
 
 > `optional` **description?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:6](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L6)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:6](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L6)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:6]
 
 > `optional` **mimeType?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:7](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L7)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:7](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L7)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:7]
 
 > **name**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:5](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L5)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:5](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L5)
 
 ***
 
@@ -38,4 +38,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:5]
 
 > **uri**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:4](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L4)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:4](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L4)

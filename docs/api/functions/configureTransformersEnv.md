@@ -8,7 +8,7 @@
 
 > **configureTransformersEnv**(`opts`): `void`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:89](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L89)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:89](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L89)
 
 Apply `@huggingface/transformers` global `env` settings the toolkit cares
 about, without overwriting unrelated fields users may have set in their

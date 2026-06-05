@@ -6,7 +6,7 @@
 
 # Interface: ResourceDefinition
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:32](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L32)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:32](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L32)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:32
 
 > **list**: () => `Promise`\<\{ `resources`: [`ResourceListEntry`](ResourceListEntry.md)[]; \}\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:37](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L37)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:37](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L37)
 
 #### Returns
 
@@ -26,7 +26,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:37
 
 > `optional` **mimeType?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:36](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L36)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:36](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L36)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:36
 
 > **read**: (`uri`, `vars`) => `Promise`\<[`ResourceReadResult`](ResourceReadResult.md)\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L38)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L38)
 
 #### Parameters
 
@@ -62,7 +62,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:38
 
 > `optional` **title?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L35)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L35)
 
 ***
 
@@ -70,7 +70,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:35
 
 > **uriScheme**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L33)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L33)
 
 ***
 
@@ -78,4 +78,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:33
 
 > **uriTemplate**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:34](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L34)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:34](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L34)

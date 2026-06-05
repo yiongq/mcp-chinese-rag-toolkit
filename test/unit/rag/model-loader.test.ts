@@ -215,7 +215,7 @@ describe('verifyModelFiles', () => {
   });
 
   it('deletes partial-download files in non-strict mode (size mismatch → recover, not brick)', async () => {
-    // Story 2.3 H10: a previously interrupted download leaves a truncated
+    // : a previously interrupted download leaves a truncated
     // file. Non-strict pre-load verify should clear it so the upcoming
     // pipeline call can redownload — NOT throw a permanent ModelHashMismatchError.
     writeFileSync(fixture.filePath, Buffer.from('{"hello":"world!!"}', 'utf8'));
@@ -310,7 +310,7 @@ describe('verifyModelFiles', () => {
     ).rejects.toBeInstanceOf(ModelHashMismatchError);
   });
 
-  it('rejects symlinks inside the cache directory (Story 2.3 H4 — TOCTOU / symlink attack guard)', async () => {
+  it('rejects symlinks inside the cache directory', async () => {
     // Replace the regular file fixture with a symlink to itself's parent
     // dir's `config.json` copy, then verify that lstat-based detection trips.
     const targetPath = path.join(fixture.cacheDir, 'real-target.json');

@@ -1,7 +1,7 @@
 import type { Chunk, PdfPage } from '../types.js';
 
 // ---------------------------------------------------------------------------
-// Story 2.8 — Indexing Plugin abstraction (FR20 first landing) + Vision
+// — Indexing Plugin abstraction + Vision
 // Caption Plugin types (ADR-0008)
 // ---------------------------------------------------------------------------
 
@@ -18,7 +18,7 @@ export interface IndexingPluginContext {
 }
 
 /**
- * FR20 indexing-time plugin. Hooks fire DURING `pnpm run index`, AFTER
+ *  indexing-time plugin. Hooks fire DURING `pnpm run index`, AFTER
  * `parsePdf()` produces {@link PdfPage}[] and BEFORE the caller passes the
  * combined chunk array to the embedder / FTS tokenizer.
  *
@@ -29,7 +29,7 @@ export interface IndexingPluginContext {
  * unchanged hybrid + rerank pipeline.
  *
  * Why a minimal single-hook interface (and not a multi-hook lifecycle):
- *   - First plugin (this story) only needs pre-chunking enrichment.
+ *   - The first plugin only needs pre-chunking enrichment.
  *   - YAGNI — additional hooks (`enrichChunks` / `postRerank`) land when a
  *     second plugin actually requires them; over-abstracting now would lock
  *     the contract before we know the real shape.
@@ -54,10 +54,10 @@ export interface IndexingPlugin {
  * `templates/anthropic-vision-provider.ts` is a reference adapter the
  * caller copies + fills in their own API key.
  *
- * Mirrors Story 2.6 {@link import('../types.js').LlmProvider} (contextual
- * retrieval) + Story 2.7 `EvalSearchFn` (eval framework) provider-injection
- * patterns. Toolkit `dependencies` stays free of vendor SDKs (NFR36 npm
- * package size guard + Story 2.6 教训 9).
+ * Mirrors {@link import('../types.js').LlmProvider} (contextual
+ * retrieval) + `EvalSearchFn` (eval framework) provider-injection
+ * patterns. Toolkit `dependencies` stays free of vendor SDKs ( npm
+ * package size guard + 教训 9).
  */
 export interface VisionProvider {
   /**
@@ -97,7 +97,7 @@ export interface VisionCaptionOptions {
   /**
    * Caption SQLite cache directory.
    * @default `<userCacheDir>/mcp-chinese-rag-toolkit/caption-cache` (resolved via
-   * the same env-paths logic Story 2.3 uses for model cache, but under a
+   * the same env-paths logic uses for model cache, but under a
    * disjoint subpath so model cache and caption cache never collide).
    */
   cacheDir?: string;
@@ -121,7 +121,7 @@ export interface VisionCaptionOptions {
    *  - `'fail-index'`: throw {@link VisionCaptionFailedError}; caller decides
    *    recovery.
    *
-   * Never silently swallows errors regardless of mode (Story 2.7 教训 2
+   * Never silently swallows errors regardless of mode (教训 2
    * fail-fast + actionable error). @default 'skip-image'
    */
   onFailure?: 'skip-image' | 'fail-index';

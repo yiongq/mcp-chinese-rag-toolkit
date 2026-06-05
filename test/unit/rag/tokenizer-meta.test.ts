@@ -43,7 +43,7 @@ describe('writeTokenizerMeta', () => {
   }
 
   it('writes JIEBA_VERSION into meta.tokenizer_version on first call', () => {
-    expect(readTokenizerVersion()).toBe(''); // Story 2.2 placeholder
+    expect(readTokenizerVersion()).toBe(''); // placeholder
     writeTokenizerMeta(handle.db);
     expect(readTokenizerVersion()).toBe(JIEBA_VERSION);
   });
@@ -86,7 +86,7 @@ describe('writeTokenizerMeta', () => {
     expect(readTokenizerVersion()).toBe('');
   });
 
-  it('throws a guidance message when the db lacks the Story 2.2 meta table', () => {
+  it('throws a guidance message when the db lacks the meta table', () => {
     const rawDb = new Database(':memory:');
     try {
       expect(() => writeTokenizerMeta(rawDb)).toThrow(/writeTokenizerMeta: meta table is missing/);

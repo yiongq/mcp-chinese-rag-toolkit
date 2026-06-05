@@ -3,7 +3,7 @@ import { Jieba } from '@node-rs/jieba';
 // specifier MUST carry the `.js` extension. `moduleResolution: bundler` (this
 // package) and esbuild/vitest tolerate the extensionless form, but the emitted
 // dist preserves the specifier verbatim and strict Node ESM — which is how the
-// downstream `mcp-hr` HTTP server bin runs `node dist/bin.js` (Story 4.6) —
+// downstream `a downstream consumer package` HTTP server bin runs `node dist/bin.js` —
 // rejects the extensionless directory import (ERR_MODULE_NOT_FOUND).
 import { dict } from '@node-rs/jieba/dict.js';
 
@@ -11,7 +11,7 @@ import { dict } from '@node-rs/jieba/dict.js';
  * Module-level Jieba singleton — the default dictionary is ~10 MB and only
  * needs to be loaded once per process. `@node-rs/jieba` 2.x is class-based
  * (replacing the 1.x top-level `cut()` helper), so we own the instance here
- * and expose only the `tokenize()` helper. Future Story 2.7 eval may add a
+ * and expose only the `tokenize()` helper. Future eval may add a
  * domain dictionary via `Jieba.withDict(customDict)` — keep that off the
  * critical path for MVP.
  */

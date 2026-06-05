@@ -14,8 +14,8 @@ import type {
 } from './types.js';
 
 /**
- * Default Hit Rate@K / MRR@K — matches FR41 / NFR14 contract (90% Hit Rate@5).
- * Mirrors Story 2.5 reranker `DEFAULT_TOP_K = 5` for consistency.
+ * Default Hit Rate@K / MRR@K — matches  /  contract (90% Hit Rate@5).
+ * Mirrors reranker `DEFAULT_TOP_K = 5` for consistency.
  */
 export const DEFAULT_EVAL_TOP_K = 5;
 
@@ -36,7 +36,7 @@ export const DEFAULT_EVAL_TOP_K = 5;
  *   - any expected.page is not a positive integer
  *
  * Reason: a silent "use defaults" path on a broken eval set would let the CI
- * gate hide regressions; fail-fast keeps NFR14 honest (Story 2.6 教训 2).
+ * gate hide regressions; fail-fast keeps  honest.
  */
 export function loadEvalSet(evalSetPath: string): EvalSet {
   // Resolve relative-to-cwd to match `pnpm test:eval` invocation expectations.
@@ -133,7 +133,7 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
     }
     // Inline `reason` wins; fall back to extracted leading `# reason:` comment.
     // Empty / whitespace-only inline reason is treated as absent so it does
-    // not silently override the comment fallback and defeat AI Agent Rule #9.
+    // not silently override the comment fallback and defeat .
     const rawInline = typeof item.reason === 'string' ? item.reason : undefined;
     const inlineReason =
       rawInline !== undefined && rawInline.trim().length > 0 ? rawInline : undefined;
@@ -249,7 +249,7 @@ export function scoreQuery(
 /**
  * Run an eval set against a `searchFn`, returning the full {@link EvalSummary}
  * for serialization by ci-helper.ts. Provider-injection — toolkit does NOT
- * bind to any specific MCP tool (mcp-hr Story 4.5 / mcp-modeling Story 6.7
+ * bind to any specific MCP tool (a downstream consumer package / a downstream consumer package
  * each wire their own).
  *
  * Hit Rate@K is defined as `hits / totalQueries`; MRR@K is the average of
@@ -280,7 +280,7 @@ export async function runEval(evalSet: EvalSet, opts: EvalRunnerOptions): Promis
     } catch (err) {
       // searchFn threw: record the error on the row and keep going so the
       // remaining queries still produce a per-query record. CI reviewer needs
-      // to see WHICH query failed, not just an opaque process exit (FR42).
+      // to see WHICH query failed, not just an opaque process exit.
       row.error = err instanceof Error ? (err.message ?? String(err)) : String(err);
       perQuery.push(row);
       continue;
@@ -307,7 +307,7 @@ export async function runEval(evalSet: EvalSet, opts: EvalRunnerOptions): Promis
 
     // Enforce the Hit Rate@K contract: hits beyond rank K MUST NOT count.
     // Providers that return more than topK rows (e.g. a debug overlay) would
-    // otherwise inflate the metric and turn NFR14 into a tautology.
+    // otherwise inflate the metric and turn  into a tautology.
     const topResults = rawResults.slice(0, topK);
     const { hitRank, reciprocalRank } = scoreQuery(q, topResults, {
       strict: opts.strict ?? false,
@@ -334,7 +334,7 @@ export async function runEval(evalSet: EvalSet, opts: EvalRunnerOptions): Promis
   };
 
   // Compute hitRateByCategory only when at least one query declares a category
-  // (Story 2.5 教训 11: optional aggregate fields should be absent, not empty,
+  // (教训 11: optional aggregate fields should be absent, not empty,
   // when there is nothing to aggregate).
   const hasCategory = perQuery.some((r) => r.category !== undefined);
   if (hasCategory) {

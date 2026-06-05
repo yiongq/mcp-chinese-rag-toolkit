@@ -79,9 +79,9 @@ describe('withPageCaption — factory validation', () => {
   });
 
   it('throws when opts.provider is missing', () => {
-    expect(() =>
-      withPageCaption({} as unknown as Parameters<typeof withPageCaption>[0]),
-    ).toThrow(/provider must be a VisionProvider/);
+    expect(() => withPageCaption({} as unknown as Parameters<typeof withPageCaption>[0])).toThrow(
+      /provider must be a VisionProvider/,
+    );
   });
 
   it('throws when opts.provider.caption is not a function', () => {
@@ -189,7 +189,11 @@ describe('withPageCaption — enrichPdf core path', () => {
     expect(chunks).toHaveLength(1);
     expect(chunks?.[0]?.page).toBe(2);
     expect(renderPageAsImageMock).toHaveBeenCalledTimes(1);
-    expect(renderPageAsImageMock).toHaveBeenCalledWith(expect.any(Uint8Array), 2, expect.any(Object));
+    expect(renderPageAsImageMock).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      2,
+      expect.any(Object),
+    );
     expect(provider.caption).toHaveBeenCalledTimes(1);
   });
 
@@ -361,10 +365,10 @@ describe('withPageCaption — enrichPdf core path', () => {
   it('rejects a page array with a bad pageNumber before any render', async () => {
     const plugin = withPageCaption({ provider: makeProvider(), cacheDir });
     await expect(
-      plugin.enrichPdf?.(
-        [{ pageNumber: 0, text: '组织架构' }] as PdfPage[],
-        { source: 'x.pdf', pdfBytes: makePdfBytes() },
-      ),
+      plugin.enrichPdf?.([{ pageNumber: 0, text: '组织架构' }] as PdfPage[], {
+        source: 'x.pdf',
+        pdfBytes: makePdfBytes(),
+      }),
     ).rejects.toThrow(/page.pageNumber must be a positive integer/);
     expect(renderPageAsImageMock).not.toHaveBeenCalled();
   });

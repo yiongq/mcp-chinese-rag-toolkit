@@ -8,7 +8,7 @@
 
 > **defineTool**\<`I`\>(`def`): [`McpToolDefinition`](../interfaces/McpToolDefinition.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:103](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts#L103)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/tool-builder.ts:103](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/tool-builder.ts#L103)
 
 ## Type Parameters
 

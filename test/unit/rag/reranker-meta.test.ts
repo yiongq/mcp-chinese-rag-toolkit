@@ -33,8 +33,8 @@ describe('writeRerankerMeta', () => {
   }
 
   it('writes the reranker modelId into meta.reranker_model on first call', () => {
-    // Story 2.2 buildSchema places an '' placeholder via the META_KEYS append
-    // landed in this story; confirm the placeholder semantics first.
+    // buildSchema places an '' placeholder via the META_KEYS append
+    // landed earlier; confirm the placeholder semantics first.
     expect(readRerankerModel()).toBe('');
     writeRerankerMeta(handle.db, makeReranker('onnx-community/bge-reranker-v2-m3-ONNX'));
     expect(readRerankerModel()).toBe('onnx-community/bge-reranker-v2-m3-ONNX');
@@ -80,7 +80,7 @@ describe('writeRerankerMeta', () => {
     expect(readRerankerModel()).toBe('');
   });
 
-  it('throws a guidance message when the db lacks the Story 2.2 meta table', () => {
+  it('throws a guidance message when the db lacks the meta table', () => {
     const rawDb = new Database(':memory:');
     try {
       expect(() =>

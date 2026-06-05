@@ -8,7 +8,7 @@
 
 > **sha256Hex**(`input`): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:210](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L210)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:210](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L210)
 
 Compute the SHA-256 digest of a buffer or string as lowercase hex.
 Strings are encoded as UTF-8 before hashing so digests match the

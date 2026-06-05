@@ -6,7 +6,7 @@
 
 # Class: VisionCaptionFailedError
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:165](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L165)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:238](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L238)
 
 Thrown when `VisionCaptionOptions.onFailure === 'fail-index'` AND all
 retries are exhausted. `cause` preserves the underlying provider error
@@ -22,7 +22,7 @@ for diagnostics.
 
 > **new VisionCaptionFailedError**(`message`, `cause?`): `VisionCaptionFailedError`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:167](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L167)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:240](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L240)
 
 #### Parameters
 
@@ -48,7 +48,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:167](http
 
 > `readonly` `optional` **cause?**: `unknown`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:169](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L169)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:242](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L242)
 
 #### Inherited from
 
@@ -72,7 +72,7 @@ Defined in: node\_modules/.pnpm/typescript@5.9.3/node\_modules/typescript/lib/li
 
 > `readonly` **name**: `"VisionCaptionFailedError"` = `'VisionCaptionFailedError'`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:166](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L166)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:239](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L239)
 
 #### Overrides
 

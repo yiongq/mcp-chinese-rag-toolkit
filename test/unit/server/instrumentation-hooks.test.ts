@@ -163,7 +163,7 @@ describe('withHooks — toolName propagation (AC3.f)', () => {
   });
 });
 
-describe('withHooks — coordinates with Story 1.3 wrapHandler (AC3.g)', () => {
+describe('withHooks — coordinates with wrapHandler (AC3.g)', () => {
   it('lets factory wrapHandler convert errors into INTERNAL_ERROR envelope while still firing error hook', async () => {
     const error = vi.fn();
     const throwingTool: McpToolDefinition = {

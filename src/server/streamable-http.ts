@@ -11,7 +11,7 @@ import {
 } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 /**
- * CORS configuration for the Streamable HTTP transport (Story 4.6, NFR9 partial / AR-Ext-4).
+ * CORS configuration for the Streamable HTTP transport.
  *
  * ADR-0006 assigns CORS to the HTTP server (toolkit) tier, not the client. When
  * supplied, the transport echoes a request's `Origin` back in
@@ -21,7 +21,7 @@ import {
  * so cookie/credentialed cross-origin flows are not enabled — MCP over HTTP does
  * not use them; echoing the specific origin is about strict whitelist semantics,
  * not credentialed access. When omitted, no CORS headers are emitted and
- * `OPTIONS` keeps its pre-Story-4.6 `405` behaviour (backward compatible).
+ * `OPTIONS` keeps its legacy `405` behaviour (backward compatible).
  */
 export interface CorsOptions {
   /**
@@ -178,7 +178,7 @@ function isHostAllowed(req: IncomingMessage, allowedHosts: readonly string[]): b
 }
 
 /**
- * Build a fresh MCP server per request (stateless mode, NFR34).
+ * Build a fresh MCP server per request (stateless mode).
  * Re-using a single `McpServer` across requests would race: each `server.connect(transport)`
  * rewires the protocol's `_transport` field, breaking in-flight responses.
  */
@@ -212,7 +212,7 @@ export async function connectStreamableHttp(
       return;
     }
 
-    // CORS (Story 4.6): resolve the echo origin once, then set ACAO eagerly so it
+    // CORS: resolve the echo origin once, then set ACAO eagerly so it
     // rides on EVERY /mcp response — preflight, JSON-RPC success, and error
     // envelopes alike (a browser can only read an error body if ACAO is present).
     // `setHeader` persists until the first write; the SDK transport's own
@@ -222,7 +222,7 @@ export async function connectStreamableHttp(
     // cache can never replay a no-ACAO response to a whitelisted origin (or echo a
     // whitelisted ACAO to a different origin). Emitting it only on the match path
     // would cache non-matches without `Vary` and risk a cross-origin mismatch.
-    // (Story 4.6 code-review.)
+    //
     if (options.cors !== undefined) {
       res.setHeader('Vary', 'Origin');
     }
@@ -231,7 +231,7 @@ export async function connectStreamableHttp(
     }
 
     // OPTIONS preflight — only intercept when CORS is configured, otherwise fall
-    // through to the 405 branch (pre-Story-4.6 behaviour). A non-whitelisted /
+    // through to the 405 branch (legacy behaviour). A non-whitelisted /
     // origin-less OPTIONS still returns 204 but WITHOUT ACAO, so the browser's
     // own CORS check blocks it; the server never 500s on a stray preflight.
     if (options.cors !== undefined && req.method === 'OPTIONS') {
@@ -286,8 +286,8 @@ export async function connectStreamableHttp(
 
       // Fresh server + transport per request (SDK-documented stateless pattern).
       const server = serverFactory();
-      // NFR9 Phase 2: insert OAuth 2.1 middleware here (loopback/127.0.0.1 exempted per architecture.md L311)
-      // SDK requires `sessionIdGenerator: undefined` for stateless mode (NFR34); cast bypasses
+      //  Phase 2: insert OAuth 2.1 middleware here (loopback/127.0.0.1 exempted per  L311)
+      // SDK requires `sessionIdGenerator: undefined` for stateless mode; cast bypasses
       // a SDK typings gap that marks the option non-optional even though the runtime supports it.
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

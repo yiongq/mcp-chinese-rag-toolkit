@@ -8,7 +8,7 @@
 
 > **HybridSearchFn** = (`query`, `opts?`) => `Promise`\<[`HybridHit`](../interfaces/HybridHit.md)[]\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:344](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L344)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:352](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L352)
 
 Bound query function returned by `createHybridSearch`.
 

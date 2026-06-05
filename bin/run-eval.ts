@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Story 2.7 CLI — runs the toolkit self-contained RAG eval set against the
- * 12-chunk bench fixture (Story 2.5 reused) and writes summary.json /
+ * CLI — runs the toolkit self-contained RAG eval set against the
+ * 12-chunk bench fixture and writes summary.json /
  * report.md / per-query.json to eval-results/. Exits non-zero when
  * Hit Rate@5 falls below RAG_EVAL_HIT_RATE_MIN (default 0.9).
  *
@@ -12,8 +12,8 @@
  *   pnpm test:eval -- --out-dir custom-results               # explicit out dir
  *
  * Exit codes:
- *   0 — Hit Rate@5 ≥ threshold (NFR14 gate passed)
- *   1 — Hit Rate@5 < threshold (NFR14 gate failed; CI must surface as `build failed`)
+ *   0 — Hit Rate@5 ≥ threshold
+ *   1 — Hit Rate@5 < threshold ( gate failed; CI must surface as `build failed`)
  *   2 — runtime error (model load failed / eval set parse failed / etc.)
  */
 
@@ -134,7 +134,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
  * bge-large-zh + bge-reranker-v2-m3 + indexes 12 chunks into in-memory
  * SQLite, returns an `EvalSearchFn` that runs the full hybrid + rerank
  * pipeline. ALSO exposes the IndexHandle disposer so the caller can release
- * the native SQLite handle deterministically (Story 2.5 教训 1).
+ * the native SQLite handle deterministically.
  */
 async function buildToolkitSearchFn(): Promise<{
   searchFn: EvalSearchFn;
@@ -171,7 +171,7 @@ async function buildToolkitSearchFn(): Promise<{
       if (typeof r.chunk.source !== 'string') {
         throw new Error(
           `run-eval: reranked[${i}] for query="${query}" has no string 'source' on chunk; ` +
-            'indexing pipeline must populate source — check Story 2.1 chunking output.',
+            'indexing pipeline must populate source — check chunking output.',
         );
       }
       const out: EvalSearchResult = {
@@ -183,7 +183,7 @@ async function buildToolkitSearchFn(): Promise<{
       if (r.chunk.content !== undefined) out.content = r.chunk.content;
       if (r.distance !== undefined) out.distance = r.distance;
       // RerankedHit exposes BM25 rank as `bm25Rank`; surface it as `ftsRank`
-      // in the EvalSearchResult to match Story 2.7 spec L31 (FR43 wording).
+      // in the EvalSearchResult to match spec L31.
       if (r.bm25Rank !== undefined) out.ftsRank = r.bm25Rank;
       return out;
     });

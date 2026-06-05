@@ -1,10 +1,10 @@
 /**
- * Story 2.9 scaffold library — called by `bin/create-mcp-rag.ts`.
+ * scaffold library — called by `bin/create-mcp-rag.ts`.
  *
  * Separated from the CLI shell so unit tests can drive `scaffoldProject` /
  * `parseArgs` directly without spawning a subprocess. Exports follow the
- * same lib-vs-CLI split used by `bin/latency-harness.ts` (Story 2.5) and
- * `bin/run-vision-caption-demo.ts` (Story 2.8).
+ * same lib-vs-CLI split used by `bin/latency-harness.ts` and
+ * `bin/run-vision-caption-demo.ts`.
  *
  * IMPORTANT — none of these symbols are re-exported from `src/index.ts`.
  * Scaffolding is a CLI-only concern; consumers reach it via `package.json#bin`.
@@ -58,7 +58,7 @@ export class ScaffoldError extends Error {
 /**
  * Thrown when the package-manager install subprocess exits non-zero.
  * Distinct subclass so callers can branch on install failures specifically
- * (Story 2.6 M1 + Story 2.7 lesson 6 fail-fast).
+ *.
  */
 export class InstallFailedError extends ScaffoldError {
   constructor(message: string) {
@@ -496,7 +496,7 @@ function isInsideGitWorktree(dir: string): boolean {
 /**
  * Core scaffolding workflow:
  *   1. Validate target dir (must NOT exist — never silently overwrite,
- *      Story 2.7 lesson 7 / Story 2.8 lesson 11). Created atomically.
+ *      lesson 7 / lesson 11). Created atomically.
  *   2. Validate template id + enforce template.json constraints
  *   3. Recursively copy `templates/create-mcp-rag/files/<template>/` → target
  *   4. Token-replace `__PROJECT_NAME__` / `__TOOLKIT_VERSION__` /

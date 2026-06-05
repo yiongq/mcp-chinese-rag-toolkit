@@ -111,7 +111,7 @@ describe('loadEvalSet', () => {
 
   it('treats empty / whitespace-only inline `reason:` as absent and falls back to comment', () => {
     // Review fix M5 — an inline `reason: ""` should not silently override the
-    // comment-based reason and defeat AI Agent Rule #9.
+    // comment-based reason and defeat .
     const body = `version: v1\nqueries:\n  # reason: comment-version\n  - query: a\n    reason: ''\n    expected:\n      - source: bench-fixture.md\n        page: 1\n`;
     const p = writeYaml('empty-inline-reason.yml', body);
     const set = loadEvalSet(p);

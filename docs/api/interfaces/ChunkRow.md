@@ -6,7 +6,7 @@
 
 # Interface: ChunkRow
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:98](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L98)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:98](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L98)
 
 Single row consumed by [IndexHandle.indexChunks](IndexHandle.md#indexchunks). `embedding.length`
 must equal the handle's `embeddingDim` (validated, fail-fast).
@@ -17,7 +17,7 @@ must equal the handle's `embeddingDim` (validated, fail-fast).
 
 > **chunk**: [`Chunk`](Chunk.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:99](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L99)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:99](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L99)
 
 ***
 
@@ -25,4 +25,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:99](https://githu
 
 > **embedding**: `Float32Array`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:100](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L100)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:100](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L100)

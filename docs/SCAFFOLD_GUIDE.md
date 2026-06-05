@@ -33,8 +33,8 @@ npx -p @yiong/mcp-chinese-rag-toolkit create-mcp-rag <project-name> [options]
 |---|---|
 | `rag-basic` | Minimal MCP RAG server: FTS5-only search + Chinese sample doc. Hello-world cold-start. Switch to bge-large-zh-v1.5 by editing `scripts/build-index.ts`. |
 
-Future templates (e.g. `rag-vision` showcasing the Story 2.8 plugin, or
-`rag-modeling-db` for the mcp-modeling pattern) will follow the same
+Future templates (e.g. `rag-vision` showcasing the plugin, or
+`rag-modeling-db` for the a downstream consumer package pattern) will follow the same
 shape — file an issue if a missing template is blocking you.
 
 ## Template anatomy

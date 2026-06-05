@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Story 2.5 CLI — runs the stdio latency harness and either writes a fresh
+ * CLI — runs the stdio latency harness and either writes a fresh
  * baseline.json or compares against the committed baseline. Default tool is a
- * full hybrid + rerank pipeline over the Story 2.4 12-chunk HR fixture
+ * full hybrid + rerank pipeline over the 12-chunk HR fixture
  * (in-memory sqlite); CI / `pnpm bench` runs this end-to-end.
  *
  * Usage:
@@ -12,7 +12,7 @@
  *   pnpm bench -- --warmup-runs 10
  *
  * Exit codes:
- *   0 — success (always; CI bench step is warn-not-block per Story 2.5 AC8)
+ *   0 — success (always; CI bench step is warn-not-block per AC8)
  *   1 — harness execution error (model load failed / hash mismatch / etc.)
  *
  * Diff is reported via stdout summary + GitHub Actions `::warning::`
@@ -183,7 +183,7 @@ async function buildSearchFixtureTool(): Promise<HarnessToolBundle> {
     tool: {
       name: 'search-fixture',
       description:
-        'Story 2.5 bench fixture — runs hybrid (FTS5 + sqlite-vec) → rerank top-5 over a 12-chunk HR corpus.',
+        'bench fixture — runs hybrid (FTS5 + sqlite-vec) → rerank top-5 over a 12-chunk HR corpus.',
       inputSchema: z.object({ query: z.string().min(1) }),
       handler: async (args: unknown) => {
         const { query } = args as { query: string };
@@ -310,8 +310,8 @@ function reportSnapshot(snapshot: LatencySnapshot): void {
   );
 }
 
-/** NFR1 hard ceiling — stdio P95 must stay below this value. */
-const NFR1_P95_CEILING_MS = 200;
+/**  hard ceiling — stdio P95 must stay below this value. */
+const _P95_CEILING_MS = 200;
 /** Relative regression threshold beyond the baseline. */
 const REGRESSION_THRESHOLD_MS = 50;
 /** Improvement threshold prompting baseline refresh suggestion. */
@@ -325,11 +325,11 @@ function emitAnnotation(message: string): void {
 }
 
 function reportDiff(baseline: LatencySnapshot | undefined, current: LatencySnapshot): void {
-  // Absolute NFR1 check first — fires regardless of baseline availability so a
+  // Absolute  check first — fires regardless of baseline availability so a
   // missing baseline cannot mask a P95 already over the 200ms ceiling.
-  if (current.p95Ms > NFR1_P95_CEILING_MS) {
+  if (current.p95Ms > _P95_CEILING_MS) {
     emitAnnotation(
-      `⚠️ NFR1 breach: current P95 ${formatMs(current.p95Ms)} > ${NFR1_P95_CEILING_MS}ms ceiling`,
+      `⚠️  breach: current P95 ${formatMs(current.p95Ms)} > ${_P95_CEILING_MS}ms ceiling`,
     );
   }
 

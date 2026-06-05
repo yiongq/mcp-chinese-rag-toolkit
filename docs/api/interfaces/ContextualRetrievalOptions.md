@@ -6,11 +6,11 @@
 
 # Interface: ContextualRetrievalOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:589](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L589)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:597](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L597)
 
-Options for `generateChunkContext` (Story 2.6 Contextual Retrieval,
- FR15). Provider injection only — toolkit does NOT bind to a specific
- LLM SDK; see Story 2.6 AC5 §design rationale.
+Options for `generateChunkContext` (Contextual Retrieval,
+ ). Provider injection only — toolkit does NOT bind to a specific
+ LLM SDK; see AC5 §design rationale.
 
 ## Properties
 
@@ -18,7 +18,7 @@ Options for `generateChunkContext` (Story 2.6 Contextual Retrieval,
 
 > `optional` **cacheKey?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:598](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L598)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:606](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L606)
 
 Cache key passed to provider for cache_control identity (e.g. doc
  sha256). Default `'default'`.
@@ -29,11 +29,11 @@ Cache key passed to provider for cache_control identity (e.g. doc
 
 > **fullDocument**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:593](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L593)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:601](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L601)
 
 Source document the chunk was sliced from. Sent ONCE per indexing
  batch with `cache_control: ephemeral`; subsequent chunks reuse the
- cached prefix → ≤ 50% token cost vs uncached (FR15).
+ cached prefix → ≤ 50% token cost vs uncached.
 
 ***
 
@@ -41,7 +41,7 @@ Source document the chunk was sliced from. Sent ONCE per indexing
 
 > `optional` **prefixLength?**: `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:595](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L595)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:603](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L603)
 
 Target prefix length range (characters).
 

@@ -37,7 +37,7 @@ describe('errors.create', () => {
     expect(parsed).toEqual(sc);
   });
 
-  it('defaults retryable to false (fail-closed per NFR15)', () => {
+  it('defaults retryable to false (fail-closed per )', () => {
     const envelope = create('X', 'm');
     const sc = envelope.structuredContent as Record<string, unknown>;
     expect(sc.retryable).toBe(false);

@@ -28,4 +28,4 @@ required.
 - [EVAL_GUIDE.md](./EVAL_GUIDE.md) — methodology for writing your own
   eval set
 - Toolkit [README](../README.md) — architecture overview, RAG primitive
-  reference, design rationale per story
+  reference, design rationale

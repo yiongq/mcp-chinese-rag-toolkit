@@ -6,11 +6,11 @@
 
 # Interface: WithLruCacheDeps
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:581](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L581)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:589](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L589)
 
 Dependencies bound by `withLruCache` (kept for the alternative
  ergonomic factory shape — not consumed by `createMcpServer` directly;
- see Story 2.6 AC3 §design rationale).
+ see AC3 §design rationale).
 
 ## Properties
 
@@ -18,7 +18,7 @@ Dependencies bound by `withLruCache` (kept for the alternative
 
 > **options**: [`CacheOptions`](CacheOptions.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:583](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L583)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:591](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L591)
 
 ***
 
@@ -26,4 +26,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:583](https://gith
 
 > **toolName**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:582](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L582)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:590](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L590)

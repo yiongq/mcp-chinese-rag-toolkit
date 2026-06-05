@@ -8,7 +8,7 @@
 
 > **chunk**(`text`, `opts?`): `Promise`\<[`Chunk`](../interfaces/Chunk.md)[]\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts:30](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts#L30)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts:30](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/chunking.ts#L30)
 
 Split text into hierarchical chunks aware of Markdown heading structure.
 
@@ -23,7 +23,7 @@ Algorithm:
 
 We hand-roll the section tracker because `@langchain/textsplitters` JS
 has no `MarkdownHeaderTextSplitter` equivalent (Python-only). See the
-Story 2.1 Dev Notes (§Markdown Hierarchical Chunking).
+Dev Notes (§Markdown Hierarchical Chunking).
 
 ## Parameters
 

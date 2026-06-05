@@ -6,7 +6,7 @@
 
 # Interface: Chunk
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:52](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L52)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:52](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L52)
 
 Output unit of the chunking pipeline.
 
@@ -21,7 +21,7 @@ SQLite `docs.text`) happens at the indexing layer, not here.
 
 > **content**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:53](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L53)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:53](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L53)
 
 ***
 
@@ -29,7 +29,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:53](https://githu
 
 > `optional` **page?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:55](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L55)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:55](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L55)
 
 ***
 
@@ -37,7 +37,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:55](https://githu
 
 > `optional` **section?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:57](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L57)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:57](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L57)
 
 Markdown heading path, levels joined by ` > ` (H1–H4 tracked).
 
@@ -47,4 +47,4 @@ Markdown heading path, levels joined by ` > ` (H1–H4 tracked).
 
 > `optional` **source?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:54](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L54)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:54](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L54)

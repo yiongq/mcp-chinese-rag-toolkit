@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// Story 2.7 — Eval Framework + RAG Eval CI Gate types (FR39-FR43, NFR14)
+// — Eval Framework + RAG Eval CI Gate types
 // ---------------------------------------------------------------------------
 
 /**
  * Result row returned by an evaluatable `searchFn`. Field naming mirrors
- * Story 2.4 `HybridHit` / Story 2.5 `RerankedHit` (camelCase wire convention,
- * architecture L555-562). All metric fields are optional — toolkit eval
+ * `HybridHit` / `RerankedHit` (camelCase wire convention). All metric fields
+ * are optional — toolkit eval
  * reports `'n/a'` when missing, never throws (callers may simplify and only
  * supply `rerankScore`).
  */
@@ -14,22 +14,22 @@ export interface EvalSearchResult {
   source: string;
   /** 1-indexed page number (mirrors PdfPage / Citation convention). */
   page?: number;
-  /** Markdown heading path (Story 2.1 chunking convention). */
+  /** Markdown heading path. */
   section?: string;
   /** Chunk content (informational; not used for Hit Rate scoring). */
   content?: string;
-  /** bge-reranker-v2-m3 sigmoid score ∈ [0, 1]; populated by Story 2.5 reranker. */
+  /** bge-reranker-v2-m3 sigmoid score ∈ [0, 1]; populated by reranker. */
   rerankScore?: number;
-  /** sqlite-vec L2 distance; populated by Story 2.4 hybrid search vec branch. */
+  /** sqlite-vec L2 distance; populated by hybrid search vec branch. */
   distance?: number;
-  /** FTS5 BM25 rank (1-indexed); populated by Story 2.4 hybrid search FTS branch. */
+  /** FTS5 BM25 rank (1-indexed); populated by hybrid search FTS branch. */
   ftsRank?: number;
 }
 
 /**
- * A `searchFn` evaluated by `runEval`. Mirrors Story 2.5 `RerankFn` /
- * Story 2.4 `HybridSearchFn` provider-injection patterns — toolkit eval does
- * NOT bind to any specific MCP tool; mcp-hr / mcp-modeling / third-party each
+ * A `searchFn` evaluated by `runEval`. Mirrors `RerankFn` /
+ * `HybridSearchFn` provider-injection patterns — toolkit eval does
+ * NOT bind to any specific MCP tool; a downstream consumer package / a downstream consumer package / third-party each
  * wire their own.
  */
 export type EvalSearchFn = (query: string, opts?: { topK?: number }) => Promise<EvalSearchResult[]>;
@@ -56,7 +56,7 @@ export interface EvalQuery {
    */
   expected: EvalExpected[];
   /**
-   * kebab-case category (architecture L440), e.g. `'engine-routing'`,
+   * kebab-case category, e.g. `'engine-routing'`,
    * `'hooks'`, `'leave-policy'`. Used by report.md aggregation.
    */
   category?: string;
@@ -95,13 +95,13 @@ export interface EvalQueryResult {
   /**
    * Error message captured when `searchFn` threw or returned an invalid shape
    * for this query. Present only on failure; the query counts as MISS for Hit
-   * Rate / MRR purposes. Keeps the eval running (FR42 — partial artifact still
+   * Rate / MRR purposes. Keeps the eval running ( — partial artifact still
    * uploaded so CI reviewer can see WHICH query crashed without losing the rest).
    */
   error?: string;
 }
 
-/** Aggregate eval-set summary, written to summary.json (FR40). */
+/** Aggregate eval-set summary, written to summary.json. */
 export interface EvalSummary {
   /** Eval set version (echoed from EvalSet.version). */
   evalSetVersion: string;
@@ -128,11 +128,11 @@ export interface EvalSummary {
 /** Options for `runEval()`. */
 export interface EvalRunnerOptions {
   /**
-   * Search function under evaluation. Caller injects (mcp-hr / mcp-modeling /
+   * Search function under evaluation. Caller injects (a downstream consumer package / a downstream consumer package /
    * third-party each wire their own).
    */
   searchFn: EvalSearchFn;
-  /** Top-K for both Hit Rate@K and MRR@K. @default 5 (FR41 / NFR14). */
+  /** Top-K for both Hit Rate@K and MRR@K. @default 5. */
   topK?: number;
   /**
    * When true, `expected.page` (if present) must EXACTLY match a top-K

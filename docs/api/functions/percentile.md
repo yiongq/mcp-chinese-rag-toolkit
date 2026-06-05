@@ -8,7 +8,7 @@
 
 > **percentile**(`samples`, `p`): `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/latency-harness.ts:64](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/latency-harness.ts#L64)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/latency-harness.ts:64](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/latency-harness.ts#L64)
 
 NIST type 7 linear-interpolation percentile (the same algorithm NumPy
 `np.quantile(..., method='linear')` and SciPy `scoreatpercentile` default

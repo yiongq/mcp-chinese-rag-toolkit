@@ -402,7 +402,7 @@ describe('createReranker (stub-by-injection)', () => {
     expect(b).toEqual(a);
   });
 
-  it('tie-breaks on docId ascending when rerankScores collide (Story 2.4 H3 lesson)', async () => {
+  it('tie-breaks on docId ascending when rerankScores collide', async () => {
     const { createReranker } = await import('../../../src/rag/reranker.js');
     // All docs get the same score → sort must fall back to docId asc.
     const reranker = makeStubReranker('stub', () => 0.7);

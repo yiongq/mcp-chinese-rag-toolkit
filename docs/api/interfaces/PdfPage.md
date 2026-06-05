@@ -6,7 +6,7 @@
 
 # Interface: PdfPage
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L10)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L10)
 
 A single page extracted from a PDF document.
 
@@ -20,7 +20,7 @@ A single page extracted from a PDF document.
 
 > **pageNumber**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L11)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L11)
 
 ***
 
@@ -28,4 +28,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:11](https://githu
 
 > **text**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L12)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:12](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L12)
