@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Story 2.8 dev-only demo CLI — runs `withVisionCaption` against a sample
+ * dev-only demo CLI — runs `withVisionCaption` against a sample
  * PDF using Anthropic Claude Haiku. Requires:
  *   - ANTHROPIC_API_KEY env var
  *   - @anthropic-ai/sdk installed (pnpm add -D @anthropic-ai/sdk)
@@ -14,7 +14,7 @@
  *   0 — Demo succeeded; captions printed to stdout
  *   1 — Demo failed (missing env / missing peer / vision LLM error)
  *
- * NOT WIRED TO CI — vision LLM calls cost real money; Story 2.7 教训 8
+ * NOT WIRED TO CI — vision LLM calls cost real money; 教训 8
  * "CI gate 是行为门槛不烧钱" is the binding constraint. Run locally
  * before opening PRs that touch vision-caption code.
  */

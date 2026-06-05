@@ -242,7 +242,7 @@ describe('renderMarkdownReport', () => {
 });
 
 describe('passesGate', () => {
-  it('returns true when hitRate equals the threshold (NFR14 ≥)', () => {
+  it('returns true when hitRate equals the threshold', () => {
     expect(passesGate(summary({ hitRate: 0.9 }), 0.9)).toBe(true);
   });
 

@@ -8,7 +8,7 @@
 
 > **rrfFuse**\<`T`\>(`sources`, `opts?`): [`FusedRow`](../interfaces/FusedRow.md)\<`T`\>[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/rrf.ts:46](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/rrf.ts#L46)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/rrf.ts:46](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/rrf.ts#L46)
 
 Reciprocal Rank Fusion (Cormack / Clarke / Büttcher 2009, SIGIR).
 
@@ -17,7 +17,7 @@ Given any number of ranked input lists, accumulates a per-id score of
 descending by score (ties broken by id ascending for determinism).
 
 The fused output preserves per-source rank lookups and payload pointers
-so single-source survival (BDD#2 in Story 2.4) is observable downstream:
+so single-source survival (BDD#2 in ) is observable downstream:
 an id that only one source returned ends up with `null` in the other
 source's `ranks` / `payloads` slot.
 

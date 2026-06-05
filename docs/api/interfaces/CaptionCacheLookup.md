@@ -6,7 +6,7 @@
 
 # Interface: CaptionCacheLookup
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:26](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L26)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:26](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L26)
 
 4-tuple primary-key lookup args used by [CaptionCache.get](CaptionCache.md#get).
 
@@ -16,7 +16,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:2
 
 > **imageSha256**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:27](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L27)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:27](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L27)
 
 ***
 
@@ -24,7 +24,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:2
 
 > **modelId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:30](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L30)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:30](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L30)
 
 ***
 
@@ -32,7 +32,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:3
 
 > **promptSha256**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:28](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L28)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:28](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L28)
 
 ***
 
@@ -40,4 +40,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:2
 
 > **providerId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:29](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L29)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:29](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L29)

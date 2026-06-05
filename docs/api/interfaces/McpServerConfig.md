@@ -6,7 +6,7 @@
 
 # Interface: McpServerConfig
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:45](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L45)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:52](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L52)
 
 ## Properties
 
@@ -14,11 +14,23 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:45
 
 > `optional` **cache?**: [`McpServerCacheConfig`](McpServerCacheConfig.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:61](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L61)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:68](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L68)
 
-Story 2.6 — L0 tool-result LRU cache. Omit (or pass `{}` without
-`indexVersion`) to disable. Disabled by default to preserve Epic 1
+— L0 tool-result LRU cache. Omit (or pass `{}` without
+`indexVersion`) to disable. Disabled by default to preserve 
 walking-skeleton behaviour for callers that haven't opted in.
+
+***
+
+### cors?
+
+> `optional` **cors?**: `CorsOptions`
+
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:74](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L74)
+
+— CORS whitelist, forwarded to the HTTP transport. Ignored for
+`transport: 'stdio'` (stdio has no origin concept). Omit to disable CORS.
+See CorsOptions; a downstream consumer package passes `{ origins: ['chrome-extension://*'] }`.
 
 ***
 
@@ -26,7 +38,7 @@ walking-skeleton behaviour for callers that haven't opted in.
 
 > `optional` **handleSignals?**: `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:55](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L55)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:62](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L62)
 
 Forwarded to stdio transport when applicable. Default true.
 
@@ -36,7 +48,7 @@ Forwarded to stdio transport when applicable. Default true.
 
 > `optional` **host?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:53](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L53)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:60](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L60)
 
 ***
 
@@ -44,7 +56,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:53
 
 > **name**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:46](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L46)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:53](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L53)
 
 ***
 
@@ -52,7 +64,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:46
 
 > `optional` **port?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:52](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L52)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:59](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L59)
 
 ***
 
@@ -60,7 +72,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:52
 
 > `optional` **prompts?**: `unknown`[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:50](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L50)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:57](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L57)
 
 ***
 
@@ -68,7 +80,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:50
 
 > `optional` **resources?**: [`ResourceDefinition`](ResourceDefinition.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:49](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L49)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:56](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L56)
 
 ***
 
@@ -76,7 +88,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:49
 
 > `optional` **tools?**: [`McpToolDefinition`](McpToolDefinition.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:48](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L48)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:55](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L55)
 
 ***
 
@@ -84,7 +96,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:48
 
 > `optional` **transport?**: `TransportKind`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:51](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L51)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:58](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L58)
 
 ***
 
@@ -92,4 +104,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:51
 
 > **version**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:47](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L47)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:54](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L54)

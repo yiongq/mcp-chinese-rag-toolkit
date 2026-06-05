@@ -222,7 +222,7 @@ function assertSafeRelativePath(p: string): void {
       );
     }
   }
-  // Reject NUL and ASCII control characters (matches Story 2.2 fts-tokenizer guard).
+  // Reject NUL and ASCII control characters (matches fts-tokenizer guard).
   for (let i = 0; i < p.length; i += 1) {
     const code = p.charCodeAt(i);
     if (code < 0x20 || code === 0x7f) {

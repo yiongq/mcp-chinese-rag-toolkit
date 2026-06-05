@@ -6,7 +6,7 @@
 
 # Interface: LlmProvider
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:607](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L607)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:615](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L615)
 
 Provider abstraction injected into `generateChunkContext`. Mirrors
  Anthropic / OpenAI / 豆包 chat completion shape so callers can plug in
@@ -21,7 +21,7 @@ Provider abstraction injected into `generateChunkContext`. Mirrors
 
 > **generateChunkPrefix**(`args`): `Promise`\<`string`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:613](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L613)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:621](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L621)
 
 Generate prefix text given a (system, user) message pair where the
  system block carries `cache_control: { type: 'ephemeral' }` for the

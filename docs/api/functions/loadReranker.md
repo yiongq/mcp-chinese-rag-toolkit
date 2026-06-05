@@ -8,7 +8,7 @@
 
 > **loadReranker**(`opts?`): `Promise`\<[`Reranker`](../interfaces/Reranker.md)\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/reranker.ts:98](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/reranker.ts#L98)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/reranker.ts:98](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/reranker.ts#L98)
 
 Resolve a fully-initialised [Reranker](../interfaces/Reranker.md) for the requested model.
 

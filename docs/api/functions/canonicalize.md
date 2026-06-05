@@ -8,9 +8,9 @@
 
 > **canonicalize**(`args`): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts#L33)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/middleware/with-lru-cache.ts#L33)
 
-Canonicalize args for cache-key stability (architecture L630):
+Canonicalize args for cache-key stability:
 
 1. JSON keys recursively sorted, so `{a:1,b:2}` ≡ `{b:2,a:1}`.
 2. String values trimmed + 全角空格 `'　'` → 半角 `' '`.

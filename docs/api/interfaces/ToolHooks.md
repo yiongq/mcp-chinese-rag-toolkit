@@ -6,7 +6,7 @@
 
 # Interface: ToolHooks
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:8](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts#L8)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:8](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/instrumentation-hooks.ts#L8)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.t
 
 > `optional` **after?**: (`ctx`) => `void` \| `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts#L10)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/instrumentation-hooks.ts#L10)
 
 #### Parameters
 
@@ -32,7 +32,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.t
 
 > `optional` **before?**: (`ctx`) => `void` \| `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:9](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts#L9)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:9](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/instrumentation-hooks.ts#L9)
 
 #### Parameters
 
@@ -50,7 +50,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.t
 
 > `optional` **error?**: (`ctx`) => `void` \| `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:13](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts#L13)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/instrumentation-hooks.ts:13](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/instrumentation-hooks.ts#L13)
 
 #### Parameters
 

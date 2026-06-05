@@ -8,7 +8,7 @@
 
 > **stitchPrefixedChunk**(`chunk`, `prefix`): [`Chunk`](../interfaces/Chunk.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:121](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts#L121)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:121](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/contextual-retrieval.ts#L121)
 
 Splice the generated prefix into a chunk by prepending + double-
 newline. Indexing-path callers should set

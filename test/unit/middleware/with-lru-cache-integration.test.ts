@@ -36,7 +36,7 @@ function makeStubSearchTool(latencyMs: number = 20): {
 } {
   const handler = vi.fn(async (args: unknown) => {
     const { query } = args as { query: string };
-    // Simulate ~Story 2.5 hybrid + rerank baseline cold path
+    // Simulate ~hybrid + rerank baseline cold path
     await new Promise((resolve) => setTimeout(resolve, latencyMs));
     return {
       content: [{ type: 'text', text: `result for ${query}` }],

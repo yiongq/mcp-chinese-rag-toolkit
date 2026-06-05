@@ -6,7 +6,7 @@
 
 # Interface: ModelManifest
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:198](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L198)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:206](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L206)
 
 Hardcoded supply-chain pin for a HuggingFace Hub model used by
 [loadEmbedder](../functions/loadEmbedder.md). The list is intentionally narrow — only files the
@@ -17,7 +17,7 @@ tamper signal.
 Tracking is always against the upstream `main` branch (the sha256 entries
 are the supply-chain boundary, so a per-revision pin is redundant).
 `embeddingDim` is the contract value for the model's vector dimension —
-`loadEmbedder` exposes it as `Embedder.dim` so the FR20 factory pattern
+`loadEmbedder` exposes it as `Embedder.dim` so the  factory pattern
 works for non-1024-dim manifests too.
 
 ## Properties
@@ -26,7 +26,7 @@ works for non-1024-dim manifests too.
 
 > **embeddingDim**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:202](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L202)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:210](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L210)
 
 Vector dimension produced by the model (e.g. 1024 for bge-large-zh-v1.5, 768 for bge-base-zh, 512 for bge-small-zh).
 
@@ -36,7 +36,7 @@ Vector dimension produced by the model (e.g. 1024 for bge-large-zh-v1.5, 768 for
 
 > **files**: readonly [`ManifestEntry`](ManifestEntry.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:204](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L204)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:212](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L212)
 
 Frozen list of files to verify.
 
@@ -46,6 +46,6 @@ Frozen list of files to verify.
 
 > **modelId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:200](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L200)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:208](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L208)
 
 HF Hub repo id consumed by `pipeline('feature-extraction', modelId)`.

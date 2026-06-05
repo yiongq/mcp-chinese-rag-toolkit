@@ -42,7 +42,7 @@ graph TD
     http --> downstream
 ```
 
-Every box is a documented export — see the per-story API sections below.
+Every box is a documented export — see the per-section API reference below.
 
 ## Performance & quality gates
 
@@ -50,11 +50,11 @@ The pipeline ships with measurable contracts rather than vibes:
 
 | Gate | Threshold | Enforced by |
 |---|---|---|
-| Retrieval quality | `Hit Rate@5 ≥ 90%` / `MRR ≥ 0.80` | `rag-eval` CI job, blocking on every PR (FR41 / NFR14) |
-| stdio latency | `P95 < 200ms` per tool call (NFR1) | `runStdioLatencyHarness` bench — warn-not-block (`>50ms` drift); baseline committed after first `pnpm bench -- --write` |
+| Retrieval quality | `Hit Rate@5 ≥ 90%` / `MRR ≥ 0.80` | `rag-eval` CI job, blocking on every PR |
+| stdio latency | `P95 < 200ms` per tool call | `runStdioLatencyHarness` bench — warn-not-block (`>50ms` drift); baseline committed after first `pnpm bench -- --write` |
 | Embedding dim | `1024` (bge-large-zh-v1.5) | model manifest pin + SHA-256 attestation |
 
-These are **framework-methodology** numbers measured against the toolkit's own 12-chunk self-eval fixture — a smoke test that the pipeline integrates end-to-end, not a domain benchmark. Each downstream package owns its real-data eval set; see [Eval Framework + RAG Eval CI Gate](#eval-framework--rag-eval-ci-gate-story-27) for the adapter pattern.
+These are **framework-methodology** numbers measured against the toolkit's own 12-chunk self-eval fixture — a smoke test that the pipeline integrates end-to-end, not a domain benchmark. Each downstream package owns its real-data eval set; see [Eval Framework + RAG Eval CI Gate](#eval-framework--rag-eval-ci-gate) for the adapter pattern.
 
 ## Install
 
@@ -92,7 +92,7 @@ import { z } from 'zod';
 
 const server = createMcpServer({
   name: 'my-mcp', version: '0.1.0', transport: 'http', port: 3000,
-  // Optional CORS whitelist (Story 4.6). Omit to disable CORS entirely.
+  // Optional CORS whitelist. Omit to disable CORS entirely.
   // Each entry is matched by exact equality OR a scheme-anchored
   // `scheme://*` wildcard (e.g. `chrome-extension://*` matches any
   // extension id). The matched Origin is echoed back in
@@ -113,7 +113,7 @@ await server.start();
 // POST http://127.0.0.1:3000/mcp
 ```
 
-When `cors` is omitted no `Access-Control-*` headers are emitted and `OPTIONS` returns `405` (pre-Story-4.6 behaviour). CORS is a no-op for `transport: 'stdio'`.
+When `cors` is omitted no `Access-Control-*` headers are emitted and `OPTIONS` returns `405` (legacy no-CORS behaviour). CORS is a no-op for `transport: 'stdio'`.
 
 ### Error envelope
 
@@ -128,7 +128,7 @@ return errors.create('ENTITY_NOT_FOUND', 'No matching record', {
 });
 ```
 
-The factory automatically wraps any thrown handler exception into an `INTERNAL_ERROR` envelope (architecture rule #5), so handlers never leak uncaught errors. Error codes are enforced `SCREAMING_SNAKE_CASE`; `retryable` defaults to `false` (fail-closed, NFR15).
+The factory automatically wraps any thrown handler exception into an `INTERNAL_ERROR` envelope, so handlers never leak uncaught errors. Error codes are enforced `SCREAMING_SNAKE_CASE`; `retryable` defaults to `false` (fail-closed).
 
 `MCP_TRANSPORT=stdio|http` env var is read when `config.transport` is omitted (default: `stdio`). Illegal values fail fast — no silent fallback.
 
@@ -152,7 +152,7 @@ Resources: 0 ✓ / Tools: 1 (echo_tool) ✓ / Prompts: 0 ✓
 
 The `defineTool` / `defineResources` helpers enforce naming conventions (snake_case tool names,
 camelCase parameter keys, `{scheme}://{kind}/{id}` resource URIs) at **build time**, and
-`withHooks` reserves an opt-in instrumentation seam for Phase 2 OpenTelemetry without touching
+`withHooks` reserves an opt-in instrumentation seam for future OpenTelemetry without touching
 business code.
 
 ### `defineTool` — author-friendly + LLM-aware
@@ -213,10 +213,10 @@ const server = createMcpServer({
 on duplicate `uriScheme` entries. Any `list()` entry or `read()` call whose URI breaks the
 `{scheme}://{kind}/{id}` pattern throws before reaching the wire.
 
-### `withHooks` — opt-in observability seam (Phase 2 OTel pattern)
+### `withHooks` — opt-in observability seam (future OTel pattern)
 
 ```ts
-// Phase 2 pattern — pseudo-code, no runtime OTel dependency in this package.
+// Future pattern — pseudo-code, no runtime OTel dependency in this package.
 import { defineTool, withHooks } from '@yiong/mcp-chinese-rag-toolkit';
 
 const tool = defineTool({ /* ...as above... */ });
@@ -241,34 +241,34 @@ Invariants you can rely on:
 
 ## Roadmap
 
-| Phase | Story / Epic | Surface added |
-| --- | --- | --- |
-| ✅ Server factory + error envelope | Story 1.3 | `createMcpServer`, `errors` helpers |
-| ✅ Tool builder + Resource provider + instrumentation hooks | Story 1.4 | `defineTool`, `defineResources`, `withHooks` |
-| ✅ ADR + naming conventions migration | Story 1.5 | docs alignment, no API change |
-| ✅ Chinese RAG pipeline (parser → chunk → embed → BM25 + vec + RRF + rerank) | Epic 2 (Stories 2.1–2.7) | `rag/*` exports + eval CI gate |
-| ✅ Vision caption plugin | Epic 2 Story 2.8 | `rag/vision-caption` |
-| ✅ `create-mcp-rag` CLI + Documentation Set (FR49) — Epic 2 closer (9/9 done) | Epic 2 Story 2.9 | `bin/create-mcp-rag`, `docs/`, `templates/create-mcp-rag/` |
+| Capability | Surface added |
+| --- | --- |
+| ✅ Server factory + error envelope | `createMcpServer`, `errors` helpers |
+| ✅ Tool builder + Resource provider + instrumentation hooks | `defineTool`, `defineResources`, `withHooks` |
+| ✅ ADR + naming conventions migration | docs alignment, no API change |
+| ✅ Chinese RAG pipeline (parser → chunk → embed → BM25 + vec + RRF + rerank) | `rag/*` exports + eval CI gate |
+| ✅ Vision caption plugin | `rag/vision-caption` |
+| ✅ `create-mcp-rag` CLI + Documentation Set | `bin/create-mcp-rag`, `docs/`, `templates/create-mcp-rag/` |
 
-Each ✅ row maps to a shipped, tested slice of this public toolkit. Phase 2 directions are summarized in [What's next](#whats-next) below.
+Each ✅ row maps to a shipped, tested slice of this public toolkit. Future directions are summarized in [What's next](#whats-next) below.
 
 ## What's next
 
-Toolkit-scoped Phase 2 directions (these are the open-source-relevant items; the full cross-package roadmap is tracked privately):
+Toolkit-scoped future directions (these are the open-source-relevant items; the full cross-package roadmap is tracked privately):
 
 - **IndexingService / RAG-as-Service pivot** — a runtime document-upload + multi-tenant indexing seam so the toolkit can grow from an embedded library into a hosted service without a rewrite (the `IndexingService` interface is deliberately reserved for this).
 - **WebGPU in-browser RAG** — run the embedder + reranker fully client-side via WebGPU, dropping the server round-trip for browser consumers.
 - **Benchmark suite + industry comparison** — reproducible latency/quality benchmarks against Aider / Continue / Cursor-style retrieval stacks.
 - **`mcp-codebase`** — a TreeSitter-based, code-aware sibling toolkit that reuses this Chinese RAG core for source-code retrieval.
 
-## RAG primitives (Story 2.1+)
+## RAG primitives
 
 The first slice of the Chinese RAG pipeline lands as pure primitives — PDF
 text extraction and Markdown-aware chunking. They are the data-shape source
 of truth (`Chunk` / `ChunkOptions` / `ParsePdfResult` / `PdfPage`) consumed
 by every subsequent indexing / retrieval layer. The higher-level
 `ChineseRagPipeline` (jieba + FTS5 + sqlite-vec + RRF + reranker) lands in
-Stories 2.2 → 2.6.
+.
 
 ### `parsePdf` — PDF → per-page text (unpdf-based)
 
@@ -313,17 +313,17 @@ const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
 // every chunk carries source + page; blank pages are skipped.
 ```
 
-Indexing (jieba tokenizer + FTS5 + `bge-large-zh-v1.5` embedder + `vec0`)
-arrives in Story 2.2; hybrid search and reranking follow in Stories 2.4–2.5.
+Indexing (jieba tokenizer + FTS5 + `bge-large-zh-v1.5` embedder + `vec0`),
+hybrid search, and reranking build on these primitives.
 
-## RAG storage layer (Story 2.2+)
+## RAG storage layer
 
 The toolkit now ships an opinionated SQLite + `sqlite-vec` + jieba storage
 layer that turns `Chunk[]` (from `chunkPdfPages` / `chunk`) into a single
 `.db` file with three tables: `docs` (content + provenance), `docs_fts`
 (FTS5 BM25 over jieba-pretokenized text) and `docs_vec` (`vec0` virtual
 table holding the per-chunk embedding). Hybrid Search + RRF land in
-Story 2.4 — this section is the storage substrate they sit on.
+— this section is the storage substrate they sit on.
 
 ### `openIndex` — open / create an index handle
 
@@ -332,14 +332,14 @@ import { openIndex } from '@yiong/mcp-chinese-rag-toolkit';
 
 const handle = openIndex('data/hr-index.db', { embeddingDim: 1024 });
 try {
-  console.log(handle.getIndexVersion()); // → 'v1-…' (Story 2.6 cache key)
+  console.log(handle.getIndexVersion()); // → 'v1-…'
 } finally {
   handle.close();
 }
 ```
 
 Pass `{ readonly: true }` to open a prebuilt `.db` (e.g. one shipped
-inside an mcp-hr npm tarball) without re-running the schema.
+inside an a downstream consumer package npm tarball) without re-running the schema.
 
 ### `indexChunks` — three-table transactional write
 
@@ -350,7 +350,7 @@ const handle = openIndex('data/hr-index.db');
 const { pages } = await parsePdf('hr.pdf');
 const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
 // `embedding` is a Float32Array of length `embeddingDim` (default 1024,
-// matching bge-large-zh-v1.5 — Story 2.3 will provide the embedder).
+// matching bge-large-zh-v1.5 — will provide the embedder).
 handle.indexChunks(chunks.map((chunk, i) => ({ chunk, embedding: embeddings[i] })));
 handle.close();
 ```
@@ -362,14 +362,14 @@ Dimension mismatches fail fast and roll back the entire batch (single
 
 ```ts
 const hits = handle.ftsSearch('请假流程', { topK: 30 });
-hits[0]?.bm25Rank; // 1-indexed, ready for Story 2.4 RRF fusion
+hits[0]?.bm25Rank; // 1-indexed, ready for RRF fusion
 ```
 
 ### `vecSearch` — sqlite-vec KNN
 
 ```ts
 const hits = handle.vecSearch(queryEmbedding, { topK: 30 });
-hits[0]?.distance; // sqlite-vec L2 distance (Story 2.3 may opt into cosine)
+hits[0]?.distance; // sqlite-vec L2 distance
 ```
 
 ### `tokenize` — standalone jieba pre-tokenization
@@ -382,18 +382,18 @@ tokenize('试用期管理规定'); // → '试用期 管理 规定'
 Exposed as a top-level helper so business code can reuse the same
 tokenizer for query expansion / synonym lookup, not just indexing.
 
-Story 2.3 will land the `bge-large-zh-v1.5` embedder so `indexChunks`
+will land the `bge-large-zh-v1.5` embedder so `indexChunks`
 can be driven from `chunk.content` end-to-end without external glue.
 
-## Embedder (Story 2.3+)
+## Embedder
 
 This section is the **semantic layer** of the Chinese RAG indexing
 pipeline. It exposes `loadEmbedder()` (returns an `Embedder` whose
 `embed` / `embedBatch` produce 1024-dim L2-normalized vectors via
 `@huggingface/transformers` + `Xenova/bge-large-zh-v1.5`) and the
 supply-chain guardrails (`verifyModelFiles` + a pinned
-`BGE_LARGE_ZH_V1_5_MANIFEST`). Hybrid Search + RRF that consume these
-vectors land in Story 2.4.
+`BGE_LARGE_ZH_V1_5_MANIFEST`). Hybrid Search + RRF consume these
+vectors.
 
 ### `loadEmbedder` — bge-large-zh-v1.5 (1024-dim, CLS pooling, L2-normalized)
 
@@ -444,17 +444,17 @@ ESM/CJS boundary should both copies of the package coexist.
 
 The manifest is hardcoded; never fetched at runtime. To bump it for a
 new upstream revision: run `pnpm manifest:fetch` (dev tool), paste the
-output into `src/rag/model-manifest.ts`, run Story 2.7 eval to confirm
+output into `src/rag/model-manifest.ts`, run eval to confirm
 no Hit Rate@5 regression, then ship as a toolkit minor bump.
 
-## Hybrid Search (Story 2.4+)
+## Hybrid Search
 
-The retrieval layer composes the Story 2.2 storage primitives and the
-Story 2.3 embedder into a single fused query: BM25 (`ftsSearch`) and
+The retrieval layer composes the storage primitives and the
+embedder into a single fused query: BM25 (`ftsSearch`) and
 vector KNN (`vecSearch`) run in parallel, and Reciprocal Rank Fusion
 (Cormack et al. 2009) merges the two ranked lists without normalizing
-their disparate score scales. Story 2.5 adds the
-`bge-reranker-v2-m3` cross-encoder on top of the hybrid top-K; Story 2.6
+their disparate score scales. adds the
+`bge-reranker-v2-m3` cross-encoder on top of the hybrid top-K; 
 adds the LRU cache around the whole pipeline.
 
 ### `createHybridSearch` — BM25 + vec fused via RRF
@@ -473,7 +473,7 @@ const handle = openIndex('index.db', { embeddingDim: embedder.dim });
 writeEmbedderMeta(handle.db, embedder); // → meta.embedding_model
 writeTokenizerMeta(handle.db); // → meta.tokenizer_version = '@node-rs/jieba@2.0.1'
 
-// (mcp-hr / mcp-modeling build-index.ts owns the chunk → embedding → indexChunks loop.)
+// (a downstream consumer package / a downstream consumer package build-index.ts owns the chunk → embedding → indexChunks loop.)
 
 const search = createHybridSearch({ handle, embedder });
 const hits = await search('试用期管理规定', { topK: 5 });
@@ -504,7 +504,7 @@ const fused = rrfFuse([bm25, vec], { k: 60 });
 ```
 
 `rrfFuse` is the same fusion `createHybridSearch` uses internally —
-exposed standalone so the Story 2.5 reranker can fuse its own third
+exposed standalone so the reranker can fuse its own third
 ranked list (`rrfFuse([fts, vec, rerank], { k: 60 })`) and so third-party
 toolkit consumers can test alternative fusion strategies against the RRF
 baseline.
@@ -519,24 +519,24 @@ writeTokenizerMeta(handle.db); // defaults to JIEBA_VERSION ('@node-rs/jieba@2.0
 ```
 
 Symmetric to `writeEmbedderMeta`: call once during indexing to pin the
-jieba release into the on-disk index. Story 2.6's cache key and any
+jieba release into the on-disk index. 's cache key and any
 future jieba-dictionary upgrade trigger a reindex decision based on this
 field; upgrading the dep without bumping `JIEBA_VERSION` is a
 correctness bug.
 
-## Reranker (Story 2.5+)
+## Reranker
 
 The reranker stage is the *last* stop in the RAG retrieval pipeline
 (`hybrid → rerank → optional LRU cache`). It runs the
 `bge-reranker-v2-m3` cross-encoder over `(query, chunk.content)` pairs
 to produce a sigmoid-of-logit relevance score in `[0, 1]` and trims the
 hybrid top-10 down to the canonical top-5 envelope used by
-`mcp-hr.search_hr_docs` and `mcp-modeling.*`. The Story 2.6 LRU cache,
+`a downstream consumer package.search_hr_docs` and `a downstream consumer package.*`. The LRU cache,
 when it lands, wraps the entire `hybrid + rerank` pipeline as a single
 `withLruCache` middleware — the reranker is intentionally a separate
 factory so callers can skip it (ablation eval) or share its cache.
 
-This section is also the home of NFR1 (`stdio P95 < 200ms`): the
+This section is also the home of  (`stdio P95 < 200ms`): the
 `runStdioLatencyHarness` + `bin/latency-harness.ts` harness measures P95 and,
 once a `bench/baseline.json` is committed, warns on `>50ms` drift (warn-not-block;
 the baseline is generated on first `pnpm bench -- --write`, see below).
@@ -589,19 +589,19 @@ const hybrid = await search('试用期管理规定', { topK: 10 });
 const reranked = await rerank('试用期管理规定', hybrid);
 // reranked[0]?.rerankScore → ~0.95 (sigmoid(logit))
 // reranked[0]?.chunk.content → '试用期管理覆盖入职三个月内的所有同事…'
-// reranked[0]?.rrfScore     → preserved from hybrid (FR43 metric breakdown)
+// reranked[0]?.rrfScore     → preserved from hybrid
 // reranked[0]?.bm25Rank     → preserved
 ```
 
 `RerankedHit extends HybridHit` — every hybrid metric (RRF score, BM25
-rank, vec distance) is preserved so tool handlers can build the FR43
+rank, vec distance) is preserved so tool handlers can build the 
 `metric breakdown` envelope without re-querying. Output is sorted by
-`rerankScore` descending; ties break on `docId` ascending (Story 2.4 H3
+`rerankScore` descending; ties break on `docId` ascending (
 symbol comparison). `topK` accepts `Infinity` for "return every
 reranked candidate" — matching `createHybridSearch`'s contract.
 
-The FR25 / NFR17 `confidence: 'low'` threshold (default `< 0.5`) is
-the tool handler's responsibility (Epic 4 `mcp-hr` owner); the toolkit
+The  /  `confidence: 'low'` threshold (default `< 0.5`) is
+the tool handler's responsibility; the toolkit
 exposes `rerankScore` raw.
 
 ### `writeRerankerMeta` + `BGE_RERANKER_V2_M3_MANIFEST`
@@ -619,12 +619,12 @@ writeRerankerMeta(handle.db, reranker);
 
 Symmetric to `writeEmbedderMeta` / `writeTokenizerMeta`: pins the
 reranker modelId into the on-disk index for provenance / debug.
-**Intentionally NOT part of the Story 2.6 cache key** — swapping the
+**Intentionally NOT part of the cache key** — swapping the
 reranker does not invalidate the FTS / vec stores, so the cache key
 stays `(toolName, indexVersion, args)`.
 
 `BGE_RERANKER_V2_M3_MANIFEST` is the supply-chain pin — same "edit
-the literal, never automate the refresh, run Story 2.7 eval before
+the literal, never automate the refresh, run eval before
 bumping" discipline as `BGE_LARGE_ZH_V1_5_MANIFEST`.
 
 ### `runStdioLatencyHarness` + `bench/baseline.json`
@@ -647,20 +647,20 @@ generated on the first run via `pnpm bench -- --write` and committed once
 reviewed (it is not pre-committed in the repo today). Once present, `pnpm bench`
 warns on `> 50ms` P95 drift, and the GitHub Actions bench job emits a
 `::warning::` annotation on regressed PRs (warn-not-block in the MVP;
-Phase 2 may flip to block). `bench/latest.json` is gitignored
+a future release may flip to block). `bench/latest.json` is gitignored
 per-run output for CI artifact upload and local diffing.
 Cross-platform baselines are NOT comparable (CI Linux x64 vs local
 macOS arm64 will skip the numeric diff and print `⚠️ env drift`
 instead).
 
-Story 2.6 wraps the full `hybrid + rerank` pipeline in an LRU
+wraps the full `hybrid + rerank` pipeline in an LRU
 cache (`withLruCache`); cache hits collapse the entire reranker
 forward pass + hybrid query to a single dict lookup, knocking p50 down
-to ~0ms for warm queries. See §L0 Tool-Result Cache below. Story 2.7
+to ~0ms for warm queries. See §L0 Tool-Result Cache below. 
 then layers the eval framework on top to enforce `Hit Rate@5 ≥ 90%` as
 a CI gate.
 
-## L0 Tool-Result Cache (Story 2.6+)
+## L0 Tool-Result Cache
 
 `withLruCache(toolName, handler, opts)` wraps an MCP tool handler with a
 per-server in-memory LRU. The cache is **L0** — the *whole*
@@ -697,7 +697,7 @@ import {
 const handle = openIndex('./data/hr-index.db', { readonly: true });
 
 const server = createMcpServer({
-  name: 'mcp-hr',
+  name: 'a downstream consumer package',
   version: '0.1.0',
   tools: [searchHrDocs],
   cache: { indexVersion: handle.getIndexVersion() }, // 500 entries / 1h TTL defaults
@@ -708,7 +708,7 @@ await server.start();
 
 Omit `cache` (or pass `cache: { enabled: false, indexVersion: '…' }`) to
 disable. Passing `cache: {}` without an `indexVersion` emits a single
-`console.warn` and falls back to cache-off (Epic 1 walking-skeleton
+`console.warn` and falls back to cache-off (walking-skeleton
 parity).
 
 ### Cache-bypass conditions
@@ -741,9 +741,9 @@ business fields.
 | MCP server process restart (stdio per-session) | In-memory LRU disappears with the process |
 | Per-entry TTL expiry (1 h default) | `lru-cache@^11` lazy eviction on next get |
 | LRU capacity limit (500 default) | Built-in least-recently-used eviction |
-| Explicit `cache.clear()` admin tool | **Not supported** — Phase 2 design pass alongside OTel |
+| Explicit `cache.clear()` admin tool | **Not supported** — a future design pass alongside OTel |
 
-### Anti-patterns (architecture L636-640)
+### Anti-patterns
 
 - ❌ Persisting the cache to SQLite — invalidation complexity ≫ benefit
 - ❌ Semantic-similarity hit ("请假怎么申请" ≡ "如何请假") — embeddings are
@@ -752,17 +752,17 @@ business fields.
 - ❌ Caching `isError` envelopes — would freeze recovery for the user
 - ❌ HTTP transport caching: the current `connectStreamableHttp`
   rebuilds the server per request → cache is effectively no-op on HTTP.
-  **stdio path is fully effective**; Epic 4 Story 4.6 re-evaluates if
+  **stdio path is fully effective**; re-evaluates if
   HTTP consumers report 100% miss rate.
 
-## Contextual Retrieval (Story 2.6+)
+## Contextual Retrieval
 
-FR15 wires Anthropic's [Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
+ wires Anthropic's [Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)
 (2024-09 release; ~35% Hit Rate improvement reported when combined
 with BM25 + Reranker) into the toolkit's indexing path. The full
 source document is sent once with `cache_control: { type: 'ephemeral'
 }`; subsequent chunks reuse the cached prefix so token cost stays
-≤ 50% vs uncached (FR15 contract).
+≤ 50% vs uncached.
 
 ### Generate prefixes during indexing
 
@@ -832,39 +832,39 @@ parse → chunk → generateChunkContext → stitchPrefixedChunk → embedder.em
                                            AND the dense vector
 ```
 
-### mcp-hr / mcp-modeling integration
+### a downstream consumer package / a downstream consumer package integration
 
-Epic 4 Story 4.1 `mcp-hr` `build-index.ts` is the first real consumer.
+`a downstream consumer package` `build-index.ts` is the first real consumer.
 The toolkit only provides the prompt template + provider abstraction
 + stitching helpers; SDK selection, API key handling, and per-doc
 sha256 computation happen caller-side (architecture §AI Agent 强制规则
 #4 — API keys never enter the toolkit).
 
-### Out of scope for this story
+### Out of scope here
 
-- Real LLM end-to-end token-reduction validation (Epic 4 mcp-hr verifies
+- Real LLM end-to-end token-reduction validation (a downstream consumer package verifies
   in real `client.messages.create` `cache_read_input_tokens` /
   `cache_creation_input_tokens` fields)
-- RAG Hit Rate@K evaluation framework (Story 2.7 owner)
-- Vision-caption plugin for PDFs with images (Story 2.8 owner)
+- RAG Hit Rate@K evaluation framework
+- Vision-caption plugin for PDFs with images
 
-**Next steps:** Story 2.7 layers the eval framework on top to enforce
-`Hit Rate@5 ≥ 90%` as a CI gate; Epic 4 mcp-hr wires this Contextual
+**Related:** the eval framework enforces
+`Hit Rate@5 ≥ 90%` as a CI gate; a downstream consumer package wires this Contextual
 Retrieval + L0 cache pair into a real HR Q&A end-to-end demo.
 
-## Eval Framework + RAG Eval CI Gate (Story 2.7+)
+## Eval Framework + RAG Eval CI Gate
 
-Story 2.7 lands the **eval framework** + **`rag-eval` CI gate** that enforces
-`Hit Rate@5 ≥ 90%` (NFR14) on every PR — *before* Epic 4 mcp-hr ships, so the
+lands the **eval framework** + **`rag-eval` CI gate** that enforces
+`Hit Rate@5 ≥ 90%` on every PR — *before* a downstream consumer package ships, so the
 RAG pipeline parameters (chunking / RRF constants / reranker / embedder /
 contextual retrieval) are locked-in by a measurable contract rather than vibe.
 
-The eval framework covers FR39-FR43:
-- **FR39** YAML-declared eval set with reason comments (`AI Agent Rule #9`)
-- **FR40** Hit Rate@K + MRR aggregate metrics
-- **FR41** CI exit-code 1 when `Hit Rate@5 < 90%` (blocking, not warn)
-- **FR42** GitHub Actions artifact: `summary.json` + `report.md` + `per-query.json`
-- **FR43** per-query metric breakdown (`rerankScore` / `distance` / `ftsRank`)
+The eval framework covers :
+- **** YAML-declared eval set with reason comments (``)
+- **** Hit Rate@K + MRR aggregate metrics
+- **** CI exit-code 1 when `Hit Rate@5 < 90%` (blocking, not warn)
+- **** GitHub Actions artifact: `summary.json` + `report.md` + `per-query.json`
+- **** per-query metric breakdown (`rerankScore` / `distance` / `ftsRank`)
 
 The 90% baseline mirrors Anthropic's
 [Contextual Retrieval blog (Sep 2024)](https://www.anthropic.com/news/contextual-retrieval)
@@ -880,9 +880,9 @@ description: |                        # optional, surfaces in report.md header
   Toolkit self-contained eval set.
 
 queries:
-  # reason: BM25 sanity check on 差旅 keyword — required by AI Agent Rule #9
+  # reason: BM25 sanity check on 差旅 keyword — required by 
   - query: 差旅报销需要保留什么凭证
-    category: leave-policy            # kebab-case (architecture L440)
+    category: leave-policy            # kebab-case
     expected:                          # OR-semantics: ANY match scores hit
       - source: bench-fixture.md
         page: 1                        # optional, only enforced in strict mode
@@ -929,12 +929,12 @@ process.exit(passesGate(summary, threshold) ? 0 : 1);
 
 ### Adapter pattern for downstream MCP packages
 
-`mcp-hr` (Epic 4 Story 4.5) and `mcp-modeling` (Epic 6 Story 6.7) each own
+`a downstream consumer package` and `a downstream consumer package` each own
 their own eval set + adapter. The toolkit provides no domain logic — only the
 runner, scorer, and CI helper. Wiring sketch:
 
 ```ts
-// packages/mcp-hr/bin/run-eval.ts
+// packages/a downstream consumer package/bin/run-eval.ts
 import { loadEvalSet, runEval, writeArtifacts, ... } from '@yiong/mcp-chinese-rag-toolkit';
 import { searchHrDocs } from '../src/tools/search-hr-docs.js';
 
@@ -961,7 +961,7 @@ rag-eval:
     - name: Run RAG eval
       env:
         SKIP_MODEL_DOWNLOAD: ''      # force real model download for accurate eval
-        RAG_EVAL_HIT_RATE_MIN: '0.9' # NFR14 default; do NOT lower in main
+        RAG_EVAL_HIT_RATE_MIN: '0.9' #  default; do NOT lower in main
       run: pnpm --filter @yiong/mcp-chinese-rag-toolkit test:eval
     - name: Upload RAG eval report
       if: always()                   # upload even on failure for debugging
@@ -981,16 +981,16 @@ Threshold defaults to **0.9** (`DEFAULT_HIT_RATE_MIN`). Override only for dev
 debugging via `RAG_EVAL_HIT_RATE_MIN=0.85 pnpm test:eval`. Production CI keeps
 the default; any PR that flips it permanently must include explicit ADR
 justification (the env var exists for transient debugging, not as a knob to
-weaken NFR14).
+weaken ).
 
 ### Per-query metric breakdown semantics
 
 | Field         | Source                          | When undefined                                    |
 |---------------|---------------------------------|---------------------------------------------------|
-| `rerankScore` | Story 2.5 `bge-reranker-v2-m3`  | searchFn skipped reranker                         |
-| `distance`    | Story 2.4 `vecSearch` (L2)      | docId only came back from FTS branch              |
-| `ftsRank`     | Story 2.4 `ftsSearch` BM25 rank | docId only came back from vec branch              |
-| `section`     | Story 2.1 chunking heading path | source doc lacks Markdown headings                |
+| `rerankScore` | `bge-reranker-v2-m3`  | searchFn skipped reranker                         |
+| `distance`    | `vecSearch` (L2)      | docId only came back from FTS branch              |
+| `ftsRank`     | `ftsSearch` BM25 rank | docId only came back from vec branch              |
+| `section`     | chunking heading path | source doc lacks Markdown headings                |
 
 Each is optional in `EvalSearchResult`. The renderer prints `-` when missing,
 never throws — so a third-party MCP server that wires only `rerankScore` is
@@ -1001,7 +1001,7 @@ still a first-class citizen.
 - ❌ Don't introduce semantic-similarity-based `expected` matching (BERTScore
   / cosine-threshold). Exact source/page match is intentional — it keeps the
   eval set unambiguous and the regression signal sharp. Mirrors the cache
-  policy in [§Caching](#l0-tool-result-cache-story-26) — no soft matches at
+  policy in [§Caching](#l0-tool-result-cache) — no soft matches at
   evaluation time either.
 - ❌ Don't add per-package `Hit Rate@K` thresholds. Production CI is uniformly
   0.9; if a downstream package truly cannot land there during MVP due to
@@ -1009,14 +1009,14 @@ still a first-class citizen.
   bar across packages.
 - ❌ Don't treat the toolkit self-eval (12-chunk fixture) as a domain
   evaluation. It is a smoke test that the pipeline integrates end-to-end.
-  Real production gates live in `mcp-hr` Story 4.5 (real PDF, 10+ queries) and
-  `mcp-modeling` Story 6.7 (engine routing + hooks + db-config queries).
+  Real production gates live in downstream consumer packages (real PDFs, 10+
+  queries, engine routing, hooks, db-config queries).
 
-**Next steps:** Story 2.8 layers the Vision Caption Plugin (ADR-0008) on top
-for PDFs with image-heavy pages; Story 2.9 ships the `create-mcp-rag` CLI that
+**Related:** the Vision Caption Plugin (ADR-0008) layers on top
+for PDFs with image-heavy pages, and the `create-mcp-rag` CLI
 scaffolds a new MCP RAG package wired into this eval framework out of the box.
 
-## Vision Caption Plugin (FR20 / ADR-0008)
+## Vision Caption Plugin
 
 Index PDF images as Chinese caption chunks via a caller-injected vision LLM.
 Runtime retrieval is unchanged — caption chunks live in the same
@@ -1101,14 +1101,14 @@ cache (zero LLM cost).
 
 This plugin ships zero vendor SDKs. Copy `templates/anthropic-vision-provider.ts`
 and adapt for 豆包 / 千问 VL / OpenAI as needed. The toolkit deliberately keeps
-the SDK choice in caller-land (mirrors Story 2.6 `LlmProvider` provider-injection
-+ Story 2.7 `EvalSearchFn`).
+the SDK choice in caller-land (mirrors `LlmProvider` provider-injection
++ `EvalSearchFn`).
 
-## create-mcp-rag CLI (Story 2.9+)
+## create-mcp-rag CLI
 
 Scaffold a new MCP RAG server project in one command. Replaces the stale
 official `@modelcontextprotocol/create-server` (1+ year no updates) and
-makes FR18 / the J4 ("5-min hello-world") milestone concrete.
+makes  / the J4 ("5-min hello-world") milestone concrete.
 
 ### Quick start
 
@@ -1137,7 +1137,7 @@ pnpm build-index && pnpm start:stdio
 
 - `package.json` with toolkit + MCP SDK + zod + better-sqlite3 deps wired
 - `src/server.ts` with `createMcpServer` + a demo `search_docs` tool
-- `data/sample-doc.md` (Chinese HR sample, 200-300 chars) + `eval/eval-set.yml` (3 queries, real Story 2.7 schema)
+- `data/sample-doc.md` (Chinese HR sample, 200-300 chars) + `eval/eval-set.yml` (3 queries, real schema)
 - End-to-end runnable in <5 minutes (FTS5-only hello-world; switch to
   real bge-large-zh-v1.5 embedder by editing `scripts/build-index.ts`)
 
@@ -1145,11 +1145,11 @@ See [docs/QUICKSTART.md](./docs/QUICKSTART.md) for the full walkthrough,
 and [docs/SCAFFOLD_GUIDE.md](./docs/SCAFFOLD_GUIDE.md) for the CLI
 reference + how to contribute new templates.
 
-## Documentation Set (FR49)
+## Documentation Set
 
 | Doc | Purpose |
 |---|---|
-| [README.md](./README.md) (this file) | API reference + design rationale per story |
+| [README.md](./README.md) (this file) | API reference + design rationale |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | 5-min hello-world via `create-mcp-rag` CLI |
 | [docs/EVAL_GUIDE.md](./docs/EVAL_GUIDE.md) | Methodology for writing your own eval set |
 | [docs/SCAFFOLD_GUIDE.md](./docs/SCAFFOLD_GUIDE.md) | CLI options + template anatomy + contributing |
@@ -1160,4 +1160,4 @@ the repo so GitHub UI / npm UI render it without a docs server).
 
 ## License
 
-MIT (LICENSE file lands in Story 1.5 alongside the ADR migration).
+MIT — see the `LICENSE` file.

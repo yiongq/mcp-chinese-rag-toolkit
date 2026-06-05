@@ -111,7 +111,7 @@ export async function loadEmbedder(opts: EmbedderOptions = {}): Promise<Embedder
 }
 
 /**
- * Persist the active embedder's model id into the Story 2.2 `meta` table.
+ * Persist the active embedder's model id into the `meta` table.
  *
  * `INSERT OR REPLACE` is used so the call is idempotent for the same model.
  * If a previous run wrote a DIFFERENT modelId (i.e. the db was originally
@@ -120,7 +120,7 @@ export async function loadEmbedder(opts: EmbedderOptions = {}): Promise<Embedder
  * underlying model would silently desync `meta` from the stored vectors.
  *
  * The function intentionally does NOT touch `meta.tokenizer_version`
- * (Story 2.4 owner) or `meta.embedding_dim` (Story 2.2 schema invariant
+ * or `meta.embedding_dim` (schema invariant
  * guarded at open time).
  */
 export function writeEmbedderMeta(db: Database.Database, embedder: Embedder): void {
@@ -148,7 +148,7 @@ function buildEmbedder(extractor: FeatureExtractor, manifest: ModelManifest): Em
   }
 
   function toFloat32(row: number[]): Float32Array {
-    // Allocate a fresh ArrayBuffer per row so downstream consumers (Story 2.2
+    // Allocate a fresh ArrayBuffer per row so downstream consumers (
     // indexChunks) can rely on `byteOffset === 0` and the full byteLength.
     const out = new Float32Array(row.length);
     for (let i = 0; i < row.length; i += 1) {

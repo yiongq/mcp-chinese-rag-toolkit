@@ -6,7 +6,7 @@ import type Database from 'better-sqlite3';
  * `packages/mcp-chinese-rag-toolkit/package.json#dependencies`).
  *
  * Bump this literal whenever the jieba runtime dep is upgraded AND
- * Story 2.7 eval confirms no Hit Rate@5 regression. Reading from
+ * eval confirms no Hit Rate@5 regression. Reading from
  * `node:fs` at runtime would couple the toolkit to its on-disk layout
  * (npm tarball / bundle / pnpm hoisting all reshape `node_modules`);
  * the literal IS the contract. `tokenizer-meta.test.ts` cross-checks
@@ -16,7 +16,7 @@ import type Database from 'better-sqlite3';
 export const JIEBA_VERSION = '@node-rs/jieba@2.0.1' as const;
 
 /**
- * Persist the active tokenizer identity into the Story 2.2 `meta` table.
+ * Persist the active tokenizer identity into the `meta` table.
  *
  * The select-then-insert pair runs inside a `BEGIN IMMEDIATE` transaction so
  * the mismatch guard is atomic — two processes racing the same `.db` cannot
@@ -29,13 +29,13 @@ export const JIEBA_VERSION = '@node-rs/jieba@2.0.1' as const;
  * the original release, so silently overwriting would let
  * `meta.tokenizer_version` desync from the on-disk index.
  *
- * The empty-string placeholder written by Story 2.2 `buildSchema` is
+ * The empty-string placeholder written by `buildSchema` is
  * treated as "not yet written" and is overwritten without complaint.
  *
- * Mirrors `writeEmbedderMeta` (Story 2.3) for `meta.embedding_model`.
+ * Mirrors `writeEmbedderMeta` for `meta.embedding_model`.
  *
  * @throws if `version` is empty or whitespace-only.
- * @throws if the db does not contain the Story 2.2 `meta` table (caller
+ * @throws if the db does not contain the `meta` table (caller
  *   must initialise via `openIndex` / `buildSchema` first).
  * @throws if a different non-empty version is already stored for this index.
  */

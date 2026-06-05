@@ -25,7 +25,7 @@ interface SectionRegion {
  *
  * We hand-roll the section tracker because `@langchain/textsplitters` JS
  * has no `MarkdownHeaderTextSplitter` equivalent (Python-only). See the
- * Story 2.1 Dev Notes (§Markdown Hierarchical Chunking).
+ * Dev Notes (§Markdown Hierarchical Chunking).
  */
 export async function chunk(text: string, opts: ChunkOptions = {}): Promise<Chunk[]> {
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK_SIZE;

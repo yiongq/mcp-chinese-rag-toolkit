@@ -6,7 +6,7 @@
 
 # Interface: ResourceReadResult
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L10)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:10](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L10)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:10
 
 > **contents**: `object`[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L11)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:11](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L11)
 
 #### blob?
 

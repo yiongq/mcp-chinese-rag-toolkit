@@ -6,7 +6,7 @@
 
 # Interface: FusedRow\<T\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:281](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L281)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:289](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L289)
 
 Output row from `rrfFuse`. `ranks[i]` / `payloads[i]` mirror the order of
 the input `sources` array; entries are `null` when the corresponding
@@ -25,7 +25,7 @@ this contract.
 
 > **id**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:282](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L282)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:290](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L290)
 
 ***
 
@@ -33,7 +33,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:282](https://gith
 
 > **payloads**: (`T` \| `null`)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:288](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L288)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:296](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L296)
 
 Per-source payload lookup. `null` for sources that did not hit `id`.
 
@@ -43,7 +43,7 @@ Per-source payload lookup. `null` for sources that did not hit `id`.
 
 > **ranks**: (`number` \| `null`)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:286](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L286)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:294](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L294)
 
 Per-source rank lookup. `null` for sources that did not hit `id`.
 
@@ -53,6 +53,6 @@ Per-source rank lookup. `null` for sources that did not hit `id`.
 
 > **score**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:284](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L284)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:292](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L292)
 
 Accumulated RRF score `Σ 1/(k + rank_i)` over every source that contained `id`.

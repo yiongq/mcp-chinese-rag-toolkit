@@ -6,7 +6,7 @@
 
 # Class: ModelHashMismatchError
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:18](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L18)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:18](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L18)
 
 Thrown when a cached model file's SHA-256 (or pre-flight byte size) does
 not match the pinned manifest. Catch with
@@ -24,7 +24,7 @@ boundary duplication).
 
 > **new ModelHashMismatchError**(`message`, `cause?`): `ModelHashMismatchError`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L20)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L20)
 
 #### Parameters
 
@@ -50,7 +50,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:20](https:
 
 > `readonly` `optional` **cause?**: `unknown`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L22)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L22)
 
 #### Inherited from
 
@@ -74,7 +74,7 @@ Defined in: node\_modules/.pnpm/typescript@5.9.3/node\_modules/typescript/lib/li
 
 > `readonly` **name**: `"ModelHashMismatchError"` = `'ModelHashMismatchError'`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:19](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L19)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:19](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L19)
 
 #### Overrides
 

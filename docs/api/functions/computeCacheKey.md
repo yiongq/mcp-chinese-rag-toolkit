@@ -8,11 +8,11 @@
 
 > **computeCacheKey**(`toolName`, `indexVersion`, `args`): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:65](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts#L65)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:65](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/middleware/with-lru-cache.ts#L65)
 
 `sha256(toolName + ':' + indexVersion + ':' + canonicalize(args))` as
 lowercase hex. The `':'` delimiter is contract — switching to `'|'` /
-`';'` / unicode separators would break Story 2.7 cross-version eval
+`';'` / unicode separators would break cross-version eval
 replay (cache keys recorded in fixtures must match new computations).
 
 ## Parameters

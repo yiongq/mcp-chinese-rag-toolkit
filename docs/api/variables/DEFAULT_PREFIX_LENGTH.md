@@ -8,7 +8,7 @@
 
 > `const` **DEFAULT\_PREFIX\_LENGTH**: `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:9](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts#L9)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:9](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/contextual-retrieval.ts#L9)
 
 Default prefix length range — picks ~50-100 chars to add a semantic
 anchor without bloating chunk size. Source: Anthropic 2024-09 blog

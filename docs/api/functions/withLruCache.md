@@ -8,7 +8,7 @@
 
 > **withLruCache**(`toolName`, `handler`, `opts`): [`ToolHandler`](../type-aliases/ToolHandler.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:182](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts#L182)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:182](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/middleware/with-lru-cache.ts#L182)
 
 Wrap a tool handler with the L0 LRU cache.
 

@@ -177,9 +177,9 @@ describe.skipIf(SKIP_NETWORK)('createHybridSearch (real bge-large-zh-v1.5 + real
     );
   });
 
-  it('embedBatch and embed produce element-wise consistent vectors for the same input (Story 2.3 D3 closure)', async () => {
-    // Story 2.4 Dev Notes §Previous Story Intelligence promised to close
-    // Story 2.3 D1/D3 deferred work by asserting that the batch and single
+  it('embedBatch and embed produce element-wise consistent vectors for the same input', async () => {
+    // Closes the previously-deferred batch/single-path
+    // D1/D3 check: assert the batch and single
     // code paths produce element-wise equivalent outputs for the same text
     // (modulo floating-point noise — bge-large-zh-v1.5 fp32 ONNX is
     // deterministic to within ~1e-3 across batch sizes).

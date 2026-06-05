@@ -22,7 +22,7 @@ describe('rrfFuse', () => {
     expect(rrfFuse([[], [], []], { k: 60 })).toEqual([]);
   });
 
-  it('matches the exact two-source RRF math from the Story 2.4 spec', () => {
+  it('matches the exact two-source RRF math from the spec', () => {
     const source0: RankedRow<Payload>[] = [row(1, 1, 'a'), row(2, 2, 'b'), row(3, 3, 'c')];
     const source1: RankedRow<Payload>[] = [row(2, 1, 'B'), row(3, 2, 'C'), row(4, 3, 'D')];
     const fused = rrfFuse([source0, source1], { k: 60 });

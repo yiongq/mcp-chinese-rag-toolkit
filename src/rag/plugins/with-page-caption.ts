@@ -130,7 +130,7 @@ function resolveOptions(opts: PageCaptionOptions): ResolvedOptions {
 }
 
 /**
- * Create an FR20 indexing plugin that captions WHOLE PDF pages by rendering
+ * Create an  indexing plugin that captions WHOLE PDF pages by rendering
  * each selected page to a PNG (`unpdf.renderPageAsImage`) and captioning it
  * with a caller-injected vision LLM. The synthetic Chinese caption chunks
  * flow into the same `docs / docs_fts / docs_vec` storage as text chunks, so

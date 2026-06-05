@@ -6,7 +6,7 @@
 
 # Class: ModelFileMissingError
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:34](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L34)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:34](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L34)
 
 Thrown by `verifyModelFiles({ strict: true })` when a pinned file is
 absent from the cache directory. The non-strict pass (used pre-download)
@@ -23,7 +23,7 @@ can pull them on first load.
 
 > **new ModelFileMissingError**(`message`, `cause?`): `ModelFileMissingError`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:36](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L36)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:36](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L36)
 
 #### Parameters
 
@@ -49,7 +49,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:36](https:
 
 > `readonly` `optional` **cause?**: `unknown`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L38)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:38](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L38)
 
 #### Inherited from
 
@@ -73,7 +73,7 @@ Defined in: node\_modules/.pnpm/typescript@5.9.3/node\_modules/typescript/lib/li
 
 > `readonly` **name**: `"ModelFileMissingError"` = `'ModelFileMissingError'`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts#L35)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/model-loader.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/model-loader.ts#L35)
 
 #### Overrides
 

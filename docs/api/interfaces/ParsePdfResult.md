@@ -6,7 +6,7 @@
 
 # Interface: ParsePdfResult
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:21](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L21)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:21](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L21)
 
 Result of parsing a PDF via `parsePdf()`.
 
@@ -19,7 +19,7 @@ enforced post-condition (see pdf-parser tests).
 
 > **pages**: [`PdfPage`](PdfPage.md)[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:23](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L23)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:23](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L23)
 
 ***
 
@@ -27,4 +27,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:23](https://githu
 
 > **totalPages**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L22)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L22)

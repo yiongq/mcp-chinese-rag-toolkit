@@ -6,7 +6,7 @@
 
 # Interface: CaptionCacheEntry
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:148](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L148)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:221](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L221)
 
 Result row returned by `CaptionCache.get` / accepted by `.set`. Internal
 cache record shape — exported for test-time introspection.
@@ -17,7 +17,7 @@ cache record shape — exported for test-time introspection.
 
 > **captionText**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:149](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L149)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:222](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L222)
 
 ***
 
@@ -25,7 +25,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:149](http
 
 > **createdAt**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:157](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L157)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:230](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L230)
 
 ISO 8601 UTC timestamp.
 
@@ -35,7 +35,7 @@ ISO 8601 UTC timestamp.
 
 > **imageSha256**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:151](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L151)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:224](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L224)
 
 sha256(imagePngBytes) — primary lookup key.
 
@@ -45,7 +45,7 @@ sha256(imagePngBytes) — primary lookup key.
 
 > **modelId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:155](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L155)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:228](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L228)
 
 ***
 
@@ -53,7 +53,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:155](http
 
 > **promptSha256**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:153](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L153)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:226](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L226)
 
 sha256(promptTemplate) — invalidates on prompt change.
 
@@ -63,4 +63,4 @@ sha256(promptTemplate) — invalidates on prompt change.
 
 > **providerId**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:154](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L154)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:227](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L227)

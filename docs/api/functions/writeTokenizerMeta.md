@@ -8,9 +8,9 @@
 
 > **writeTokenizerMeta**(`db`, `version?`): `void`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/tokenizer-meta.ts:42](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/tokenizer-meta.ts#L42)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/tokenizer-meta.ts:42](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/tokenizer-meta.ts#L42)
 
-Persist the active tokenizer identity into the Story 2.2 `meta` table.
+Persist the active tokenizer identity into the `meta` table.
 
 The select-then-insert pair runs inside a `BEGIN IMMEDIATE` transaction so
 the mismatch guard is atomic — two processes racing the same `.db` cannot
@@ -23,10 +23,10 @@ this function throws — the `docs_fts` reverse index was tokenized with
 the original release, so silently overwriting would let
 `meta.tokenizer_version` desync from the on-disk index.
 
-The empty-string placeholder written by Story 2.2 `buildSchema` is
+The empty-string placeholder written by `buildSchema` is
 treated as "not yet written" and is overwritten without complaint.
 
-Mirrors `writeEmbedderMeta` (Story 2.3) for `meta.embedding_model`.
+Mirrors `writeEmbedderMeta` for `meta.embedding_model`.
 
 ## Parameters
 
@@ -48,7 +48,7 @@ if `version` is empty or whitespace-only.
 
 ## Throws
 
-if the db does not contain the Story 2.2 `meta` table (caller
+if the db does not contain the `meta` table (caller
   must initialise via `openIndex` / `buildSchema` first).
 
 ## Throws

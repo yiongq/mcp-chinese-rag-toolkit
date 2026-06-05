@@ -8,16 +8,16 @@
 
 > **renderChunkContextPrompt**(`args`): `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:27](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts#L27)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/contextual-retrieval.ts:27](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/contextual-retrieval.ts#L27)
 
 Render the toolkit's canonical prompt template for chunk-context
 generation. Exposed for test introspection + so multiple toolkit
-consumers (mcp-hr / mcp-modeling) emit comparable Hit Rate metrics
+consumers (a downstream consumer package / a downstream consumer package) emit comparable Hit Rate metrics
 by sharing the same wording.
 
 The rendered output is NOT submitted directly — providers (Anthropic
 / OpenAI / 豆包) accept the `(system, user)` pair via their own SDK
-message shape (see Story 2.6 AC5 §Anthropic adapter example) and
+message shape (see AC5 §Anthropic adapter example) and
 apply `cache_control: { type: 'ephemeral' }` to the system block.
 
 NOTE: This helper is completely independent from the L0 LRU cache

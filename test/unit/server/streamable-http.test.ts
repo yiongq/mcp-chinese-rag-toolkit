@@ -124,7 +124,7 @@ describe('connectStreamableHttp — request validation', () => {
   });
 });
 
-describe('connectStreamableHttp — CORS (Story 4.6)', () => {
+describe('connectStreamableHttp — CORS', () => {
   const VALID_JSONRPC = JSON.stringify({
     jsonrpc: '2.0',
     method: 'initialize',
@@ -172,7 +172,11 @@ describe('connectStreamableHttp — CORS (Story 4.6)', () => {
     const handle = await start({ port: 38783, cors: { origins: ['chrome-extension://*'] } });
     const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: 'https://evil.com', Accept: 'application/json, text/event-stream' },
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://evil.com',
+        Accept: 'application/json, text/event-stream',
+      },
       body: VALID_JSONRPC,
     });
     await res.text();

@@ -20,26 +20,26 @@ export interface McpToolDefinition {
 }
 
 /**
- * Story 2.6 — L0 tool-result LRU cache configuration. Supplying
+ * — L0 tool-result LRU cache configuration. Supplying
  * {@link McpServerCacheConfig.indexVersion} enables the cache; omitting
  * it (or providing only `{}`) prints a single warning and falls back to
- * cache-disabled behaviour (Epic 1 walking-skeleton parity).
+ * cache-disabled behaviour.
  *
- * Per Story 2.6 §架构现实校正 #4: when `transport: 'http'`, the cache
+ * Per §架构现实校正 #4: when `transport: 'http'`, the cache
  * is per-request (each `connectStreamableHttp` request re-builds the
- * server) — effectively a no-op. Story 4.6 re-evaluated this and
- * RESOLVED to keep it a no-op by design: NFR34 mandates a stateless
+ * server) — effectively a no-op. re-evaluated this and
+ * RESOLVED to keep it a no-op by design:  mandates a stateless
  * HTTP server, and a cross-request L0 cache would reintroduce shared
- * mutable state. HTTP callers (mcp-hr) therefore intentionally omit
- * `cache`. The cache stays fully effective on stdio (the mcp-hr /
- * mcp-modeling default consumer).
+ * mutable state. HTTP callers (a downstream consumer package) therefore intentionally omit
+ * `cache`. The cache stays fully effective on stdio (the a downstream consumer package /
+ * a downstream consumer package default consumer).
  */
 export interface McpServerCacheConfig {
   /** @default true when `indexVersion` is provided; false otherwise. */
   enabled?: boolean;
   /** @default 500 (architecture §缓存策略 L628). */
   max?: number;
-  /** @default 60 * 60 * 1000 (1h, FR16). */
+  /** @default 60 * 60 * 1000 (1h). */
   ttlMs?: number;
   /**
    * REQUIRED to enable cache. Typically `IndexHandle.getIndexVersion()`
@@ -61,15 +61,15 @@ export interface McpServerConfig {
   /** Forwarded to stdio transport when applicable. Default true. */
   handleSignals?: boolean;
   /**
-   * Story 2.6 — L0 tool-result LRU cache. Omit (or pass `{}` without
-   * `indexVersion`) to disable. Disabled by default to preserve Epic 1
+   * — L0 tool-result LRU cache. Omit (or pass `{}` without
+   * `indexVersion`) to disable. Disabled by default to preserve
    * walking-skeleton behaviour for callers that haven't opted in.
    */
   cache?: McpServerCacheConfig;
   /**
-   * Story 4.6 — CORS whitelist, forwarded to the HTTP transport. Ignored for
+   * — CORS whitelist, forwarded to the HTTP transport. Ignored for
    * `transport: 'stdio'` (stdio has no origin concept). Omit to disable CORS.
-   * See {@link CorsOptions}; mcp-hr passes `{ origins: ['chrome-extension://*'] }`.
+   * See {@link CorsOptions}; a downstream consumer package passes `{ origins: ['chrome-extension://*'] }`.
    */
   cors?: CorsOptions;
 }
@@ -126,10 +126,10 @@ function sanitizeResourceError(err: unknown, context: 'list' | 'read'): Error {
 
 function validateConfig(config: McpServerConfig): void {
   if (typeof config.name !== 'string' || config.name.trim().length === 0) {
-    throw new Error("createMcpServer: 'name' must be a non-empty string (MCP Inspector NFR22)");
+    throw new Error("createMcpServer: 'name' must be a non-empty string (MCP Inspector )");
   }
   if (typeof config.version !== 'string' || config.version.trim().length === 0) {
-    throw new Error("createMcpServer: 'version' must be a non-empty string (MCP Inspector NFR22)");
+    throw new Error("createMcpServer: 'version' must be a non-empty string (MCP Inspector )");
   }
   const seen = new Set<string>();
   for (const tool of config.tools ?? []) {
@@ -148,14 +148,14 @@ function validateConfig(config: McpServerConfig): void {
 }
 
 function buildServer(config: McpServerConfig): McpServer {
-  // Story 1.3 Task 4.6 referenced prior-art §2.9's `{ elicitation: {} }` capability,
+  // Task 4.6 referenced prior-art §2.9's `{ elicitation: {} }` capability,
   // but that pattern is for the MCP *client* (which declares it can receive
   // ElicitRequests). Servers issue ElicitRequests instead, and the SDK's
-  // `ServerCapabilities` type intentionally omits `elicitation`. Deferred to Story 1.4
+  // `ServerCapabilities` type intentionally omits `elicitation`. Deferred to
   // when tool-builder helpers add server-side elicitation issuing logic.
   const server = new McpServer({ name: config.name, version: config.version });
 
-  // Story 2.6 — resolve L0 cache eligibility at build time. `cache: {}` with
+  // — resolve L0 cache eligibility at build time. `cache: {}` with
   // missing `indexVersion` disables; explicit `enabled: false` also disables.
   // Either way the per-tool handler below chooses cache-wrap vs raw-handler
   // statically — no per-call branching. Warning is emitted ONCE inside
@@ -173,7 +173,7 @@ function buildServer(config: McpServerConfig): McpServer {
   for (const tool of config.tools ?? []) {
     // Cache wraps the INNER handler so isError envelopes from `wrapHandler`'s
     // fallback path can never re-enter cache via the read side (the wrap
-    // order is "cache inside, wrapHandler outside" — see Story 2.6 §wrap
+    // order is "cache inside, wrapHandler outside" — see §wrap
     // order). Throws from `tool.handler` propagate up through `withLruCache`
     // unchanged and are converted to INTERNAL_ERROR by `wrapHandler`; the
     // resulting isError envelope is rejected by `shouldSkipWrite` on the
@@ -259,7 +259,7 @@ function buildServer(config: McpServerConfig): McpServer {
 export function createMcpServer(config: McpServerConfig): McpServerHandle {
   validateConfig(config);
 
-  // Story 2.6 — emit cache config warning ONCE per server instance. Inlining
+  // — emit cache config warning ONCE per server instance. Inlining
   // this inside `buildServer` would re-fire per HTTP request (each request
   // re-runs `buildServer`); the warning is a configuration hint that only
   // makes sense at construction time.

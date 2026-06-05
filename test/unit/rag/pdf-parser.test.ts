@@ -20,7 +20,7 @@ describe('parsePdf', () => {
     const elapsed = Date.now() - t0;
 
     // Local macOS M-series ~1s; CI Linux ~3s. 15s buffer guards only against
-    // a >5× regression in unpdf (per Story 2.1 Dev Notes §test performance).
+    // a >5× regression in unpdf (per Dev Notes §test performance).
     expect(elapsed).toBeLessThan(15_000);
     expect(result.totalPages).toBeGreaterThan(0);
   });

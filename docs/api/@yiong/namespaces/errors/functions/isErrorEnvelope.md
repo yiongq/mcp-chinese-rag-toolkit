@@ -1,0 +1,21 @@
+[**@yiong/mcp-chinese-rag-toolkit**](../../../../README.md)
+
+***
+
+[@yiong/mcp-chinese-rag-toolkit](../../../../README.md) / [errors](../README.md) / isErrorEnvelope
+
+# Function: isErrorEnvelope()
+
+> **isErrorEnvelope**(`result`): result is \{ \_meta?: \{ io.modelcontextprotocol/related-task?: \{ taskId: string \}; progressToken?: string \| number; \[key: string\]: unknown \}; content: (\{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; text: string; type: "text" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; data: string; mimeType: string; type: "image" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; data: string; mimeType: string; type: "audio" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; description?: string; icons?: \{ mimeType?: string; sizes?: string\[\]; src: string; theme?: "light" \| "dark" \}\[\]; mimeType?: string; name: string; size?: number; title?: string; type: "resource\_link"; uri: string \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; resource: \{ \_meta?: \{ \[key: string\]: unknown \}; mimeType?: string; text: string; uri: string \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; blob: string; mimeType?: string; uri: string \}; type: "resource" \})\[\]; isError?: boolean; structuredContent?: \{ \[key: string\]: unknown \}; \[key: string\]: unknown \} & \{ isError: true; structuredContent: \{ citations?: \{ content?: string; page?: number; section?: string; source: string \}\[\]; confidence?: "low" \| "medium" \| "high"; details?: Record\<string, unknown\>; error: string; message: string; refusal?: string; retryable: boolean; suggestions?: string\[\] \} \}
+
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/errors.ts:90](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/errors.ts#L90)
+
+## Parameters
+
+### result
+
+`unknown`
+
+## Returns
+
+result is \{ \_meta?: \{ io.modelcontextprotocol/related-task?: \{ taskId: string \}; progressToken?: string \| number; \[key: string\]: unknown \}; content: (\{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; text: string; type: "text" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; data: string; mimeType: string; type: "image" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; data: string; mimeType: string; type: "audio" \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; description?: string; icons?: \{ mimeType?: string; sizes?: string\[\]; src: string; theme?: "light" \| "dark" \}\[\]; mimeType?: string; name: string; size?: number; title?: string; type: "resource\_link"; uri: string \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; annotations?: \{ audience?: ("user" \| "assistant")\[\]; lastModified?: string; priority?: number \}; resource: \{ \_meta?: \{ \[key: string\]: unknown \}; mimeType?: string; text: string; uri: string \} \| \{ \_meta?: \{ \[key: string\]: unknown \}; blob: string; mimeType?: string; uri: string \}; type: "resource" \})\[\]; isError?: boolean; structuredContent?: \{ \[key: string\]: unknown \}; \[key: string\]: unknown \} & \{ isError: true; structuredContent: \{ citations?: \{ content?: string; page?: number; section?: string; source: string \}\[\]; confidence?: "low" \| "medium" \| "high"; details?: Record\<string, unknown\>; error: string; message: string; refusal?: string; retryable: boolean; suggestions?: string\[\] \} \}

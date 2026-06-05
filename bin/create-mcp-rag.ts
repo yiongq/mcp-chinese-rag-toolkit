@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Story 2.9 CLI — scaffolds a new MCP RAG server project. FR18 final landing.
+ * CLI — scaffolds a new MCP RAG server project.  final landing.
  *
  * Usage:
  *   npx @yiong/mcp-chinese-rag-toolkit create-mcp-rag <project-name> [options]

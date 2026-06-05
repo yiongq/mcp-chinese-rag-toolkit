@@ -42,6 +42,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Public-hygiene gate — this package is open source; its README, source
+      # comments, generated API docs, templates and tests must read as
+      # user-facing docs, never as an internal story/epic/requirement tracker.
+      - name: Public-hygiene gate (no internal jargon in user-facing files)
+        run: node scripts/check-public-hygiene.mjs
+
       - name: Test (vitest unit + light integration)
         env:
           # Integration tests that hit huggingface.co are skipped in CI by

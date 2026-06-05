@@ -28,8 +28,8 @@ function uniqueTmp(prefix: string): string {
 
 // 12 HR-flavoured chunks mirroring `hybrid-search.integration.test.ts`. The
 // fixture is intentionally NOT extracted into a shared helper (YAGNI — only
-// two integration suites use it; Story 2.6 / 2.7 will revisit if a third
-// emerges) per Story 2.5 Task 11.3.
+// two integration suites use it; / 2.7 will revisit if a third
+// emerges) per Task 11.3.
 const FIXTURE_CHUNKS: ChunkRow['chunk'][] = [
   {
     content: '差旅报销规定要求保留所有原始凭证并填写电子差旅单。',
@@ -155,7 +155,7 @@ describe.skipIf(SKIP_NETWORK)(
       expect(reranked[0]?.rerankScore).toBeGreaterThan(0.9);
     });
 
-    it('low-confidence detection: query "蓝鲸深空探测" → every reranked rerankScore < 0.5 (FR25 / NFR17 threshold)', async () => {
+    it('low-confidence detection: query "蓝鲸深空探测" → every reranked rerankScore < 0.5', async () => {
       const hybrid = await hybridSearch('蓝鲸深空探测');
       // hybrid may return zero hits (no token overlap); rerank short-circuits if so.
       const reranked = await rerank('蓝鲸深空探测', hybrid);

@@ -8,7 +8,7 @@
 
 > **loadEvalSet**(`evalSetPath`): [`EvalSet`](../interfaces/EvalSet.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts:41](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts#L41)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/eval-runner.ts:41](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/eval-runner.ts#L41)
 
 Parse an eval-set.yml file from disk into a typed [EvalSet](../interfaces/EvalSet.md).
 
@@ -26,7 +26,7 @@ THROWS friendly errors when:
   - any expected.page is not a positive integer
 
 Reason: a silent "use defaults" path on a broken eval set would let the CI
-gate hide regressions; fail-fast keeps NFR14 honest (Story 2.6 教训 2).
+gate hide regressions; fail-fast keeps  honest.
 
 ## Parameters
 

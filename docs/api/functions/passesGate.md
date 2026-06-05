@@ -8,7 +8,7 @@
 
 > **passesGate**(`summary`, `threshold?`): `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/ci-helper.ts:160](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/eval/ci-helper.ts#L160)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/eval/ci-helper.ts:160](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/eval/ci-helper.ts#L160)
 
 Returns true when the eval summary meets the CI gate (hitRate ≥ threshold).
 

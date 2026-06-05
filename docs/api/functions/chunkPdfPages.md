@@ -8,7 +8,7 @@
 
 > **chunkPdfPages**(`pages`, `opts?`): `Promise`\<[`Chunk`](../interfaces/Chunk.md)[]\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts:65](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts#L65)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/chunking.ts:65](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/chunking.ts#L65)
 
 Chunk an array of `PdfPage` objects, attaching `page` metadata per page.
 Blank pages (whitespace-only `text`) are skipped without emitting chunks.

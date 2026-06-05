@@ -6,8 +6,8 @@ import Database from 'better-sqlite3';
 import type { CaptionCacheEntry } from './types.js';
 
 /**
- * Caption SQLite cache — DISTINCT from `IndexHandle.db` (Story 2.2 main
- * index file) AND from `withLruCache` L0 tool-result cache (Story 2.6).
+ * Caption SQLite cache — DISTINCT from `IndexHandle.db` (main
+ * index file) AND from `withLruCache` L0 tool-result cache.
  *
  * Architecture §缓存策略 L639 explicitly carves this out: "索引期 plugin
  * 自带的离线 cache 属不同层级，不在此约束内". Reuses `better-sqlite3`
@@ -33,7 +33,7 @@ export interface CaptionCacheLookup {
 /**
  * Plugin-owned caption cache. Single underlying `better-sqlite3` handle;
  * caller MUST invoke `close()` exactly once (see `with-vision-caption.ts`
- * try/finally pattern, Story 2.5 教训 1).
+ * try/finally pattern 教训 1).
  */
 export interface CaptionCache {
   /** Look up a cached caption; returns `undefined` on miss. */
@@ -53,7 +53,7 @@ const CACHE_SUBPATH = path.join('mcp-chinese-rag-toolkit', 'caption-cache');
 
 /**
  * Resolve the default per-user caption cache directory. Mirrors the
- * env-paths semantics used by Story 2.3 `resolveCacheDir` for the model
+ * env-paths semantics used by `resolveCacheDir` for the model
  * cache — same prefer-XDG-CACHE-HOME order — but writes under a sibling
  * `caption-cache/` subpath so the model cache (multi-GB ONNX files) and
  * the caption cache (small SQLite DB) never collide.

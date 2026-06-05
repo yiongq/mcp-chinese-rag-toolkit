@@ -6,7 +6,7 @@
 
 # Interface: McpServerHandle
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:64](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L64)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:77](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L77)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:64
 
 > `readonly` **server**: `McpServer`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:67](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L67)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:80](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L80)
 
 ## Methods
 
@@ -22,7 +22,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:67
 
 > **close**(): `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:66](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L66)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:79](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L79)
 
 #### Returns
 
@@ -34,7 +34,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:66
 
 > **start**(): `Promise`\<`void`\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:65](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L65)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:78](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L78)
 
 #### Returns
 

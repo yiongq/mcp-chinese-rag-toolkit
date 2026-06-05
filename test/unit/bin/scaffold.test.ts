@@ -335,7 +335,7 @@ describe('scaffoldProject', () => {
     ) as { name: string; dependencies: Record<string, string> };
     expect(pkg.name).toBe('token-test');
     // Accept either `^x.y.z` (real published version) or `latest` (placeholder
-    // 0.0.0 fallback) — Story 2.9 code-review fix H2.
+    // 0.0.0 fallback) — code-review fix H2.
     expect(pkg.dependencies['@yiong/mcp-chinese-rag-toolkit']).toMatch(/^(\^\d|latest$)/);
   });
 

@@ -8,7 +8,7 @@
 
 > **defineResources**(`def`): [`ResourceDefinition`](../interfaces/ResourceDefinition.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:74](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L74)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:74](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L74)
 
 ## Parameters
 

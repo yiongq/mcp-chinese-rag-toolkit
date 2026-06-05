@@ -8,7 +8,7 @@
 
 > **tokenize**(`text`): `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/fts-tokenizer.ts:47](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/fts-tokenizer.ts#L47)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/fts-tokenizer.ts:53](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/fts-tokenizer.ts#L53)
 
 Tokenizes Chinese (or mixed CJK + Latin) input into a space-joined token
 string suitable for FTS5's default `unicode61` tokenizer. The output is

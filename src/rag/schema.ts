@@ -2,13 +2,13 @@ import type Database from 'better-sqlite3';
 
 import type { SchemaOptions } from './types.js';
 
-/** Default vector dimension — matches bge-large-zh-v1.5 (Story 2.3 owner). */
+/** Default vector dimension — matches bge-large-zh-v1.5. */
 const DEFAULT_EMBEDDING_DIM = 1024;
 
 /** Upper bound chosen to keep `float[N]` DDL sane and protect against arithmetic overflow. */
 const MAX_EMBEDDING_DIM = 65535;
 
-/** Generates a default `index_version` value. Not cryptographic — only acts as a cache-key discriminator (Story 2.6). */
+/** Generates a default `index_version` value. Not cryptographic — only acts as a cache-key discriminator. */
 function createDefaultIndexVersion(): string {
   return `v1-${Date.now().toString(36)}`;
 }
@@ -37,14 +37,14 @@ function assertValidEmbeddingDim(value: number): void {
  * - All DDL uses `IF NOT EXISTS`.
  * - `meta.index_version` is written **only** when absent; re-running `buildSchema`
  *   with a new `indexVersion` does not overwrite an established value (prevents
- *   accidental Story 2.6 cache invalidation).
+ *   accidental cache invalidation).
  * - `meta.embedding_dim`: written on first invocation; on subsequent invocations
  *   a mismatch between the stored value and the caller-supplied opts throws —
  *   the underlying `docs_vec` `float[N]` is DDL-locked at the first build, so
  *   silently overwriting meta would let the value drift away from the actual
  *   on-disk vector schema.
  * - `meta.embedding_model` / `meta.tokenizer_version`: empty-string placeholders
- *   are written when absent. Story 2.3 (embedder) and Story 2.4 (query path)
+ *   are written when absent. (embedder) and (query path)
  *   own the actual values.
  */
 export function buildSchema(db: Database.Database, opts: SchemaOptions = {}): void {
@@ -107,7 +107,7 @@ export function buildSchema(db: Database.Database, opts: SchemaOptions = {}): vo
     );
   }
 
-  // Story 2.3 / 2.4 / 2.5 owners populate these — write empty-string
+  // / 2.4 / 2.5 owners populate these — write empty-string
   // placeholders so downstream readers can rely on the keys existing.
   if (!metaSelect.get('embedding_model')) metaInsert.run('embedding_model', '');
   if (!metaSelect.get('tokenizer_version')) metaInsert.run('tokenizer_version', '');

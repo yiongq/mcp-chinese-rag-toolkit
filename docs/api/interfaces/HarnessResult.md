@@ -6,7 +6,7 @@
 
 # Interface: HarnessResult
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:539](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L539)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:547](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L547)
 
 Result returned by `runStdioLatencyHarness` — includes raw samples for debug.
 
@@ -16,7 +16,7 @@ Result returned by `runStdioLatencyHarness` — includes raw samples for debug.
 
 > **samples**: `number`[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:542](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L542)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:550](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L550)
 
 Raw per-call latency array (warm runs only) — for histograms / debug.
 
@@ -26,4 +26,4 @@ Raw per-call latency array (warm runs only) — for histograms / debug.
 
 > **snapshot**: [`LatencySnapshot`](LatencySnapshot.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:540](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L540)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:548](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L548)

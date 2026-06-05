@@ -6,12 +6,12 @@
 
 # Interface: RerankerOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:358](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L358)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:366](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L366)
 
 Options for [loadReranker](../functions/loadReranker.md).
 
 Mirrors [EmbedderOptions](EmbedderOptions.md) field-for-field so callers wiring both
-pipelines together (Epic 4 mcp-hr / mcp-modeling) get a uniform surface.
+pipelines together get a uniform surface.
 `dtype` is currently fixed at `'q8'` (model_quantized.onnx) by the default
 manifest — see `BGE_RERANKER_V2_M3_MANIFEST` JSDoc for the rationale.
 
@@ -21,7 +21,7 @@ manifest — see `BGE_RERANKER_V2_M3_MANIFEST` JSDoc for the rationale.
 
 > `optional` **allowRemoteModels?**: `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:369](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L369)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:377](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L377)
 
 Whether transformers.js may fetch missing files from HF Hub. Set false for fully offline / air-gapped runs.
 
@@ -37,7 +37,7 @@ true
 
 > `optional` **cacheDir?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:367](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L367)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:375](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L375)
 
 Absolute path override; defaults to `<userCacheDir>/mcp-chinese-rag-toolkit/models` (shared with embedder).
 
@@ -47,7 +47,7 @@ Absolute path override; defaults to `<userCacheDir>/mcp-chinese-rag-toolkit/mode
 
 > `optional` **manifest?**: [`ModelManifest`](ModelManifest.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:365](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L365)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:373](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L373)
 
 Override the default bge-reranker-v2-m3 manifest. Pass a `ModelManifest`
 whose `modelId` is recognised by `@huggingface/transformers`
@@ -65,7 +65,7 @@ BGE_RERANKER_V2_M3_MANIFEST
 
 > `optional` **verifyHashes?**: `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:371](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L371)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:379](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L379)
 
 Hash-verification toggle — never set false in production.
 

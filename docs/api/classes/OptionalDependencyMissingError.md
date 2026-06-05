@@ -6,7 +6,7 @@
 
 # Class: OptionalDependencyMissingError
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:180](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L180)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:253](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L253)
 
 Thrown when `@napi-rs/canvas` (optional peer) is not installed. The
 `install` arg becomes part of an actionable error message (e.g.
@@ -22,7 +22,7 @@ Thrown when `@napi-rs/canvas` (optional peer) is not installed. The
 
 > **new OptionalDependencyMissingError**(`packageName`, `install`): `OptionalDependencyMissingError`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:182](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L182)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:255](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L255)
 
 #### Parameters
 
@@ -72,7 +72,7 @@ Defined in: node\_modules/.pnpm/typescript@5.9.3/node\_modules/typescript/lib/li
 
 > `readonly` **name**: `"OptionalDependencyMissingError"` = `'OptionalDependencyMissingError'`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:181](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L181)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:254](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L254)
 
 #### Overrides
 
@@ -84,7 +84,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:181](http
 
 > `readonly` **packageName**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:183](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts#L183)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/types.ts:256](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/types.ts#L256)
 
 ***
 

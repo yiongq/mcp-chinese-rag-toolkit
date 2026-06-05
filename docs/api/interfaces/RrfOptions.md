@@ -6,7 +6,7 @@
 
 # Interface: RrfOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:292](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L292)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:300](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L300)
 
 Options for `rrfFuse`.
 
@@ -16,7 +16,7 @@ Options for `rrfFuse`.
 
 > `optional` **k?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:294](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L294)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:302](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L302)
 
 RRF constant — defaults to 60 (Cormack 2009 / Elasticsearch / Weaviate convention). Range [1, 1000].
 
@@ -26,7 +26,7 @@ RRF constant — defaults to 60 (Cormack 2009 / Elasticsearch / Weaviate convent
 
 > `optional` **topK?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:296](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L296)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:304](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L304)
 
 Final fused top-K cap.
 

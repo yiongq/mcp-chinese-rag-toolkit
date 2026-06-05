@@ -6,12 +6,12 @@
 
 # Interface: FtsHit
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:123](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L123)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:123](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L123)
 
 Result from [IndexHandle.ftsSearch](IndexHandle.md#ftssearch).
 
 `bm25Rank` is a 1-indexed position in the returned ordering (consumed by
-Story 2.4 RRF `1/(k + rank)`); `bm25Score` is the FTS5-native `rank`
+RRF `1/(k + rank)`); `bm25Score` is the FTS5-native `rank`
 column (negative-floor; closer to 0 = more relevant) and is passed
 through verbatim for debugging / threshold filtering.
 
@@ -21,7 +21,7 @@ through verbatim for debugging / threshold filtering.
 
 > **bm25Rank**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:126](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L126)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:126](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L126)
 
 ***
 
@@ -29,7 +29,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:126](https://gith
 
 > **bm25Score**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:127](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L127)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:127](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L127)
 
 ***
 
@@ -37,7 +37,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:127](https://gith
 
 > **chunk**: [`Chunk`](Chunk.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:125](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L125)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:125](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L125)
 
 ***
 
@@ -45,4 +45,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:125](https://gith
 
 > **docId**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:124](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L124)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:124](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L124)

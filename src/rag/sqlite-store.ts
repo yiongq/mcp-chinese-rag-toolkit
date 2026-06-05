@@ -14,7 +14,7 @@ import type {
   VecHit,
 } from './types.js';
 
-/** Default top-K — mirrors Story 2.4 hybrid RRF (top-30 each side before fusion). */
+/** Default top-K — mirrors hybrid RRF (top-30 each side before fusion). */
 const DEFAULT_TOP_K = 30;
 
 const REQUIRED_TABLES = ['docs', 'docs_fts', 'docs_vec', 'meta'] as const;
@@ -115,7 +115,7 @@ function assertEmbeddingShape(value: Float32Array, expectedDim: number, context:
  * and returns an {@link IndexHandle} wrapping the five storage primitives.
  *
  * Pass `':memory:'` for an ephemeral in-process database — useful for tests
- * and for the Story 2.5 latency-harness.
+ * and for the latency-harness.
  *
  * Throws (and closes the underlying connection) when:
  * - the file path is unreachable or extension load fails;

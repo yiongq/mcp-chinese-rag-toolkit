@@ -64,7 +64,7 @@ afterEach(async () => {
   }
 });
 
-describe('createMcpServer with Story 2.6 cache', () => {
+describe('createMcpServer with cache', () => {
   it('cache: undefined → backward-compatible, handler invoked every time', async () => {
     const { tool, handler } = stubSearchTool();
     activeRig = await buildRig([tool]);

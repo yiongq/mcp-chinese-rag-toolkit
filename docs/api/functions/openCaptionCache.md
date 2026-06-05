@@ -8,7 +8,7 @@
 
 > **openCaptionCache**(`opts`): [`CaptionCache`](../interfaces/CaptionCache.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:112](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts#L112)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/plugins/caption-cache.ts:112](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/plugins/caption-cache.ts#L112)
 
 Open (or create) the caption cache. Schema is created on demand:
 

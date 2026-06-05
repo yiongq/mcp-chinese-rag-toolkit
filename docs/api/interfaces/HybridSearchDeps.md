@@ -6,7 +6,7 @@
 
 # Interface: HybridSearchDeps
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:336](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L336)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:344](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L344)
 
 Dependencies bound by `createHybridSearch`.
 
@@ -16,7 +16,7 @@ Dependencies bound by `createHybridSearch`.
 
 > `optional` **defaultOpts?**: [`HybridSearchOptions`](HybridSearchOptions.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:340](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L340)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:348](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L348)
 
 Optional default options applied when the per-call `opts` does not override.
 
@@ -26,7 +26,7 @@ Optional default options applied when the per-call `opts` does not override.
 
 > **embedder**: [`Embedder`](Embedder.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:338](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L338)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:346](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L346)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:338](https://gith
 
 > **handle**: [`IndexHandle`](IndexHandle.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:337](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L337)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:345](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L345)

@@ -6,18 +6,21 @@
 
 # Interface: McpServerCacheConfig
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:30](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L30)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:37](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L37)
 
-Story 2.6 — L0 tool-result LRU cache configuration. Supplying
+— L0 tool-result LRU cache configuration. Supplying
 [McpServerCacheConfig.indexVersion](#indexversion) enables the cache; omitting
 it (or providing only `{}`) prints a single warning and falls back to
-cache-disabled behaviour (Epic 1 walking-skeleton parity).
+cache-disabled behaviour.
 
-Per Story 2.6 §架构现实校正 #4: when `transport: 'http'`, the cache
-is currently per-request (each `connectStreamableHttp` request
-re-builds the server) — effectively a no-op until Epic 4 Story 4.6
-re-evaluates. Cache is fully effective on stdio (the mcp-hr /
-mcp-modeling default).
+Per §架构现实校正 #4: when `transport: 'http'`, the cache
+is per-request (each `connectStreamableHttp` request re-builds the
+server) — effectively a no-op. re-evaluated this and
+RESOLVED to keep it a no-op by design:  mandates a stateless
+HTTP server, and a cross-request L0 cache would reintroduce shared
+mutable state. HTTP callers (a downstream consumer package) therefore intentionally omit
+`cache`. The cache stays fully effective on stdio (the a downstream consumer package /
+a downstream consumer package default consumer).
 
 ## Properties
 
@@ -25,7 +28,7 @@ mcp-modeling default).
 
 > `optional` **enabled?**: `boolean`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:32](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L32)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:39](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L39)
 
 #### Default
 
@@ -37,7 +40,7 @@ true when `indexVersion` is provided; false otherwise.
 
 > `optional` **indexVersion?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:42](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L42)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:49](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L49)
 
 REQUIRED to enable cache. Typically `IndexHandle.getIndexVersion()`
 read at startup time so the value is stable for the server's
@@ -49,7 +52,7 @@ lifetime (re-reading per call wastes 50-100µs × calls/sec).
 
 > `optional` **max?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:34](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L34)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:41](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L41)
 
 #### Default
 
@@ -63,10 +66,10 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:34
 
 > `optional` **ttlMs?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:36](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts#L36)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/create-mcp-server.ts:43](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/create-mcp-server.ts#L43)
 
 #### Default
 
 ```ts
-60 * 60 * 1000 (1h, FR16).
+60 * 60 * 1000 (1h).
 ```

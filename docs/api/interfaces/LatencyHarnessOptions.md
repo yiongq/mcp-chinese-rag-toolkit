@@ -6,7 +6,7 @@
 
 # Interface: LatencyHarnessOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:466](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L466)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:474](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L474)
 
 Options for `runStdioLatencyHarness`.
 
@@ -16,7 +16,7 @@ Options for `runStdioLatencyHarness`.
 
 > `optional` **measureRuns?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:470](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L470)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:478](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L478)
 
 Number of measured tool calls.
 
@@ -32,7 +32,7 @@ Number of measured tool calls.
 
 > `optional` **queries?**: `string`[]
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:475](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L475)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:483](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L483)
 
 Fixture: query strings cycled through during measurement.
 
@@ -48,7 +48,7 @@ Fixture: query strings cycled through during measurement.
 
 > `optional` **toolName?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:480](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L480)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:488](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L488)
 
 Tool name to invoke. Default tool is a hybrid + rerank pipeline over an
 in-memory 12-chunk HR fixture (mirrors the integration test fixture).
@@ -59,7 +59,7 @@ in-memory 12-chunk HR fixture (mirrors the integration test fixture).
 
 > `optional` **warmupRuns?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:468](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L468)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:476](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L476)
 
 Number of throwaway warm-up calls before measurement starts.
 

@@ -6,7 +6,7 @@
 
 # Interface: ChunkOptions
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L33)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:33](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L33)
 
 Options controlling the Markdown hierarchical splitter behaviour.
 
@@ -20,7 +20,7 @@ Chinese text 1 character ≈ 0.6 tokens under bge-large-zh-v1.5.
 
 > `optional` **chunkOverlap?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:37](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L37)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:37](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L37)
 
 #### Default
 
@@ -34,7 +34,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:37](https://githu
 
 > `optional` **chunkSize?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L35)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:35](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L35)
 
 #### Default
 
@@ -48,7 +48,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:35](https://githu
 
 > `optional` **page?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:41](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L41)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:41](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L41)
 
 Propagated unchanged to every produced chunk.
 
@@ -58,6 +58,6 @@ Propagated unchanged to every produced chunk.
 
 > `optional` **source?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:39](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L39)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:39](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L39)
 
 Propagated unchanged to every produced chunk.

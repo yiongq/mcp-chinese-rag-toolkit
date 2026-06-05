@@ -8,14 +8,14 @@
 
 > **openIndex**(`filePath`, `opts?`): [`IndexHandle`](../interfaces/IndexHandle.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/sqlite-store.ts:125](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/sqlite-store.ts#L125)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/sqlite-store.ts:125](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/sqlite-store.ts#L125)
 
 Opens (or creates) the SQLite RAG index at `filePath`, loads the `sqlite-vec`
 extension on the connection, applies the four-table schema when writable,
 and returns an [IndexHandle](../interfaces/IndexHandle.md) wrapping the five storage primitives.
 
 Pass `':memory:'` for an ephemeral in-process database — useful for tests
-and for the Story 2.5 latency-harness.
+and for the latency-harness.
 
 Throws (and closes the underlying connection) when:
 - the file path is unreachable or extension load fails;

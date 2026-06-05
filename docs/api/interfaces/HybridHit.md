@@ -6,11 +6,11 @@
 
 # Interface: HybridHit
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:318](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L318)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:326](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L326)
 
 A single fused hit returned by the bound hybrid-search function.
 
-Field semantics intentionally mirror the upstream Story 2.2 types:
+Field semantics intentionally mirror the upstream types:
 `bm25Score` is the FTS5 native `rank` column (negative-floor, closer to
 0 = more relevant); `distance` is the sqlite-vec L2 distance (lower =
 closer). Optional fields are `undefined` when the corresponding source
@@ -26,7 +26,7 @@ did not contribute to this hit (single-source survival).
 
 > `optional` **bm25Rank?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:326](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L326)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:334](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L334)
 
 1-indexed BM25 position within `ftsSearch` top-N — undefined when only vec hit.
 
@@ -36,7 +36,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:326](https://gith
 
 > `optional` **bm25Score?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:328](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L328)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:336](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L336)
 
 Mirrors [FtsHit.bm25Score](FtsHit.md#bm25score) — undefined when only vec hit.
 
@@ -46,7 +46,7 @@ Mirrors [FtsHit.bm25Score](FtsHit.md#bm25score) — undefined when only vec hit.
 
 > **chunk**: [`Chunk`](Chunk.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:322](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L322)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:330](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L330)
 
 Chunk content + provenance (source / page / section).
 
@@ -56,7 +56,7 @@ Chunk content + provenance (source / page / section).
 
 > `optional` **distance?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:332](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L332)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:340](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L340)
 
 Mirrors [VecHit.distance](VecHit.md#distance) — undefined when only BM25 hit.
 
@@ -66,7 +66,7 @@ Mirrors [VecHit.distance](VecHit.md#distance) — undefined when only BM25 hit.
 
 > **docId**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:320](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L320)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:328](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L328)
 
 `docs.id` — stable per-index identifier.
 
@@ -76,7 +76,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:320](https://gith
 
 > **rrfScore**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:324](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L324)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:332](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L332)
 
 `Σ 1/(rrfK + rank_i)` across whichever sources hit this docId.
 
@@ -86,6 +86,6 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:324](https://gith
 
 > `optional` **vecRank?**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:330](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L330)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:338](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L338)
 
 1-indexed vector position within `vecSearch` top-N — undefined when only BM25 hit.

@@ -39,7 +39,7 @@ export interface ResourceDefinition {
 }
 
 function buildUriPattern(scheme: string): RegExp {
-  // Mirror epics.md L545-546 and architecture.md L420.
+  // Mirror  L545-546 and  L420.
   // Anchored to the supplied scheme so each resource enforces its own URI namespace.
   return new RegExp(`^${scheme}://[a-z][a-z0-9_-]*/[A-Za-z0-9_.-]+$`);
 }

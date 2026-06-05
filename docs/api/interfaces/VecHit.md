@@ -6,11 +6,11 @@
 
 # Interface: VecHit
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:135](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L135)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:135](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L135)
 
 Result from [IndexHandle.vecSearch](IndexHandle.md#vecsearch). `distance` is the sqlite-vec
-default L2 distance (Story 2.3 may opt into cosine via L2-normalized
-embeddings; see Story 2.2 Dev Notes §sqlite-vec distance 语义).
+default L2 distance (may opt into cosine via L2-normalized
+embeddings; see Dev Notes §sqlite-vec distance 语义).
 
 ## Properties
 
@@ -18,7 +18,7 @@ embeddings; see Story 2.2 Dev Notes §sqlite-vec distance 语义).
 
 > **chunk**: [`Chunk`](Chunk.md)
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:137](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L137)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:137](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L137)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:137](https://gith
 
 > **distance**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:138](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L138)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:138](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L138)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:138](https://gith
 
 > **docId**: `number`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:136](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L136)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:136](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L136)

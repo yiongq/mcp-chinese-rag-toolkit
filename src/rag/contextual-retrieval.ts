@@ -11,12 +11,12 @@ export const DEFAULT_PREFIX_LENGTH = { min: 50, max: 100 } as const;
 /**
  * Render the toolkit's canonical prompt template for chunk-context
  * generation. Exposed for test introspection + so multiple toolkit
- * consumers (mcp-hr / mcp-modeling) emit comparable Hit Rate metrics
+ * consumers (a downstream consumer package / a downstream consumer package) emit comparable Hit Rate metrics
  * by sharing the same wording.
  *
  * The rendered output is NOT submitted directly — providers (Anthropic
  * / OpenAI / 豆包) accept the `(system, user)` pair via their own SDK
- * message shape (see Story 2.6 AC5 §Anthropic adapter example) and
+ * message shape (see AC5 §Anthropic adapter example) and
  * apply `cache_control: { type: 'ephemeral' }` to the system block.
  *
  * NOTE: This helper is completely independent from the L0 LRU cache
@@ -51,7 +51,7 @@ export function renderChunkContextPrompt(args: {
  * CRITICAL — the caller MUST invoke this with the SAME `cacheKey` for
  * all chunks of the same source document; otherwise the provider's
  * prompt cache treats every request as a miss and token cost stays at
- * 100% instead of dropping to ≤ 50% (FR15 contract).
+ * 100% instead of dropping to ≤ 50%.
  *
  * Recommended `cacheKey` is the document's sha256 (or any stable
  * per-source identifier). For deterministic chunk-context generation
@@ -59,7 +59,7 @@ export function renderChunkContextPrompt(args: {
  *
  * Provider injection rationale: the toolkit does not depend on any
  * specific LLM SDK (architecture §AI Agent 强制规则 #4) — the caller
- * (e.g. mcp-hr Story 4.1 build-index script) instantiates Anthropic /
+ * (e.g. a downstream consumer package build-index script) instantiates Anthropic /
  * OpenAI / 豆包 clients with their own API key and adapts the response
  * to {@link LlmProvider}. Provider-side `cache_control` orchestration
  * lives in the adapter; this helper only stitches the prompt skeleton.

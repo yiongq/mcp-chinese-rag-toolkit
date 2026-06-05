@@ -180,7 +180,7 @@ describe('createMcpServer config validation', () => {
     await handle.close();
   });
 
-  it('rejects empty name (NFR22 / TR10)', () => {
+  it('rejects empty name', () => {
     expect(() => createMcpServer({ name: '', version: '0.0.0-test', tools: [echoTool] })).toThrow(
       /name/,
     );
@@ -189,7 +189,7 @@ describe('createMcpServer config validation', () => {
     ).toThrow(/name/);
   });
 
-  it('rejects empty version (NFR22 / TR10)', () => {
+  it('rejects empty version', () => {
     expect(() => createMcpServer({ name: 'ok', version: '', tools: [echoTool] })).toThrow(
       /version/,
     );

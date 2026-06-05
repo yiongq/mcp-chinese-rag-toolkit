@@ -30,7 +30,7 @@ function assertValidTopK(topK: number): void {
  * descending by score (ties broken by id ascending for determinism).
  *
  * The fused output preserves per-source rank lookups and payload pointers
- * so single-source survival (BDD#2 in Story 2.4) is observable downstream:
+ * so single-source survival (BDD#2 in ) is observable downstream:
  * an id that only one source returned ends up with `null` in the other
  * source's `ranks` / `payloads` slot.
  *

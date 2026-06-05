@@ -17,7 +17,7 @@ describe('docs/EVAL_GUIDE.md YAML examples', () => {
     expect(yamlBlocks.length).toBeGreaterThan(0);
   });
 
-  it('each fenced YAML block parses via Story 2.7 loadEvalSet', async () => {
+  it('each fenced YAML block parses via loadEvalSet', async () => {
     expect(yamlBlocks.length).toBeGreaterThan(0);
     for (const [idx, block] of yamlBlocks.entries()) {
       const tmpDir = mkdtempSync(path.join(tmpdir(), 'eval-guide-test-'));

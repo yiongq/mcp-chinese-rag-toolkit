@@ -8,7 +8,7 @@
 
 > **RerankFn** = (`query`, `candidates`, `opts?`) => `Promise`\<[`RerankedHit`](../interfaces/RerankedHit.md)[]\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:459](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/rag/types.ts#L459)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/rag/types.ts:467](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/rag/types.ts#L467)
 
 Bound rerank function returned by `createReranker`.
 

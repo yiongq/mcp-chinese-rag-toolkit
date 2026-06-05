@@ -8,12 +8,12 @@
 
 > **injectCacheMeta**(`result`, `status`): `object`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:127](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts#L127)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/middleware/with-lru-cache.ts:127](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/middleware/with-lru-cache.ts#L127)
 
 Inject `structuredContent._meta.cache = status` without mutating the
 input result. The `_meta` namespace (underscore prefix) avoids
-collision with business fields; other `_meta.*` entries (e.g. Story
-2.7 `_meta.indexVersion`) are owned by their respective writers.
+collision with business fields; other `_meta.*` entries (e.g.
+`_meta.indexVersion`) are owned by their respective writers.
 
 Always called on BOTH read and write paths, so the
 `structuredContent._meta.cache` field is guaranteed present and

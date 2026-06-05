@@ -11,7 +11,7 @@ import { OptionalDependencyMissingError } from '../../../../src/rag/plugins/type
 // keyed on (width, height, encoded pixel hash) — enough for the tests below
 // to assert magic bytes, resize behaviour, and idempotency without booting
 // the real native module (which is an optional peer the toolkit does NOT
-// install in CI; Story 2.8 spec Optional Peer Dependency Mechanics table).
+// install in CI; spec Optional Peer Dependency Mechanics table).
 // ---------------------------------------------------------------------------
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

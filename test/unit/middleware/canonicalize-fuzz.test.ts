@@ -26,7 +26,7 @@ describe('canonicalize — defensive / edge cases', () => {
   it('circular references propagate as a thrown error (loud failure)', () => {
     const cyclic: Record<string, unknown> = { a: 1 };
     cyclic.self = cyclic;
-    // Story 2.6 chose to propagate rather than wrap — callers (zod-validated
+    // chose to propagate rather than wrap — callers (zod-validated
     // tool args) should never construct cyclic inputs in practice; if it
     // happens it's a programmer error worth surfacing loudly. The exact
     // error type depends on whether `normalizeValue` recursion or

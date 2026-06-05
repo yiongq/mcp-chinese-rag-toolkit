@@ -14,7 +14,7 @@ export interface ToolHooks {
 }
 
 // Hook failures must never affect business results — Phase 2 OTel injection is observability,
-// not a business dependency. Per architecture.md L608 we surface via console.warn.
+// not a business dependency. Per  L608 we surface via console.warn.
 async function runHookSafe(
   phase: 'before' | 'after' | 'error',
   hook: ((ctx: never) => void | Promise<void>) | undefined,
@@ -47,7 +47,7 @@ export function withHooks(
     } catch (err) {
       const durationMs = performance.now() - startedAt;
       await runHookSafe('error', hooks.error, { ...baseCtx, err, durationMs });
-      // Re-throw the original error so Story 1.3 wrapHandler owns envelope conversion;
+      // Re-throw the original error so wrapHandler owns envelope conversion;
       // double-wrapping would lose stack trace and break the INTERNAL_ERROR contract.
       throw err;
     }

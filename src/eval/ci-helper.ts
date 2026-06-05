@@ -4,14 +4,14 @@ import path from 'node:path';
 import type { EvalSummary } from './types.js';
 
 /**
- * Default `eval-results/` location relative to the consuming package (mcp-hr /
- * mcp-modeling each have their own; toolkit self-eval writes to
+ * Default `eval-results/` location relative to the consuming package (a downstream consumer package /
+ * a downstream consumer package each have their own; toolkit self-eval writes to
  * `packages/mcp-chinese-rag-toolkit/eval-results/`).
  */
 export const DEFAULT_RESULTS_DIR = 'eval-results';
 
 /**
- * Default minimum Hit Rate@K — matches NFR14 (90%). Can be overridden via the
+ * Default minimum Hit Rate@K — matches  (90%). Can be overridden via the
  * `RAG_EVAL_HIT_RATE_MIN` env var (parsed as float ∈ [0, 1]). Production CI
  * MUST keep the default; dev override exists only for debugging.
  */
@@ -25,7 +25,7 @@ export interface WriteArtifactsOptions {
 /**
  * Write summary.json / report.md / per-query.json into outDir. Creates the
  * directory if it does not exist. Atomic per-file write is NOT used — eval is
- * non-interactive batch and CI re-runs are cheap (mirrors Story 2.5 bench's
+ * non-interactive batch and CI re-runs are cheap (mirrors bench's
  * straight write); partial output on crash is acceptable because the gate
  * step fails fast and the report becomes worthless either way.
  */
@@ -44,11 +44,11 @@ export function writeArtifacts(
   const reportPath = path.join(outDir, 'report.md');
   const perQueryPath = path.join(outDir, 'per-query.json');
 
-  // summary.json — FR42 machine-readable artifact (consumed by future
+  // summary.json —  machine-readable artifact (consumed by future
   // dashboards / Phase 2 OTel exporter; structure stability matters).
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
 
-  // per-query.json — FR43 verbose breakdown (rerankScore / distance / ftsRank),
+  // per-query.json —  verbose breakdown (rerankScore / distance / ftsRank),
   // serialised separately because it is verbose (~10-50 KB) and most PR review
   // only needs summary.md.
   writeFileSync(perQueryPath, `${JSON.stringify(summary.perQuery, null, 2)}\n`, 'utf8');
@@ -141,7 +141,7 @@ function escapeMarkdown(s: string): string {
 /**
  * Read `RAG_EVAL_HIT_RATE_MIN` env var, fall back to {@link DEFAULT_HIT_RATE_MIN}.
  * Validates the parsed value is a finite float in [0, 1]; throws actionable
- * error otherwise (Story 2.6 教训 3 — error message contains the env var name
+ * error otherwise (教训 3 — error message contains the env var name
  * so reviewers see immediately which knob is wrong).
  */
 export function resolveHitRateMin(envValue?: string): number {
@@ -163,7 +163,7 @@ export function passesGate(summary: EvalSummary, threshold = DEFAULT_HIT_RATE_MI
 
 /**
  * GitHub Actions-friendly stdout writer — emits `::error::` annotation on
- * gate failure + `::notice::` on pass. Mirrors Story 2.5 latency-harness
+ * gate failure + `::notice::` on pass. Mirrors latency-harness
  * bench `::warning::` idiom for consistency. No-op outside GitHub Actions so
  * local runs do not pollute stdout.
  */
@@ -173,11 +173,11 @@ export function emitGitHubActionsAnnotation(summary: EvalSummary, threshold: num
   const minPct = (threshold * 100).toFixed(2);
   if (summary.hitRate < threshold) {
     process.stdout.write(
-      `::error title=RAG Eval CI Gate Failed::Hit Rate@${summary.topK} = ${pct}% < ${minPct}% (NFR14 threshold). See eval-results/report.md for per-query breakdown.\n`,
+      `::error title=RAG Eval CI Gate Failed::Hit Rate@${summary.topK} = ${pct}% < ${minPct}%. See eval-results/report.md for per-query breakdown.\n`,
     );
   } else {
     process.stdout.write(
-      `::notice title=RAG Eval Passed::Hit Rate@${summary.topK} = ${pct}% ≥ ${minPct}% (NFR14 threshold). MRR = ${summary.mrr.toFixed(4)}.\n`,
+      `::notice title=RAG Eval Passed::Hit Rate@${summary.topK} = ${pct}% ≥ ${minPct}%. MRR = ${summary.mrr.toFixed(4)}.\n`,
     );
   }
 }

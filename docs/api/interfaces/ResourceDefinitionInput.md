@@ -6,7 +6,7 @@
 
 # Interface: ResourceDefinitionInput
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:19](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L19)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:19](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L19)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:19
 
 > **list**: () => `Promise`\<\{ `resources`: [`ResourceListEntry`](ResourceListEntry.md)[]; \}\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:24](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L24)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:24](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L24)
 
 List all readable resource instances.
 
@@ -28,7 +28,7 @@ List all readable resource instances.
 
 > `optional` **mimeType?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L22)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:22](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L22)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:22
 
 > **read**: (`uri`, `vars`) => `Promise`\<[`ResourceReadResult`](ResourceReadResult.md)\>
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:29](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L29)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:29](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L29)
 
 Read a single resource. `vars` originates from RFC 6570 expansion of
 `{scheme}://{kind}/{id}`.
@@ -67,7 +67,7 @@ Read a single resource. `vars` originates from RFC 6570 expansion of
 
 > `optional` **title?**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:21](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L21)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:21](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L21)
 
 ***
 
@@ -75,4 +75,4 @@ Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:21
 
 > **uriScheme**: `string`
 
-Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts#L20)
+Defined in: [packages/mcp-chinese-rag-toolkit/src/server/resource-provider.ts:20](https://github.com/yiongq/mcp-chinese-rag-toolkit/blob/main/src/server/resource-provider.ts#L20)

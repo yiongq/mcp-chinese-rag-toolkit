@@ -93,7 +93,7 @@ function resolveOptions(opts: VisionCaptionOptions): ResolvedOptions {
     );
   }
   // Explicit undefined vs. false: only `false` flips off the marker; an
-  // omitted field defaults to `true` (Story 2.7 教训 7).
+  // omitted field defaults to `true`.
   const markSyntheticChunk = opts.markSyntheticChunk !== false;
   const promptTemplate = opts.promptTemplate ?? DEFAULT_VISION_PROMPT;
   if (typeof promptTemplate !== 'string' || promptTemplate.length === 0) {
@@ -118,7 +118,7 @@ function resolveOptions(opts: VisionCaptionOptions): ResolvedOptions {
 }
 
 /**
- * Create an FR20 indexing plugin that captions PDF images using a
+ * Create an  indexing plugin that captions PDF images using a
  * caller-injected vision LLM provider. Synthetic Chinese caption chunks
  * flow into the same `docs / docs_fts / docs_vec` storage as text chunks
  * (architecture §RAG Indexing Strategy L292-299).
@@ -130,14 +130,14 @@ function resolveOptions(opts: VisionCaptionOptions): ResolvedOptions {
  *      cache lookup → `provider.caption` (concurrency-limited, retry on
  *      transient errors, timeout per call) → cache write → synthetic
  *      `Chunk[]`. Cache handle disposed via try/finally regardless of
- *      success path (Story 2.5 教训 1).
+ *      success path.
  */
 export function withVisionCaption(opts: VisionCaptionOptions): IndexingPlugin {
   const resolved = resolveOptions(opts);
 
   // Eagerly validate canvas availability so a missing peer fails the
   // factory call instead of the first image inside enrichPdf — much
-  // easier to debug at boot time (Story 2.6 M1 actionable error).
+  // easier to debug at boot time.
   // Reset to null on rejection so the caller can `pnpm add @napi-rs/canvas`
   // then reuse the same plugin instance without re-creating it.
   let canvasReady: Promise<unknown> | null = null;
@@ -162,7 +162,7 @@ export function withVisionCaption(opts: VisionCaptionOptions): IndexingPlugin {
         return await runEnrichPdf(pages, safeCtx, resolved, cache);
       } finally {
         // Surface dispose errors via warn so they cannot mask the
-        // primary throw path (Story 2.7 教训 12 — finally must not eat
+        // primary throw path (教训 12 — finally must not eat
         // the in-flight error).
         try {
           cache.close();
