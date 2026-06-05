@@ -25,7 +25,14 @@ export default defineConfig({
     dts: format === 'es' ? '.d.ts' : '.d.cts',
   }),
   publint: 'ci-only',
-  // attw temporarily disabled — upstream bug (attw 0.18 + fflate 0.8 + Node 22). Re-enable before Epic 7 npm publish. See deferred-work.md.
+  // attw still disabled — final DoD re-check for Story 7.5 (2026-06-04): flipping
+  // to 'ci-only' and running `CI=true pnpm build` on @arethetypeswrong/cli@0.17.4
+  // + fflate@0.8.3 + Node 22.22.0 still throws `ATTW check failed: TypeError:
+  // Cannot read properties of undefined (reading 'filename')` (the upstream
+  // gunzip/fflate bug remains unfixed; publint passes in the same run). This is a
+  // documented known exception, NOT a silent skip — the published .d.ts/.d.cts
+  // stay gated by publint + the package's own type tests. Re-enable once upstream
+  // fflate/attw ships a fix. See RELEASING.md §5 + deferred-work.md.
   attw: false,
   failOnWarn: 'ci-only',
   hooks: {

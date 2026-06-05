@@ -10,6 +10,52 @@
 
 🚀 **v0.1.0 first public release.** Server factory + tool/resource builders + full Chinese RAG pipeline (FTS5+jieba / Hybrid Search RRF / BGE Reranker / Contextual Retrieval) all included.
 
+## Architecture
+
+A query flows through a hybrid retriever (BM25 + dense vectors fused by RRF), a cross-encoder reranker, and an L0 result cache — then `createMcpServer` exposes the whole thing over stdio **or** Streamable HTTP to whatever downstream MCP server you build:
+
+```mermaid
+graph TD
+    q["query (Chinese text)"]
+    subgraph pipeline["ChineseRagPipeline"]
+        subgraph hybrid["Hybrid Search (parallel)"]
+            jieba["jieba tokenizer + FTS5 BM25"]
+            embed["bge-large-zh-v1.5 embedder + sqlite-vec KNN"]
+        end
+        rrf["RRF fusion (k=60)"]
+        rerank["bge-reranker-v2-m3 cross-encoder"]
+        cache["L0 LRU cache (sha256 key, 1h TTL)"]
+    end
+    q --> jieba
+    q --> embed
+    jieba --> rrf
+    embed --> rrf
+    rrf --> rerank --> cache --> chunks["top-K chunks (with cite metadata)"]
+    subgraph factory["createMcpServer factory"]
+        std["stdio transport"]
+        http["Streamable HTTP transport"]
+    end
+    chunks --> factory
+    factory --> std
+    factory --> http
+    std --> downstream["your downstream MCP server"]
+    http --> downstream
+```
+
+Every box is a documented export — see the per-story API sections below.
+
+## Performance & quality gates
+
+The pipeline ships with measurable contracts rather than vibes:
+
+| Gate | Threshold | Enforced by |
+|---|---|---|
+| Retrieval quality | `Hit Rate@5 ≥ 90%` / `MRR ≥ 0.80` | `rag-eval` CI job, blocking on every PR (FR41 / NFR14) |
+| stdio latency | `P95 < 200ms` per tool call (NFR1) | `runStdioLatencyHarness` bench — warn-not-block (`>50ms` drift); baseline committed after first `pnpm bench -- --write` |
+| Embedding dim | `1024` (bge-large-zh-v1.5) | model manifest pin + SHA-256 attestation |
+
+These are **framework-methodology** numbers measured against the toolkit's own 12-chunk self-eval fixture — a smoke test that the pipeline integrates end-to-end, not a domain benchmark. Each downstream package owns its real-data eval set; see [Eval Framework + RAG Eval CI Gate](#eval-framework--rag-eval-ci-gate-story-27) for the adapter pattern.
+
 ## Install
 
 ```bash
@@ -204,7 +250,16 @@ Invariants you can rely on:
 | ✅ Vision caption plugin | Epic 2 Story 2.8 | `rag/vision-caption` |
 | ✅ `create-mcp-rag` CLI + Documentation Set (FR49) — Epic 2 closer (9/9 done) | Epic 2 Story 2.9 | `bin/create-mcp-rag`, `docs/`, `templates/create-mcp-rag/` |
 
-See the umbrella roadmap in the repo root [`README.md`](../../README.md) for cross-package status.
+Each ✅ row maps to a shipped, tested slice of this public toolkit. Phase 2 directions are summarized in [What's next](#whats-next) below.
+
+## What's next
+
+Toolkit-scoped Phase 2 directions (these are the open-source-relevant items; the full cross-package roadmap is tracked privately):
+
+- **IndexingService / RAG-as-Service pivot** — a runtime document-upload + multi-tenant indexing seam so the toolkit can grow from an embedded library into a hosted service without a rewrite (the `IndexingService` interface is deliberately reserved for this).
+- **WebGPU in-browser RAG** — run the embedder + reranker fully client-side via WebGPU, dropping the server round-trip for browser consumers.
+- **Benchmark suite + industry comparison** — reproducible latency/quality benchmarks against Aider / Continue / Cursor-style retrieval stacks.
+- **`mcp-codebase`** — a TreeSitter-based, code-aware sibling toolkit that reuses this Chinese RAG core for source-code retrieval.
 
 ## RAG primitives (Story 2.1+)
 
@@ -482,8 +537,9 @@ when it lands, wraps the entire `hybrid + rerank` pipeline as a single
 factory so callers can skip it (ablation eval) or share its cache.
 
 This section is also the home of NFR1 (`stdio P95 < 200ms`): the
-`runStdioLatencyHarness` + `bin/latency-harness.ts` + `bench/baseline.json`
-trio enforces the P95 contract on every PR.
+`runStdioLatencyHarness` + `bin/latency-harness.ts` harness measures P95 and,
+once a `bench/baseline.json` is committed, warns on `>50ms` drift (warn-not-block;
+the baseline is generated on first `pnpm bench -- --write`, see below).
 
 ### `loadReranker` + `Reranker.rank`
 
@@ -586,7 +642,9 @@ pair (`InMemoryTransport.createLinkedPair()`). The resulting snapshot
 includes P50/P95/P99 + cold-start + a full environment fingerprint
 (`node` / `platform` / `arch` / toolkit + model + jieba versions).
 
-`bench/baseline.json` is committed as a contract file — `pnpm bench`
+`bench/baseline.json` is the contract file `pnpm bench` diffs against —
+generated on the first run via `pnpm bench -- --write` and committed once
+reviewed (it is not pre-committed in the repo today). Once present, `pnpm bench`
 warns on `> 50ms` P95 drift, and the GitHub Actions bench job emits a
 `::warning::` annotation on regressed PRs (warn-not-block in the MVP;
 Phase 2 may flip to block). `bench/latest.json` is gitignored
@@ -946,8 +1004,8 @@ still a first-class citizen.
   policy in [§Caching](#l0-tool-result-cache-story-26) — no soft matches at
   evaluation time either.
 - ❌ Don't add per-package `Hit Rate@K` thresholds. Production CI is uniformly
-  0.9; if `mcp-modeling` truly cannot land there during MVP due to non-RAG
-  Oracle config tools, evaluate the allowlist in Epic 6 — don't fragment the
+  0.9; if a downstream package truly cannot land there during MVP due to
+  non-RAG database-config tools, evaluate the allowlist before fragmenting the
   bar across packages.
 - ❌ Don't treat the toolkit self-eval (12-chunk fixture) as a domain
   evaluation. It is a smoke test that the pipeline integrates end-to-end.

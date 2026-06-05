@@ -52,3 +52,9 @@ jobs:
 
       - name: Build (tsdown + publint + attw ci-only gates)
         run: pnpm build
+
+      # NFR36 — published package unpacked size must stay < 100 MB. Runs after
+      # build so `dist/` (declared in `files`) is measured. `npm pack --dry-run`
+      # does not publish.
+      - name: Size guard (unpacked < 100MB)
+        run: node scripts/check-pack-size.mjs
