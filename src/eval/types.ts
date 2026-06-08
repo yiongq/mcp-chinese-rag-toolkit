@@ -29,8 +29,8 @@ export interface EvalSearchResult {
 /**
  * A `searchFn` evaluated by `runEval`. Mirrors `RerankFn` /
  * `HybridSearchFn` provider-injection patterns — toolkit eval does
- * NOT bind to any specific MCP tool; a downstream consumer package / a downstream consumer package / third-party each
- * wire their own.
+ * NOT bind to any specific MCP tool; a downstream consumer package or
+ * third-party each wire their own.
  */
 export type EvalSearchFn = (query: string, opts?: { topK?: number }) => Promise<EvalSearchResult[]>;
 
@@ -135,8 +135,8 @@ export interface EvalSummary {
 /** Options for `runEval()`. */
 export interface EvalRunnerOptions {
   /**
-   * Search function under evaluation. Caller injects (a downstream consumer package / a downstream consumer package /
-   * third-party each wire their own).
+   * Search function under evaluation. Caller injects (a downstream consumer
+   * package or third-party each wire their own).
    */
   searchFn: EvalSearchFn;
   /** Top-K for both Hit Rate@K and MRR@K. @default 5. */
@@ -146,4 +146,85 @@ export interface EvalRunnerOptions {
    * result.page. When false (default), only source match counts.
    */
   strict?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// — Reference-free answer-quality scoring (deterministic, model-agnostic)
+// ---------------------------------------------------------------------------
+//
+// The functions in `judges.ts` score answer quality WITHOUT a gold reference,
+// using the RAGAS metric family (faithfulness / answer relevance / context
+// precision). They are deliberately split from the model-facing extraction
+// step: an upstream caller uses a language model to break an answer into atomic
+// claims, generate reverse questions, and judge chunk usefulness; it also
+// injects an embedding function to vectorize text. The types below are the
+// hand-off contract — the already-extracted, structured inputs those scoring
+// functions consume. This keeps the scoring layer pure math: no model calls, no
+// embedding calls, no I/O, same input → same output.
+
+/**
+ * One atomic claim extracted from a generated answer, paired with whether the
+ * retrieved context supports it. The boolean is decided upstream (by a language
+ * model or a human); {@link faithfulness} only aggregates it.
+ */
+export interface ClaimVerdict {
+  /** The atomic claim text (informational; aids auditing, not used in scoring). */
+  claim: string;
+  /** `true` when the retrieved context supports this claim. */
+  supported: boolean;
+}
+
+/**
+ * Result of {@link faithfulness}. `score` is the supported fraction; the raw
+ * counts are returned alongside so a reviewer can audit how the score was
+ * reached.
+ */
+export interface FaithfulnessResult {
+  /** Supported fraction ∈ [0, 1]; `0` when there are no claims (see docs). */
+  score: number;
+  /** Number of claims marked `supported`. */
+  supportedClaims: number;
+  /** Total number of claims considered. */
+  totalClaims: number;
+}
+
+/**
+ * Input to {@link answerRelevance}. The original query and the reverse
+ * questions (generated upstream from the answer) are supplied as embeddings —
+ * vectorization happens in the caller, not here. Embeddings are NOT assumed to
+ * be unit-normalized.
+ */
+export interface AnswerRelevanceInput {
+  /** Embedding of the original user query. */
+  queryEmbedding: readonly number[];
+  /** Embeddings of the reverse questions generated from the answer. */
+  generatedQuestionEmbeddings: ReadonlyArray<readonly number[]>;
+}
+
+/**
+ * Result of {@link answerRelevance}. `score` is the mean cosine similarity; the
+ * per-question values are returned so a reviewer can see which reverse question
+ * drove the score.
+ */
+export interface AnswerRelevanceResult {
+  /** Mean cosine similarity ∈ [-1, 1]; `0` when there are no reverse questions. */
+  score: number;
+  /**
+   * Cosine similarity of each reverse question against the query, in input
+   * order. Length equals `generatedQuestionEmbeddings.length`.
+   */
+  perQuestionSimilarity: number[];
+}
+
+/**
+ * Result of {@link contextPrecision}. `score` is the order-sensitive average
+ * precision; the useful/total counts are returned for auditing.
+ */
+export interface ContextPrecisionResult {
+  /** Order-sensitive average precision ∈ [0, 1]; `0` when degenerate (see docs). */
+  score: number;
+  /** Number of retrieved chunks flagged useful. */
+  usefulCount: number;
+  /** Total number of retrieved chunks considered. */
+  total: number;
 }

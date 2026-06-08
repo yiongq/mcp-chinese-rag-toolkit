@@ -20,6 +20,14 @@ import type { EvalSearchResult } from './types.js';
 export const EVAL_ERROR_CODES = {
   /** A result row reached an answer metric with missing or blank `content`. */
   EVAL_CONTENT_MISSING: 'EVAL_CONTENT_MISSING',
+  /**
+   * A scoring function received a structurally invalid numeric input — e.g. two
+   * embeddings of different length, or a vector containing a non-finite value
+   * (`NaN` / `±Infinity`). These come from a provider-injected embedding
+   * function and are not runtime type-checked, so the metric fails loudly here
+   * rather than silently producing a meaningless number.
+   */
+  EVAL_INVALID_METRIC_INPUT: 'EVAL_INVALID_METRIC_INPUT',
 } as const;
 
 /** Union of the registered eval error codes. */

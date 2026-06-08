@@ -134,7 +134,7 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
     }
     // Inline `reason` wins; fall back to extracted leading `# reason:` comment.
     // Empty / whitespace-only inline reason is treated as absent so it does
-    // not silently override the comment fallback and defeat .
+    // not silently override the comment fallback.
     const rawInline = typeof item.reason === 'string' ? item.reason : undefined;
     const inlineReason =
       rawInline !== undefined && rawInline.trim().length > 0 ? rawInline : undefined;
