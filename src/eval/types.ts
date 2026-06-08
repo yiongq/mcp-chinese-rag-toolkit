@@ -357,3 +357,143 @@ export interface JudgeCallOptions {
  * consumes — never citations or confidence.
  */
 export type JudgeOutcome<T> = { ok: true; value: T } | { ok: false; error: EvalErrorCore };
+
+// ---------------------------------------------------------------------------
+// — Answer-eval orchestration layer (wires retrieval → generation → judge → score)
+// ---------------------------------------------------------------------------
+//
+// The orchestration entry point runs a whole answer-quality evaluation for a set
+// of queries: it retrieves context, generates an answer from that context, drives
+// the judge tasks, feeds their structured output to the pure scoring functions,
+// and stamps the run with reproducible version metadata. The contracts below are
+// its injection surface and result shape. Like the judge signature, the injected
+// functions carry PURE eval semantics — no business / transport fields.
+
+/**
+ * Generate an answer from a query and its retrieved context. Provider-agnostic,
+ * PURE eval semantics — the signature carries no business / transport fields. The
+ * caller wires a real language model behind this single shape, or a deterministic
+ * mock in CI.
+ */
+export type GenerateFn = (input: { query: string; context: string }) => Promise<string>;
+
+/**
+ * Embed a batch of texts into vectors, one row per input in the same order.
+ * Optional in the orchestrator — only answer relevance needs it. Mirrors the
+ * toolkit embedder's batch shape; PURE eval semantics, no business fields.
+ */
+export type EmbedFn = (texts: readonly string[]) => Promise<number[][]>;
+
+/**
+ * Reproducible version metadata stamped onto every answer-eval run so scores stay
+ * comparable and auditable across time and configurations. Each field has a
+ * distinct provenance (see field docs); none may be hardcoded by the toolkit.
+ */
+export interface AnswerEvalVersionMeta {
+  /** Generation model name — caller-injected (NEVER hardcoded in the toolkit). */
+  generateModel: string;
+  /** Judge model name — caller-injected (NEVER hardcoded in the toolkit). */
+  judgeModel: string;
+  /** Judge prompt version — the toolkit's own JUDGE_PROMPT_VERSION at run time. */
+  judgePromptVersion: string;
+  /** Toolkit package version, read from package.json (provenance, auditable). */
+  toolkitVersion: string;
+  /** Eval-set version — echoed from EvalSet.version. */
+  evalSpecVersion: string;
+}
+
+/**
+ * The five RAGAS metric results for one query. Each is OPTIONAL because a metric
+ * is skipped (never faked) when its inputs are unavailable: the reference-based
+ * pair when the query has no reference answer, and answer relevance when no embed
+ * function is injected or its judge step degrades. A skipped metric is absent here
+ * and explained in {@link AnswerEvalQueryResult.skipped}.
+ */
+export interface AnswerEvalMetrics {
+  /** Reference-free: fraction of the answer's claims the context supports. */
+  faithfulness?: FaithfulnessResult;
+  /** Reference-free: how well the answer addresses the query (needs an embed fn). */
+  answerRelevance?: AnswerRelevanceResult;
+  /** Reference-free: order-sensitive precision of the retrieved context. */
+  contextPrecision?: ContextPrecisionResult;
+  /** Reference-based: statement-level F1 against the reference answer. */
+  answerCorrectness?: AnswerCorrectnessResult;
+  /** Reference-based: fraction of reference sentences the context accounts for. */
+  contextRecall?: ContextRecallResult;
+}
+
+/**
+ * Per-query result row. Mirrors the resilience of the retrieval runner: a fault
+ * fatal to THIS query (a throwing search/generate function, a missing chunk, or a
+ * judge infrastructure rejection) is recorded in {@link error} and the run keeps
+ * going, so a reviewer can see WHICH query failed at WHICH step without losing the
+ * rest of the run.
+ */
+export interface AnswerEvalQueryResult {
+  /** The query under evaluation. */
+  query: string;
+  /** Optional kebab-case category echoed from the eval query. */
+  category?: string;
+  /** The generated answer under evaluation (verbatim, for auditing). */
+  answer?: string;
+  /** The computed metrics; a skipped metric is absent (see {@link skipped}). */
+  metrics: AnswerEvalMetrics;
+  /**
+   * Per-metric skip / degrade notes, keyed by metric name → reason. A reference
+   * metric with no reference answer reads `NO_REFERENCE_ANSWER`; answer relevance
+   * with no embed function reads `NO_EMBED_FN`; a degraded judge call records its
+   * stable degrade code. Absent when nothing was skipped.
+   */
+  skipped?: Record<string, string>;
+  /**
+   * Fatal-for-this-query error; the query is still recorded. Absent on success.
+   * May coexist with populated {@link metrics}: a fault that surfaces partway
+   * through a query (e.g. a judge infrastructure rejection on a reference-based
+   * metric) is recorded here even though earlier reference-free metrics already
+   * scored. Treat any metric that IS present as authoritative regardless of
+   * `error` — `error` marks the query as incomplete, not the metrics already
+   * computed as invalid.
+   */
+  error?: string;
+}
+
+/**
+ * Aggregate result of an answer-eval run, returned by `runAnswerEval`. The five
+ * RAGAS metrics are intentionally NOT collapsed into a single number — they
+ * measure different things on different scales, so averaging them would be
+ * meaningless.
+ */
+export interface AnswerEvalSummary {
+  /** Eval-set version (echoed from EvalSet.version). */
+  evalSpecVersion: string;
+  /** When the run executed (ISO 8601 UTC). */
+  timestamp: string;
+  /** Total queries evaluated. */
+  totalQueries: number;
+  /** Top-K used when retrieving context for each query. */
+  topK: number;
+  /** Reproducible version metadata stamped once per run. */
+  versionMeta: AnswerEvalVersionMeta;
+  /** Per-query breakdown. */
+  perQuery: AnswerEvalQueryResult[];
+}
+
+/** Options for `runAnswerEval`. */
+export interface AnswerEvalOptions {
+  /** Retrieval function under evaluation. Caller injects (provider-agnostic). */
+  searchFn: EvalSearchFn;
+  /** Answer generation function. Caller injects (provider-agnostic). */
+  generateFn: GenerateFn;
+  /** Judge function driving the five judge tasks. Caller injects. */
+  judgeFn: JudgeFn;
+  /** Optional embed function; when omitted, answer relevance is skipped. */
+  embedFn?: EmbedFn;
+  /** Top-K context chunks to retrieve per query. @default DEFAULT_EVAL_TOP_K */
+  topK?: number;
+  /** Generation model name, stamped into version metadata. Required, non-empty. */
+  generateModel: string;
+  /** Judge model name, stamped into version metadata. Required, non-empty. */
+  judgeModel: string;
+  /** Wall-clock budget per judge call, forwarded to each judge task. */
+  judgeTimeoutMs?: number;
+}

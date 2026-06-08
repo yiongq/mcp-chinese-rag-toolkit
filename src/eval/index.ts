@@ -1,3 +1,4 @@
+export { runAnswerEval } from './answer-eval.js';
 export type { WriteArtifactsOptions } from './ci-helper.js';
 export {
   DEFAULT_HIT_RATE_MIN,
@@ -37,12 +38,18 @@ export {
 export type {
   AnswerCorrectnessResult,
   AnswerCorrectnessStatement,
+  AnswerEvalMetrics,
+  AnswerEvalOptions,
+  AnswerEvalQueryResult,
+  AnswerEvalSummary,
+  AnswerEvalVersionMeta,
   AnswerRelevanceInput,
   AnswerRelevanceResult,
   ClaimVerdict,
   ContextPrecisionResult,
   ContextRecallResult,
   CorrectnessLabel,
+  EmbedFn,
   EvalExpected,
   EvalQuery,
   EvalQueryResult,
@@ -52,6 +59,7 @@ export type {
   EvalSet,
   EvalSummary,
   FaithfulnessResult,
+  GenerateFn,
   JudgeCallOptions,
   JudgeFn,
   JudgeOutcome,
