@@ -1,4 +1,5 @@
 export { runAnswerEval } from './answer-eval.js';
+export { renderBenchmarkTable, runBenchmark } from './benchmark.js';
 export type { WriteArtifactsOptions } from './ci-helper.js';
 export {
   DEFAULT_HIT_RATE_MIN,
@@ -45,6 +46,10 @@ export type {
   AnswerEvalVersionMeta,
   AnswerRelevanceInput,
   AnswerRelevanceResult,
+  BenchmarkConfig,
+  BenchmarkConfigResult,
+  BenchmarkOptions,
+  BenchmarkSummary,
   ClaimVerdict,
   ContextPrecisionResult,
   ContextRecallResult,

@@ -226,16 +226,38 @@ function extractReasonComments(doc: Document): Array<string | undefined> {
 }
 
 /**
+ * Whether a single retrieved result satisfies one of a query's expected hits —
+ * the SINGLE source of truth for "does this result count as a hit". Shared by the
+ * retrieval scorer ({@link scoreQuery}) and the multi-config comparison's ranking
+ * gain derivation so the two never drift into two divergent match rules.
+ *
+ * Semantics:
+ *   - `strict: false` (default): a source match is enough.
+ *   - `strict: true`: when an expected entry declares a `page`, the result's
+ *     `page` must match exactly; expected entries without a page still match on
+ *     source alone.
+ */
+export function expectedMatches(
+  query: EvalQuery,
+  result: { source: string; page?: number },
+  strict?: boolean,
+): boolean {
+  return query.expected.some((e) => {
+    if (e.source !== result.source) return false;
+    if (strict === true && e.page !== undefined) {
+      return e.page === result.page;
+    }
+    return true;
+  });
+}
+
+/**
  * Score a single query: returns hit rank (1-indexed, undefined = miss) +
  * reciprocal rank. Pure function — easy to test without spinning up a
  * RAG pipeline.
  *
- * Semantics:
- *   - First match in topResults wins (subsequent expected matches ignored).
- *   - `strict: false` (default): source-only match.
- *   - `strict: true`: when `expected.page` is set, the result's `page` must
- *     match exactly; expected entries without a page still match on source
- *     alone.
+ * First match in topResults wins (subsequent expected matches ignored); the
+ * per-result hit rule itself lives in {@link expectedMatches}.
  */
 export function scoreQuery(
   query: EvalQuery,
@@ -245,14 +267,7 @@ export function scoreQuery(
   for (let i = 0; i < topResults.length; i += 1) {
     const result = topResults[i];
     if (!result) continue;
-    const matched = query.expected.some((e) => {
-      if (e.source !== result.source) return false;
-      if (opts.strict === true && e.page !== undefined) {
-        return e.page === result.page;
-      }
-      return true;
-    });
-    if (matched) {
+    if (expectedMatches(query, result, opts.strict)) {
       const rank = i + 1;
       return { hitRank: rank, reciprocalRank: 1 / rank };
     }

@@ -497,3 +497,93 @@ export interface AnswerEvalOptions {
   /** Wall-clock budget per judge call, forwarded to each judge task. */
   judgeTimeoutMs?: number;
 }
+
+// ---------------------------------------------------------------------------
+// — Multi-config comparison layer (orchestrates retrieval + answer eval per config)
+// ---------------------------------------------------------------------------
+//
+// The comparison entry point runs the SAME eval set through several named
+// retrieval configurations and lays the results out as one readable table, so a
+// reviewer can see at a glance which retrieval setup scores best on both
+// retrieval quality (Hit Rate@K / MRR / nDCG@K) and answer quality (the RAGAS
+// metrics). It is an ORCHESTRATOR only — it reuses the retrieval runner, the
+// answer-eval orchestrator and the ranking-gain metric without reimplementing any
+// formula. Crucially it stays provider-agnostic: it knows nothing about HOW a
+// retrieval configuration is built (reranking, lexical vs vector, tokenizer
+// choices). The caller pre-wires each configuration as a `searchFn`; the toolkit
+// only iterates over them.
+
+/**
+ * One named retrieval configuration to compare. The caller pre-wires `searchFn`
+ * to a specific retrieval variant; the toolkit does not know how that variant is
+ * constructed and never inspects it beyond calling it.
+ */
+export interface BenchmarkConfig {
+  /** Display name for this configuration's row in the comparison table. */
+  name: string;
+  /** The retrieval variant under evaluation, injected by the caller. */
+  searchFn: EvalSearchFn;
+}
+
+/** Options for `runBenchmark`. */
+export interface BenchmarkOptions {
+  /** Named retrieval configurations to compare; non-empty, names must be unique. */
+  configs: BenchmarkConfig[];
+  /** Answer generation function, shared across all configurations. Caller-injected. */
+  generateFn: GenerateFn;
+  /** Judge function driving the answer-quality judge tasks. Caller-injected. */
+  judgeFn: JudgeFn;
+  /** Optional embed function; when omitted, answer relevance is skipped. */
+  embedFn?: EmbedFn;
+  /** Top-K for retrieval, ranking gain and answer context. @default DEFAULT_EVAL_TOP_K */
+  topK?: number;
+  /** Generation model name, stamped into version metadata. Required, non-empty. */
+  generateModel: string;
+  /** Judge model name, stamped into version metadata. Required, non-empty. */
+  judgeModel: string;
+  /** Wall-clock budget per judge call, forwarded to each answer-eval run. */
+  judgeTimeoutMs?: number;
+  /** Forwarded to retrieval scoring and ranking-gain derivation (page-exact match). */
+  strict?: boolean;
+}
+
+/**
+ * One row of the comparison: the FULL retrieval and answer-eval sub-results are
+ * retained (auditable, per-query detail preserved) alongside the aggregates the
+ * table renders — the mean ranking gain and the mean of each answer metric that
+ * actually appeared. A metric that never appeared (e.g. answer relevance with no
+ * embed function) is OMITTED from `answerMeans`, never recorded as `0` or
+ * `undefined`.
+ */
+export interface BenchmarkConfigResult {
+  /** Echoes {@link BenchmarkConfig.name}. */
+  name: string;
+  /** Full retrieval sub-result (Hit Rate@K, MRR, per-query top results). */
+  retrieval: EvalSummary;
+  /** Mean nDCG@K across queries, derived from binary expected-hit gains. */
+  ndcg: number;
+  /** Full answer-eval sub-result (per-query RAGAS metrics + version metadata). */
+  answer: AnswerEvalSummary;
+  /** Mean of each answer metric that appeared; absent metrics are omitted. */
+  answerMeans: Partial<Record<keyof AnswerEvalMetrics, number>>;
+}
+
+/**
+ * Aggregate result of a multi-config comparison run, returned by `runBenchmark`.
+ * The version metadata is pinned ONCE at the summary level because every
+ * configuration shares the same models, toolkit, judge prompt and eval spec. The
+ * many metrics are intentionally NOT collapsed into a single "overall" score —
+ * they measure different things on different scales.
+ */
+export interface BenchmarkSummary {
+  /** Eval-set version (echoed from EvalSet.version). */
+  evalSpecVersion: string;
+  /** When the run executed (ISO 8601 UTC). */
+  timestamp: string;
+  /** Top-K used across retrieval, ranking gain and answer context. */
+  topK: number;
+  /** Reproducible version metadata, identical across configurations. */
+  versionMeta: AnswerEvalVersionMeta;
+  /** One result row per configuration, in input order. */
+  configs: BenchmarkConfigResult[];
+}
