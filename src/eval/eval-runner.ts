@@ -294,8 +294,9 @@ function discountedCumulativeGain(gains: readonly number[], k: number): number {
  * score  = idcg === 0 ? 0 : dcg / idcg                // ∈ [0, 1]
  * ```
  *
- * `gains` is the graded relevance of each result in retrieved order; labels are
- * expected to be `≥ 0` (e.g. `{0, 1, 2, 3}`). `opts.k` truncates the ranking to
+ * `gains` is the graded relevance of each result in retrieved order; labels must
+ * be `≥ 0` (e.g. `{0, 1, 2, 3}`) — a negative gain is rejected (see `@throws`)
+ * because it would push `score` outside `[0, 1]`. `opts.k` truncates the ranking to
  * its first `k` positions; it defaults to the full list length. An empty list
  * and an all-zero list both score `0` (there is no ideal gain to normalize by).
  *
@@ -304,8 +305,9 @@ function discountedCumulativeGain(gains: readonly number[], k: number): number {
  * calibration later calls for it.
  *
  * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when `gains`
- *   is not an array, contains a non-finite value (`NaN` / `±Infinity`), or when
- *   `opts.k` is provided but is not a positive integer. Graded labels come from
+ *   is not an array, contains a non-finite (`NaN` / `±Infinity`) or negative
+ *   value, or when `opts.k` is provided but is not a positive integer. Graded
+ *   labels come from
  *   injected / hand-authored data and are not guaranteed by the static type at
  *   runtime, so these structural faults fail loudly rather than silently produce
  *   a meaningless number.
@@ -319,10 +321,14 @@ export function ndcg(gains: readonly number[], opts?: { k?: number }): NdcgResul
   }
   for (let i = 0; i < gains.length; i += 1) {
     const gain = gains[i];
-    if (gain === undefined || !Number.isFinite(gain)) {
+    // Graded relevance must be a finite, non-negative number. A negative gain
+    // would let `dcg`/`idcg` flip sign and drive `score` outside the documented
+    // `[0, 1]` range (e.g. a stray `-1` "irrelevant" label scoring `< 0` or
+    // `> 1`), so reject it loudly rather than emit a meaningless number.
+    if (gain === undefined || !Number.isFinite(gain) || gain < 0) {
       throw evalError(
         'EVAL_INVALID_METRIC_INPUT',
-        `ndcg: gains contains a non-finite value at index ${i}`,
+        `ndcg: gains contains a non-finite or negative value at index ${i}`,
       );
     }
   }

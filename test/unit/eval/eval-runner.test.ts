@@ -539,6 +539,16 @@ describe('ndcg', () => {
     expect(ndcg(gains)).toEqual(ndcg(gains));
   });
 
+  it('handles opts.k larger than the ranking length and keeps score in [0, 1]', () => {
+    // No position beyond the list contributes, so an over-length k matches the
+    // un-truncated score; the result must still respect the documented range.
+    const clamped = ndcg([3, 2, 1], { k: 10 });
+    const full = ndcg([3, 2, 1]);
+    expect(clamped.score).toBe(full.score);
+    expect(clamped.score).toBeGreaterThanOrEqual(0);
+    expect(clamped.score).toBeLessThanOrEqual(1);
+  });
+
   it('throws EVAL_INVALID_METRIC_INPUT for a non-array input', () => {
     const bad = null as unknown as number[];
     expect(() => ndcg(bad)).toThrow(EvalFrameworkError);
@@ -549,12 +559,15 @@ describe('ndcg', () => {
     }
   });
 
-  const nonFiniteCases: Array<{ label: string; gains: number[] }> = [
+  const invalidGainCases: Array<{ label: string; gains: number[] }> = [
     { label: 'NaN', gains: [1, Number.NaN, 2] },
     { label: '+Infinity', gains: [Number.POSITIVE_INFINITY, 1] },
     { label: '-Infinity', gains: [1, Number.NEGATIVE_INFINITY] },
+    // A negative graded label would flip the sign of dcg/idcg and drive `score`
+    // outside the documented `[0, 1]` range, so it must be rejected loudly.
+    { label: 'negative', gains: [1, -1, 2] },
   ];
-  for (const c of nonFiniteCases) {
+  for (const c of invalidGainCases) {
     it(`throws EVAL_INVALID_METRIC_INPUT on a ${c.label} gain`, () => {
       let caught: unknown;
       try {
