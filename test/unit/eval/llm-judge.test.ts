@@ -98,6 +98,32 @@ describe('callJudge', () => {
     }
   });
 
+  it('clears its timeout timer on the malformed-degrade path too', async () => {
+    vi.useFakeTimers();
+    try {
+      // The judge resolves fast with unparseable output, so the timer is still
+      // armed when parsing throws — the `finally` must clear it on this path too,
+      // not only on the happy path.
+      const outcome = await callJudge(okJudge('not json'), 'p', (raw) => JSON.parse(raw));
+      expect(outcome.ok).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls back to the default budget for a non-positive or non-finite timeout', async () => {
+    // 0 / negative / NaN / Infinity would each coerce to a ~1ms timeout and
+    // degrade a fast judge spuriously; they must behave like the default budget.
+    for (const timeoutMs of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const outcome = await callJudge(okJudge('{"x":1}'), 'p', (raw) => JSON.parse(raw), {
+        timeoutMs,
+      });
+      expect(outcome.ok).toBe(true);
+      expect(expectOk(outcome)).toEqual({ x: 1 });
+    }
+  });
+
   it('exposes a default timeout constant and a dated prompt version', () => {
     expect(DEFAULT_JUDGE_TIMEOUT_MS).toBeGreaterThan(0);
     expect(JUDGE_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -130,6 +156,19 @@ describe('judgeClaimSupport', () => {
       '评审结果如下：\n```json\n[{"claim":"享有带薪年假","supported":false}]\n```\n以上。';
     const verdicts = expectOk(await judgeClaimSupport(okJudge(raw), { answer, context }));
     expect(verdicts).toEqual([{ claim: '享有带薪年假', supported: false }]);
+  });
+
+  it('recovers bare JSON embedded in unfenced prose (slice path)', async () => {
+    const raw = '评审结果：[{"claim":"试用期为六个月","supported":true}] 完毕。';
+    const verdicts = expectOk(await judgeClaimSupport(okJudge(raw), { answer, context }));
+    expect(verdicts).toEqual([{ claim: '试用期为六个月', supported: true }]);
+  });
+
+  it('skips a non-JSON fenced block and recovers a later JSON fence', async () => {
+    const raw =
+      '```text\n推理过程：先拆论断。\n```\n```json\n[{"claim":"试用期为六个月","supported":true}]\n```';
+    const verdicts = expectOk(await judgeClaimSupport(okJudge(raw), { answer, context }));
+    expect(verdicts).toEqual([{ claim: '试用期为六个月', supported: true }]);
   });
 
   it('degrades when a verdict is missing the supported flag', async () => {
@@ -171,6 +210,15 @@ describe('judgeReverseQuestions', () => {
     expect(expectDegrade(await judgeReverseQuestions(okJudge(raw), { answer })).error).toBe(
       'EVAL_JUDGE_MALFORMED_OUTPUT',
     );
+  });
+
+  it('slices the array and ignores a later bracket of the other kind', async () => {
+    // Unfenced: an array followed by prose containing a `{…}`. Anchoring on the
+    // first `[` and the last `]` (same kind) recovers the array; a naive
+    // first-bracket-to-last-bracket slice would span into the `}` and fail.
+    const raw = '["试用期多久？","试用期有多长？"] 说明：详见 {备注}。';
+    const questions = expectOk(await judgeReverseQuestions(okJudge(raw), { answer }));
+    expect(questions).toEqual(['试用期多久？', '试用期有多长？']);
   });
 
   it('builds a pure prompt carrying the answer and a JSON constraint', () => {

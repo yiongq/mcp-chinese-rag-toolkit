@@ -339,7 +339,10 @@ export type JudgeFn = (prompt: string) => Promise<string>;
 /** Options for a judge call. */
 export interface JudgeCallOptions {
   /**
-   * Wall-clock budget in ms before the call degrades to a timeout.
+   * Wall-clock budget in ms before the call degrades to a timeout. Must be a
+   * finite, positive number; any other value (`0`, negative, `NaN`, `Infinity`)
+   * falls back to the default rather than producing a spurious instant timeout.
+   * There is no sentinel to disable the timeout — omit this to use the default.
    * @default DEFAULT_JUDGE_TIMEOUT_MS
    */
   timeoutMs?: number;

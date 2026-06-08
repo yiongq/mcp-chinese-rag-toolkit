@@ -59,7 +59,16 @@ export async function callJudge<T>(
   parse: (raw: string) => T,
   opts?: JudgeCallOptions,
 ): Promise<JudgeOutcome<T>> {
-  const timeoutMs = opts?.timeoutMs ?? DEFAULT_JUDGE_TIMEOUT_MS;
+  // Fall back to the default for any budget that is not a usable wall-clock
+  // deadline. A `0`, negative, `NaN`, or `Infinity` value would otherwise be
+  // coerced by `setTimeout` to ~1ms (or overflow with a warning) and degrade
+  // even a fast judge to a spurious timeout; `??` alone only guards `undefined`.
+  // There is no "disable the timeout" sentinel — omit the option for the default.
+  const requested = opts?.timeoutMs;
+  const timeoutMs =
+    typeof requested === 'number' && Number.isFinite(requested) && requested > 0
+      ? requested
+      : DEFAULT_JUDGE_TIMEOUT_MS;
   // A resolved sentinel (not a rejection) keeps "timed out" a definite value
   // check, never confused with a genuine `judgeFn` rejection.
   const TIMEOUT = Symbol('judge-timeout');
@@ -110,34 +119,69 @@ export async function callJudge<T>(
  * Pull a JSON value out of a judge's raw text. A real model almost always wraps
  * its JSON in a ```` ```json ```` fence or surrounds it with prose; a bare
  * `JSON.parse` would then flag every real call as malformed. This relaxes the
- * WRAPPING only — it strips a fenced block, trims, and as a last resort slices
- * from the first `{`/`[` to the last `}`/`]` — then parses. The shape is still
- * validated strictly by the caller's schema; this never relaxes the shape.
+ * WRAPPING only, trying candidates in descending confidence:
+ *  1. the whole trimmed string,
+ *  2. the body of each fenced block in turn (so a leading non-JSON fence — e.g.
+ *     a ```` ```text ```` reasoning block — cannot shadow a later JSON fence),
+ *  3. a best-effort slice from the first `{`/`[` to the last closing bracket of
+ *     the SAME kind (so a stray bracket of the OTHER kind in the prose cannot
+ *     extend or corrupt the span).
+ * The first candidate that parses wins. The shape is still validated by the
+ * caller's schema afterwards; this never relaxes the shape.
  *
- * Throws `SyntaxError` when no JSON value can be recovered (the caller's
+ * Throws `SyntaxError` when no candidate yields parseable JSON (the caller's
  * `callJudge` turns that into a malformed-output degrade).
  */
 function extractJson(raw: string): unknown {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = (fenced?.[1] ?? raw).trim();
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    // Fall through to a best-effort slice between the outermost brackets.
+  const trimmed = raw.trim();
+  const candidates: string[] = [trimmed];
+  for (const match of trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) {
+    const body = match[1]?.trim();
+    if (body) candidates.push(body);
   }
-  const firstBracket = candidate.search(/[[{]/);
-  const lastCurly = candidate.lastIndexOf('}');
-  const lastSquare = candidate.lastIndexOf(']');
-  const lastBracket = Math.max(lastCurly, lastSquare);
-  if (firstBracket === -1 || lastBracket <= firstBracket) {
-    throw new SyntaxError('no JSON object or array found in judge output');
+  const sliced = sliceBalancedJson(trimmed);
+  if (sliced !== undefined) candidates.push(sliced);
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Try the next, lower-confidence candidate.
+    }
   }
-  return JSON.parse(candidate.slice(firstBracket, lastBracket + 1));
+  throw new SyntaxError('no JSON object or array found in judge output');
+}
+
+/**
+ * Slice the first JSON object or array out of free-form text: anchor on the
+ * first `{` or `[`, then pair it with the last `}` or `]` OF THE SAME KIND, so a
+ * stray bracket of the other kind elsewhere in the prose cannot extend the span.
+ * Returns `undefined` when no such span exists.
+ */
+function sliceBalancedJson(text: string): string | undefined {
+  const firstObject = text.indexOf('{');
+  const firstArray = text.indexOf('[');
+  let open = -1;
+  let close = -1;
+  if (firstObject !== -1 && (firstArray === -1 || firstObject < firstArray)) {
+    open = firstObject;
+    close = text.lastIndexOf('}');
+  } else if (firstArray !== -1) {
+    open = firstArray;
+    close = text.lastIndexOf(']');
+  }
+  if (open === -1 || close <= open) return undefined;
+  return text.slice(open, close + 1);
 }
 
 // ---------------------------------------------------------------------------
-// — Parsers (zod-strict on the target shape; malformed input throws → degrade)
+// — Parsers (zod-validated against the target shape; malformed input throws → degrade)
 // ---------------------------------------------------------------------------
+//
+// The schemas enforce the required fields and their value types. Following zod's
+// default, unrecognized extra keys are ignored rather than rejected — intentional
+// tolerance, since a real model may add commentary fields; only a missing/wrong
+// field or wrong value type degrades.
 
 const claimVerdictsSchema = z.array(z.object({ claim: z.string(), supported: z.boolean() }));
 const reverseQuestionsSchema = z.array(z.string());
@@ -156,6 +200,11 @@ function parseReverseQuestions(raw: string): string[] {
 
 function parseStatements(raw: string): AnswerCorrectnessStatement[] {
   return statementsSchema.parse(extractJson(raw));
+}
+
+/** Parse a boolean array whose length is not known caller-side (see below). */
+function parseFlags(raw: string): boolean[] {
+  return booleanFlagsSchema.parse(extractJson(raw));
 }
 
 /** Parse a boolean array and require it to line up one-to-one with the input. */
@@ -262,9 +311,9 @@ export function buildContextAttributionPrompt(input: {
 // — Judge tasks (build prompt → call → parse → outcome), one per scoring metric
 // ---------------------------------------------------------------------------
 //
-// Each task is one instance of the same {build prompt, parse with a strict
-// schema, call through `callJudge`} pattern — five instances of one verified
-// mechanism, not five separate mechanisms.
+// Each task is one instance of the same {build prompt, parse with a zod schema,
+// call through `callJudge`} pattern — five instances of one verified mechanism,
+// not five separate mechanisms.
 
 /** Extract atomic claims and per-claim support, feeding the faithfulness score. */
 export function judgeClaimSupport(
@@ -307,16 +356,20 @@ export function judgeStatementClassification(
   return callJudge(judgeFn, buildStatementClassificationPrompt(input), parseStatements, opts);
 }
 
-/** Judge whether each reference sentence is attributable to the context. */
+/**
+ * Judge whether each reference sentence is attributable to the context.
+ *
+ * Unlike {@link judgeContextUsefulness} — which knows the chunk count and so
+ * enforces a one-to-one length alignment — the reference answer is split into
+ * sentences by the judge, so there is no caller-side count to validate against.
+ * The returned flags are therefore positional only: their count IS the sentence
+ * count downstream. Verifying that count against an independent split is left to
+ * the orchestration/scoring layer.
+ */
 export function judgeContextAttribution(
   judgeFn: JudgeFn,
   input: { referenceAnswer: string; context: string },
   opts?: JudgeCallOptions,
 ): Promise<JudgeOutcome<boolean[]>> {
-  return callJudge(
-    judgeFn,
-    buildContextAttributionPrompt(input),
-    (raw) => booleanFlagsSchema.parse(extractJson(raw)),
-    opts,
-  );
+  return callJudge(judgeFn, buildContextAttributionPrompt(input), parseFlags, opts);
 }
