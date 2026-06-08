@@ -71,6 +71,19 @@ describe('faithfulness', () => {
       expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
     }
   });
+
+  it('treats malformed elements (null / missing / non-boolean supported) as not supported', () => {
+    const verdicts = [
+      claim('试用期为六个月。', true),
+      { claim: '缺少支撑字段。' } as unknown as ClaimVerdict,
+      null as unknown as ClaimVerdict,
+      { claim: '支撑值非布尔。', supported: 1 } as unknown as ClaimVerdict,
+    ];
+    const result = faithfulness(verdicts);
+    // Only the strictly-`true` element counts; the rest degrade to unsupported
+    // rather than throwing or inflating the score.
+    expect(result).toEqual({ score: 1 / 4, supportedClaims: 1, totalClaims: 4 });
+  });
 });
 
 describe('cosineSimilarity', () => {
@@ -128,6 +141,19 @@ describe('cosineSimilarity', () => {
       expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
     });
   }
+
+  it('throws EVAL_INVALID_METRIC_INPUT when an intermediate sum overflows to non-finite', () => {
+    // Each component is finite, but the sum of squares overflows to +Infinity,
+    // which would otherwise make the result a silent NaN.
+    let caught: unknown;
+    try {
+      cosineSimilarity([1e200, 1e200], [1e200, 1e200]);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(EvalFrameworkError);
+    expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+  });
 });
 
 describe('answerRelevance', () => {
@@ -181,6 +207,57 @@ describe('answerRelevance', () => {
     };
     expect(answerRelevance(input)).toEqual(answerRelevance(input));
   });
+
+  it('throws EVAL_INVALID_METRIC_INPUT for a null / non-object input', () => {
+    const bad = null as unknown as Parameters<typeof answerRelevance>[0];
+    expect(() => answerRelevance(bad)).toThrow(EvalFrameworkError);
+    try {
+      answerRelevance(bad);
+    } catch (e) {
+      expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    }
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT when queryEmbedding is not an array', () => {
+    const bad = {
+      queryEmbedding: null,
+      generatedQuestionEmbeddings: [[1, 0]],
+    } as unknown as Parameters<typeof answerRelevance>[0];
+    expect(() => answerRelevance(bad)).toThrow(EvalFrameworkError);
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT when generatedQuestionEmbeddings is not an array', () => {
+    const bad = {
+      queryEmbedding: [1, 0],
+      generatedQuestionEmbeddings: null,
+    } as unknown as Parameters<typeof answerRelevance>[0];
+    expect(() => answerRelevance(bad)).toThrow(EvalFrameworkError);
+  });
+
+  it('propagates EVAL_INVALID_METRIC_INPUT when a reverse question mismatches the query length', () => {
+    let caught: unknown;
+    try {
+      answerRelevance({ queryEmbedding: [1, 0], generatedQuestionEmbeddings: [[1, 0, 0]] });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(EvalFrameworkError);
+    expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+  });
+
+  it('propagates EVAL_INVALID_METRIC_INPUT for a non-finite reverse-question value', () => {
+    let caught: unknown;
+    try {
+      answerRelevance({
+        queryEmbedding: [1, 0],
+        generatedQuestionEmbeddings: [[Number.NaN, 0]],
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(EvalFrameworkError);
+    expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+  });
 });
 
 describe('contextPrecision', () => {
@@ -220,5 +297,14 @@ describe('contextPrecision', () => {
     } catch (e) {
       expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
     }
+  });
+
+  it('treats non-boolean truthy flags as not useful (strict true only)', () => {
+    const flags = [1, true, 'yes', undefined] as unknown as boolean[];
+    const result = contextPrecision(flags);
+    // Only index 1 is strictly `true`: precision@2 = 1/2, over 1 useful chunk.
+    expect(result.score).toBeCloseTo(0.5, 12);
+    expect(result.usefulCount).toBe(1);
+    expect(result.total).toBe(4);
   });
 });

@@ -66,9 +66,10 @@ export function faithfulness(verdicts: readonly ClaimVerdict[]): FaithfulnessRes
  * "no direction" carries no similarity signal.
  *
  * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when the
- *   inputs are not arrays, have different lengths, or contain a non-finite
- *   value (`NaN` / `±Infinity`). These are structural faults from injected data
- *   and must fail loudly rather than silently produce a meaningless number.
+ *   inputs are not arrays, have different lengths, contain a non-finite value
+ *   (`NaN` / `±Infinity`), or when an intermediate sum overflows to a non-finite
+ *   value. These are structural faults from injected data and must fail loudly
+ *   rather than silently produce a meaningless number.
  */
 export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
   if (!Array.isArray(a) || !Array.isArray(b)) {
@@ -99,6 +100,15 @@ export function cosineSimilarity(a: readonly number[], b: readonly number[]): nu
     normA += ai * ai;
     normB += bi * bi;
   }
+  // Individually-finite inputs can still overflow when summed (e.g. components
+  // near `Number.MAX_VALUE`), turning an accumulator into `±Infinity` and the
+  // result into `NaN`. Catch that here rather than returning a meaningless value.
+  if (!Number.isFinite(dot) || !Number.isFinite(normA) || !Number.isFinite(normB)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      'cosineSimilarity: intermediate sum overflowed to a non-finite value',
+    );
+  }
   if (normA === 0 || normB === 0) return 0;
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
@@ -115,15 +125,41 @@ export function cosineSimilarity(a: readonly number[], b: readonly number[]): nu
  * evasive ("noncommittal") answers is the caller's responsibility, not this
  * function's.
  *
- * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) propagated
- *   from {@link cosineSimilarity} when an embedding is malformed (e.g. a length
- *   mismatch against the query embedding, or a non-finite value).
+ * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when `input`
+ *   is not an object, or either embedding field is not an array, or (propagated
+ *   from {@link cosineSimilarity}) an embedding has a length mismatch against
+ *   the query embedding or contains a non-finite value. Like the other scoring
+ *   functions, these structural faults from injected data fail loudly here.
  */
 export function answerRelevance(input: AnswerRelevanceInput): AnswerRelevanceResult {
+  // `input` is provider-injected and not guaranteed by the static type at
+  // runtime, so guard its shape before destructuring (a raw `TypeError` would
+  // otherwise escape uncoded and bypass the `EVAL_INVALID_METRIC_INPUT` branch).
+  const raw = input as unknown;
+  if (raw === null || typeof raw !== 'object') {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `answerRelevance: expected an input object, got ${raw === null ? 'null' : typeof raw}`,
+    );
+  }
   const { queryEmbedding, generatedQuestionEmbeddings } = input;
+  if (!Array.isArray(queryEmbedding)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `answerRelevance: queryEmbedding must be an array, got ${typeof queryEmbedding}`,
+    );
+  }
+  if (!Array.isArray(generatedQuestionEmbeddings)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `answerRelevance: generatedQuestionEmbeddings must be an array, got ${typeof generatedQuestionEmbeddings}`,
+    );
+  }
   const perQuestionSimilarity: number[] = [];
   for (const questionEmbedding of generatedQuestionEmbeddings) {
-    perQuestionSimilarity.push(cosineSimilarity(questionEmbedding, queryEmbedding));
+    // Query first so a propagated length-mismatch message reads "(query vs
+    // question)"; cosine is symmetric, so the score is unaffected by the order.
+    perQuestionSimilarity.push(cosineSimilarity(queryEmbedding, questionEmbedding));
   }
   const score =
     perQuestionSimilarity.length === 0
@@ -135,13 +171,16 @@ export function answerRelevance(input: AnswerRelevanceInput): AnswerRelevanceRes
 /**
  * Context precision — order-sensitive average precision over a ranked list of
  * retrieved chunks, each flagged useful or not. Useful chunks that rank higher
- * contribute more, rewarding a retriever that puts the relevant context first
- * (Manning & Raghavan §8.4, average precision).
+ * contribute more, rewarding a retriever that puts the relevant context first.
+ * This follows the average-precision intuition (Manning & Raghavan §8.4),
+ * normalized over the useful chunks present in the provided ranked list — so the
+ * score reflects ordering within what was retrieved, not corpus-level recall.
  *
  * For each position `k` (1-indexed), `precision@k = (useful in first k) / k`.
- * The score is the mean of `precision@k` taken only at the positions that are
- * useful, divided by the total number of useful chunks. It is `0` when the list
- * is empty or contains no useful chunk.
+ * The score sums `precision@k` over only the useful positions and divides by the
+ * total number of useful chunks (i.e. the mean of `precision@k` across the
+ * useful positions). It is `0` when the list is empty or contains no useful
+ * chunk.
  *
  * A chunk counts as useful only when its flag is strictly `true`, so a
  * malformed (non-boolean) flag degrades to "not useful".
