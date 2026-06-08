@@ -92,6 +92,7 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
       expected?: unknown;
       category?: unknown;
       reason?: unknown;
+      referenceAnswer?: unknown;
     };
     if (typeof item.query !== 'string' || item.query.trim().length === 0) {
       throw new Error(`loadEvalSet: queries[${i}].query must be a non-empty string`);
@@ -140,6 +141,17 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
     const commentReason = commentReasons[i];
     const reason = inlineReason ?? commentReason;
     if (reason !== undefined) out.reason = reason;
+    // Optional gold reference answer. Only attach when present so existing eval
+    // sets stay byte-identical after a round-trip; when present it must be a
+    // non-empty string (a blank value is an authoring mistake, not "absent").
+    if (item.referenceAnswer !== undefined) {
+      if (typeof item.referenceAnswer !== 'string' || item.referenceAnswer.trim().length === 0) {
+        throw new Error(
+          `loadEvalSet: queries[${i}].referenceAnswer must be a non-empty string when present`,
+        );
+      }
+      out.referenceAnswer = item.referenceAnswer;
+    }
     return out;
   });
 

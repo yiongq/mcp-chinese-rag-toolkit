@@ -66,6 +66,13 @@ export interface EvalQuery {
    * Inline `reason:` YAML field takes precedence over the comment fallback.
    */
   reason?: string;
+  /**
+   * Optional gold reference answer for this query. Reference-based answer
+   * metrics (e.g. answer correctness / context recall) consume it; retrieval
+   * scoring and reference-free metrics ignore it entirely. Adding it is purely
+   * additive — existing eval sets and callers that never set it are unaffected.
+   */
+  referenceAnswer?: string;
 }
 
 /** Top-level eval-set.yml document shape. */

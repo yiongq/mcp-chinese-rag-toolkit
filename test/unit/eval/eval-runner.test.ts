@@ -151,6 +151,38 @@ describe('loadEvalSet', () => {
     expect(set.description).toBe('smoke');
     expect(set.queries[0]?.category).toBe('leave-policy');
   });
+
+  it('attaches referenceAnswer when present as a non-empty string', () => {
+    const body = `version: v1\nqueries:\n  - query: 试用期多久\n    referenceAnswer: 试用期为六个月。\n    expected:\n      - source: bench-fixture.md\n`;
+    const p = writeYaml('ref-answer.yml', body);
+    const set = loadEvalSet(p);
+    expect(set.queries[0]?.referenceAnswer).toBe('试用期为六个月。');
+  });
+
+  it('omits referenceAnswer entirely when absent (no undefined key)', () => {
+    const body = `version: v1\nqueries:\n  - query: a\n    expected:\n      - source: x\n`;
+    const p = writeYaml('no-ref-answer.yml', body);
+    const set = loadEvalSet(p);
+    const q = set.queries[0];
+    expect(q && 'referenceAnswer' in q).toBe(false);
+  });
+
+  it('throws when referenceAnswer is present but blank or the wrong type', () => {
+    const blank = writeYaml(
+      'blank-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: '   '\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(blank)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+    const wrongType = writeYaml(
+      'num-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: 42\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(wrongType)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+  });
 });
 
 describe('scoreQuery', () => {
