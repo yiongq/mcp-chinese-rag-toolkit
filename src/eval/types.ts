@@ -2,6 +2,10 @@
 // — Eval Framework + RAG Eval CI Gate types
 // ---------------------------------------------------------------------------
 
+// `import type` is erased at compile time (verbatimModuleSyntax), so referencing
+// the error core here introduces no runtime import cycle with `errors.ts`.
+import type { EvalErrorCore } from './errors.js';
+
 /**
  * Result row returned by an evaluatable `searchFn`. Field naming mirrors
  * `HybridHit` / `RerankedHit` (camelCase wire convention). All metric fields
@@ -310,3 +314,43 @@ export interface NdcgResult {
   /** Effective rank cutoff used: the requested `k`, or the list length by default. */
   k: number;
 }
+
+// ---------------------------------------------------------------------------
+// — LLM-facing judge layer (impure boundary: prompt → call → parse → degrade)
+// ---------------------------------------------------------------------------
+//
+// The functions in `llm-judge.ts` are the impure counterpart to the pure
+// scoring layer above: they build a prompt, call an injected judge, and parse
+// the model's text into the already-structured inputs the scoring functions
+// consume (claim verdicts, reverse questions, useful/attribution flags,
+// classified statements). Isolating the model's non-determinism and malformed
+// output in this thin, mockable layer is what keeps the scoring layer pure.
+// The contracts below are that layer's hand-off surface, shared with the
+// orchestration step that wires a real judge (or a deterministic mock in CI).
+
+/**
+ * A judge function: takes a fully-constructed prompt, returns the model's raw
+ * text response. Provider-agnostic, PURE eval semantics — the signature carries
+ * no business / envelope fields. The caller wires a real language model (or a
+ * deterministic mock in CI) behind this single string-in / string-out shape.
+ */
+export type JudgeFn = (prompt: string) => Promise<string>;
+
+/** Options for a judge call. */
+export interface JudgeCallOptions {
+  /**
+   * Wall-clock budget in ms before the call degrades to a timeout.
+   * @default DEFAULT_JUDGE_TIMEOUT_MS
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * Outcome of a judge call: either a parsed value, or a DEGRADE carrying the lean
+ * error core. A malformed judge output or a timeout degrades here — the call
+ * never throws for those two conditions (a non-timeout rejection from the judge
+ * itself still propagates; that is an infrastructure fault, not a judge-output
+ * fault). `value` only ever holds the structured input the scoring layer
+ * consumes — never citations or confidence.
+ */
+export type JudgeOutcome<T> = { ok: true; value: T } | { ok: false; error: EvalErrorCore };

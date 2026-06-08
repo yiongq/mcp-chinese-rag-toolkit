@@ -22,16 +22,49 @@ export const EVAL_ERROR_CODES = {
   EVAL_CONTENT_MISSING: 'EVAL_CONTENT_MISSING',
   /**
    * A scoring function received a structurally invalid numeric input — e.g. two
-   * embeddings of different length, or a vector containing a non-finite value
-   * (`NaN` / `±Infinity`). These come from a provider-injected embedding
-   * function and are not runtime type-checked, so the metric fails loudly here
-   * rather than silently producing a meaningless number.
+   * embeddings of different length, or a vector containing a non-finite
+   * (`NaN` / `±Infinity`) or negative value. These come from a provider-injected
+   * embedding function and are not runtime type-checked, so the metric fails
+   * loudly here rather than silently producing a meaningless number.
    */
   EVAL_INVALID_METRIC_INPUT: 'EVAL_INVALID_METRIC_INPUT',
+  /**
+   * A judge returned text that could not be parsed into the expected structured
+   * shape — not JSON, valid JSON of the wrong shape, or a wrong value type.
+   * Carried by a DEGRADED judge outcome (returned, not thrown). Not retryable:
+   * the same prompt against the same judge will most likely be malformed again.
+   */
+  EVAL_JUDGE_MALFORMED_OUTPUT: 'EVAL_JUDGE_MALFORMED_OUTPUT',
+  /**
+   * A judge call did not resolve within its wall-clock budget. Carried by a
+   * DEGRADED judge outcome (returned, not thrown). Retryable: a timeout is
+   * transient, so a later attempt could plausibly succeed.
+   */
+  EVAL_JUDGE_TIMEOUT: 'EVAL_JUDGE_TIMEOUT',
 } as const;
 
 /** Union of the registered eval error codes. */
 export type EvalErrorCode = (typeof EVAL_ERROR_CODES)[keyof typeof EVAL_ERROR_CODES];
+
+/**
+ * The lean error core carried by a DEGRADED judge outcome — RETURNED inside an
+ * outcome object, never thrown. Deliberately NOT the MCP tool error envelope: a
+ * judge degrade has no citations, confidence, or suggestions, only a stable
+ * code, a diagnostic message, and whether a retry could plausibly help.
+ *
+ * The field is `error` (the stable code), distinct on purpose from
+ * {@link EvalFrameworkError.code} (the THROWN shape). One is a returned degrade,
+ * the other is a thrown fault; do not collapse them — `EvalFrameworkError`
+ * extends `Error` and would throw, which a degrade must never do.
+ */
+export interface EvalErrorCore {
+  /** Stable SCREAMING_SNAKE error code. */
+  error: EvalErrorCode;
+  /** Human-readable diagnostic (no PII, no business fields). */
+  message: string;
+  /** Whether retrying could plausibly help (timeout → true; malformed → false). */
+  retryable: boolean;
+}
 
 /**
  * Error thrown by the eval framework. Carries a stable {@link EvalErrorCode}

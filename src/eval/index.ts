@@ -8,7 +8,7 @@ export {
   resolveHitRateMin,
   writeArtifacts,
 } from './ci-helper.js';
-export type { EvalErrorCode } from './errors.js';
+export type { EvalErrorCode, EvalErrorCore } from './errors.js';
 export {
   assertContentPopulated,
   EVAL_ERROR_CODES,
@@ -24,6 +24,16 @@ export {
   cosineSimilarity,
   faithfulness,
 } from './judges.js';
+export {
+  callJudge,
+  DEFAULT_JUDGE_TIMEOUT_MS,
+  JUDGE_PROMPT_VERSION,
+  judgeClaimSupport,
+  judgeContextAttribution,
+  judgeContextUsefulness,
+  judgeReverseQuestions,
+  judgeStatementClassification,
+} from './llm-judge.js';
 export type {
   AnswerCorrectnessResult,
   AnswerCorrectnessStatement,
@@ -42,5 +52,8 @@ export type {
   EvalSet,
   EvalSummary,
   FaithfulnessResult,
+  JudgeCallOptions,
+  JudgeFn,
+  JudgeOutcome,
   NdcgResult,
 } from './types.js';
