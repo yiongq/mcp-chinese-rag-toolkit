@@ -228,3 +228,85 @@ export interface ContextPrecisionResult {
   /** Total number of retrieved chunks considered. */
   total: number;
 }
+
+// ---------------------------------------------------------------------------
+// — Reference-based answer-quality scoring + ranking gain (deterministic)
+// ---------------------------------------------------------------------------
+//
+// These contracts feed the scoring functions that DO compare an answer against
+// a gold reference (answer correctness, context recall) plus a graded-relevance
+// ranking metric (nDCG). As with the reference-free family, the language-model
+// step that classifies each answer statement, judges whether each reference
+// sentence is attributable to the retrieved context, or assigns a graded
+// relevance label happens upstream in the caller; the scoring functions consume
+// these already-extracted, structured inputs and stay pure math (no model
+// calls, no embedding calls, no I/O, same input → same output).
+
+/**
+ * Classification of a single answer statement against the gold reference, as
+ * decided upstream by a language model or a human:
+ *  - `'TP'` (true positive): present in both the answer and the reference.
+ *  - `'FP'` (false positive): present in the answer but not the reference.
+ *  - `'FN'` (false negative): present in the reference but missing from the answer.
+ */
+export type CorrectnessLabel = 'TP' | 'FP' | 'FN';
+
+/**
+ * One classified statement consumed by {@link answerCorrectness}: the statement
+ * text (informational, aids auditing) paired with its TP/FP/FN classification.
+ */
+export interface AnswerCorrectnessStatement {
+  /** The statement text (informational; aids auditing, not used in scoring). */
+  statement: string;
+  /** Whether this statement is a true / false positive or a false negative. */
+  label: CorrectnessLabel;
+}
+
+/**
+ * Result of {@link answerCorrectness}. `score` is the statement-level F1; the
+ * precision/recall and raw TP/FP/FN counts are returned alongside so a reviewer
+ * can audit exactly how the score was reached.
+ */
+export interface AnswerCorrectnessResult {
+  /** Statement-level F1 ∈ [0, 1]; `0` when there are no true positives. */
+  score: number;
+  /** `tp / (tp + fp)` ∈ [0, 1]; `0` when there are no positives. */
+  precision: number;
+  /** `tp / (tp + fn)` ∈ [0, 1]; `0` when there is nothing to recall. */
+  recall: number;
+  /** Statements present in both the answer and the reference. */
+  truePositives: number;
+  /** Statements present in the answer but not the reference. */
+  falsePositives: number;
+  /** Statements present in the reference but missing from the answer. */
+  falseNegatives: number;
+}
+
+/**
+ * Result of {@link contextRecall}. `score` is the attributed fraction; the
+ * attributed/total sentence counts are returned for auditing.
+ */
+export interface ContextRecallResult {
+  /** Attributed fraction ∈ [0, 1]; `0` when there are no sentences. */
+  score: number;
+  /** Number of reference sentences attributable to the retrieved context. */
+  attributedSentences: number;
+  /** Total number of reference sentences considered. */
+  totalSentences: number;
+}
+
+/**
+ * Result of {@link ndcg}. `score` is the normalized discounted cumulative gain;
+ * the raw `dcg` / `idcg` and the effective cutoff `k` are returned so a reviewer
+ * can audit the normalization.
+ */
+export interface NdcgResult {
+  /** Normalized DCG ∈ [0, 1]; `0` when the ideal gain is `0` (empty / all-zero). */
+  score: number;
+  /** Discounted cumulative gain of the provided ranking, truncated at `k`. */
+  dcg: number;
+  /** Discounted cumulative gain of the ideal (descending) ranking, truncated at `k`. */
+  idcg: number;
+  /** Effective rank cutoff used: the requested `k`, or the list length by default. */
+  k: number;
+}

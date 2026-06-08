@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { EvalFrameworkError } from '../../../src/eval/errors.js';
 import {
+  answerCorrectness,
   answerRelevance,
   contextPrecision,
+  contextRecall,
   cosineSimilarity,
   faithfulness,
 } from '../../../src/eval/judges.js';
-import type { ClaimVerdict } from '../../../src/eval/types.js';
+import type { AnswerCorrectnessStatement, ClaimVerdict } from '../../../src/eval/types.js';
 
 // Small offline fixtures. Claim text is neutral Chinese so the suite needs no
 // model, no embeddings download, and no network. Embeddings are hand-written
@@ -306,5 +308,153 @@ describe('contextPrecision', () => {
     expect(result.score).toBeCloseTo(0.5, 12);
     expect(result.usefulCount).toBe(1);
     expect(result.total).toBe(4);
+  });
+});
+
+// A statement classified against the gold reference. Text is neutral Chinese so
+// the suite needs no model and no network; only the label drives the score.
+function stmt(
+  statement: string,
+  label: AnswerCorrectnessStatement['label'],
+): AnswerCorrectnessStatement {
+  return { statement, label };
+}
+
+describe('answerCorrectness', () => {
+  it('all true positives → F1 / precision / recall all 1', () => {
+    const result = answerCorrectness([stmt('试用期为六个月。', 'TP'), stmt('周末双休。', 'TP')]);
+    expect(result).toEqual({
+      score: 1,
+      precision: 1,
+      recall: 1,
+      truePositives: 2,
+      falsePositives: 0,
+      falseNegatives: 0,
+    });
+  });
+
+  it('all false negatives → 0 (nothing recalled)', () => {
+    const result = answerCorrectness([stmt('缺失论断一。', 'FN'), stmt('缺失论断二。', 'FN')]);
+    expect(result.score).toBe(0);
+    expect(result.precision).toBe(0);
+    expect(result.recall).toBe(0);
+    expect(result.falseNegatives).toBe(2);
+  });
+
+  it('all false positives → 0 (nothing correct)', () => {
+    const result = answerCorrectness([stmt('编造论断一。', 'FP'), stmt('编造论断二。', 'FP')]);
+    expect(result.score).toBe(0);
+    expect(result.precision).toBe(0);
+    expect(result.recall).toBe(0);
+    expect(result.falsePositives).toBe(2);
+  });
+
+  it('mixed 2 TP / 1 FP / 1 FN → F1 = 2/3 with auditable counts', () => {
+    const result = answerCorrectness([
+      stmt('试用期为六个月。', 'TP'),
+      stmt('每年享有带薪年假。', 'TP'),
+      stmt('公司提供免费午餐。', 'FP'),
+      stmt('转正需主管评估。', 'FN'),
+    ]);
+    // F1 = 2·tp / (2·tp + fp + fn) = 4 / (4 + 1 + 1) = 2/3.
+    expect(result.score).toBeCloseTo(2 / 3, 12);
+    expect(result.precision).toBeCloseTo(2 / 3, 12); // 2 / (2 + 1)
+    expect(result.recall).toBeCloseTo(2 / 3, 12); // 2 / (2 + 1)
+    expect(result.truePositives).toBe(2);
+    expect(result.falsePositives).toBe(1);
+    expect(result.falseNegatives).toBe(1);
+  });
+
+  it('empty statement list → 0', () => {
+    expect(answerCorrectness([])).toEqual({
+      score: 0,
+      precision: 0,
+      recall: 0,
+      truePositives: 0,
+      falsePositives: 0,
+      falseNegatives: 0,
+    });
+  });
+
+  it('no true positives (only FP + FN) → 0', () => {
+    const result = answerCorrectness([stmt('编造论断。', 'FP'), stmt('遗漏论断。', 'FN')]);
+    expect(result.score).toBe(0);
+    expect(result.truePositives).toBe(0);
+  });
+
+  it('ignores statements with an unknown / missing label rather than miscounting', () => {
+    const result = answerCorrectness([
+      stmt('试用期为六个月。', 'TP'),
+      { statement: '标签未知。', label: 'XX' } as unknown as AnswerCorrectnessStatement,
+      null as unknown as AnswerCorrectnessStatement,
+    ]);
+    // Only the single TP counts; the rest fall through every bucket.
+    expect(result).toEqual({
+      score: 1,
+      precision: 1,
+      recall: 1,
+      truePositives: 1,
+      falsePositives: 0,
+      falseNegatives: 0,
+    });
+  });
+
+  it('is deterministic: same input yields an equal result twice', () => {
+    const statements = [stmt('a', 'TP'), stmt('b', 'FP'), stmt('c', 'FN')];
+    expect(answerCorrectness(statements)).toEqual(answerCorrectness(statements));
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT for a non-array input', () => {
+    const bad = null as unknown as AnswerCorrectnessStatement[];
+    expect(() => answerCorrectness(bad)).toThrow(EvalFrameworkError);
+    try {
+      answerCorrectness(bad);
+    } catch (e) {
+      expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    }
+  });
+});
+
+describe('contextRecall', () => {
+  const cases: Array<{ label: string; flags: boolean[]; score: number }> = [
+    { label: '[true] → 1', flags: [true], score: 1 },
+    { label: '[false] → 0', flags: [false], score: 0 },
+    { label: '[true, false] → 0.5', flags: [true, false], score: 0.5 },
+    { label: '[true, true, true] → 1', flags: [true, true, true], score: 1 },
+    { label: '[false, false] → 0', flags: [false, false], score: 0 },
+    { label: '[] → 0', flags: [], score: 0 },
+  ];
+
+  for (const c of cases) {
+    it(c.label, () => {
+      const result = contextRecall(c.flags);
+      expect(result.score).toBeCloseTo(c.score, 12);
+      expect(result.totalSentences).toBe(c.flags.length);
+      expect(result.attributedSentences).toBe(c.flags.filter((f) => f === true).length);
+    });
+  }
+
+  it('treats non-boolean truthy flags as not attributable (strict true only)', () => {
+    const flags = [1, true, 'yes'] as unknown as boolean[];
+    const result = contextRecall(flags);
+    // Only index 1 is strictly `true`: 1 of 3 sentences attributed.
+    expect(result.score).toBeCloseTo(1 / 3, 12);
+    expect(result.attributedSentences).toBe(1);
+    expect(result.totalSentences).toBe(3);
+  });
+
+  it('is deterministic: same input yields an equal result twice', () => {
+    const flags = [true, false, true];
+    expect(contextRecall(flags)).toEqual(contextRecall(flags));
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT for a non-array input', () => {
+    const bad = undefined as unknown as boolean[];
+    expect(() => contextRecall(bad)).toThrow(EvalFrameworkError);
+    try {
+      contextRecall(bad);
+    } catch (e) {
+      expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    }
   });
 });

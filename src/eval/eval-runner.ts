@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Document } from 'yaml';
 import { isMap, isScalar, parseDocument } from 'yaml';
 
+import { evalError } from './errors.js';
 import type {
   EvalExpected,
   EvalQuery,
@@ -11,6 +12,7 @@ import type {
   EvalSearchResult,
   EvalSet,
   EvalSummary,
+  NdcgResult,
 } from './types.js';
 
 /**
@@ -259,9 +261,90 @@ export function scoreQuery(
 }
 
 /**
+ * Sum of discounted gains over the first `k` positions of a ranking, using the
+ * standard linear gain with a 1-indexed log2 position discount:
+ * `Σ gain(i) / log2(i + 1)`. Inputs are assumed already validated as finite.
+ */
+function discountedCumulativeGain(gains: readonly number[], k: number): number {
+  let sum = 0;
+  const limit = Math.min(k, gains.length);
+  for (let i = 0; i < limit; i += 1) {
+    const gain = gains[i];
+    // `gains` is pre-validated finite, but `noUncheckedIndexedAccess` still
+    // types the read as `number | undefined`; guard to satisfy it.
+    if (gain === undefined) continue;
+    // 0-indexed loop variable `i` maps to 1-indexed position `i + 1`, so the
+    // discount is `1 / log2((i + 1) + 1)` — position 1 gets `1 / log2(2) = 1`.
+    sum += gain / Math.log2(i + 2);
+  }
+  return sum;
+}
+
+/**
+ * nDCG@k — Normalized Discounted Cumulative Gain over a ranked list of graded
+ * relevance labels. A retrieval (information-retrieval) metric that complements
+ * the binary Hit Rate@K / MRR@K: instead of hit-or-miss it rewards putting the
+ * MORE relevant results first, where each position's gain is discounted by its
+ * rank (Järvelin–Kekäläinen 2002; matches scikit-learn's `ndcg_score` default).
+ *
+ * ```
+ * discount(i) = 1 / log2(i + 1)                       // 1-indexed; position 1 → 1
+ * DCG@k  = Σ_{i=1..min(k,N)} gains[i-1] · discount(i)
+ * IDCG@k = the same sum over gains sorted descending  // the best achievable order
+ * score  = idcg === 0 ? 0 : dcg / idcg                // ∈ [0, 1]
+ * ```
+ *
+ * `gains` is the graded relevance of each result in retrieved order; labels are
+ * expected to be `≥ 0` (e.g. `{0, 1, 2, 3}`). `opts.k` truncates the ranking to
+ * its first `k` positions; it defaults to the full list length. An empty list
+ * and an all-zero list both score `0` (there is no ideal gain to normalize by).
+ *
+ * Uses the LINEAR gain `gains[i]`; the exponential variant `2^gains[i] − 1`
+ * (which weights highly-relevant results more steeply) is a one-line swap if a
+ * calibration later calls for it.
+ *
+ * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when `gains`
+ *   is not an array, contains a non-finite value (`NaN` / `±Infinity`), or when
+ *   `opts.k` is provided but is not a positive integer. Graded labels come from
+ *   injected / hand-authored data and are not guaranteed by the static type at
+ *   runtime, so these structural faults fail loudly rather than silently produce
+ *   a meaningless number.
+ */
+export function ndcg(gains: readonly number[], opts?: { k?: number }): NdcgResult {
+  if (!Array.isArray(gains)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `ndcg: expected an array of graded relevance gains, got ${typeof gains}`,
+    );
+  }
+  for (let i = 0; i < gains.length; i += 1) {
+    const gain = gains[i];
+    if (gain === undefined || !Number.isFinite(gain)) {
+      throw evalError(
+        'EVAL_INVALID_METRIC_INPUT',
+        `ndcg: gains contains a non-finite value at index ${i}`,
+      );
+    }
+  }
+  const requestedK = opts?.k;
+  if (requestedK !== undefined && (!Number.isInteger(requestedK) || requestedK < 1)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `ndcg: opts.k must be a positive integer when provided, got ${String(requestedK)}`,
+    );
+  }
+  const k = requestedK ?? gains.length;
+  const dcg = discountedCumulativeGain(gains, k);
+  const ideal = [...gains].sort((a, b) => b - a);
+  const idcg = discountedCumulativeGain(ideal, k);
+  const score = idcg === 0 ? 0 : dcg / idcg;
+  return { score, dcg, idcg, k };
+}
+
+/**
  * Run an eval set against a `searchFn`, returning the full {@link EvalSummary}
  * for serialization by ci-helper.ts. Provider-injection — toolkit does NOT
- * bind to any specific MCP tool (a downstream consumer package / a downstream consumer package
+ * bind to any specific MCP tool (a downstream consumer package / third-party
  * each wire their own).
  *
  * Hit Rate@K is defined as `hits / totalQueries`; MRR@K is the average of

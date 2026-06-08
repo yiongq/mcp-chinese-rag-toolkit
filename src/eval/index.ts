@@ -15,18 +15,24 @@ export {
   EvalFrameworkError,
   evalError,
 } from './errors.js';
-export { DEFAULT_EVAL_TOP_K, loadEvalSet, runEval, scoreQuery } from './eval-runner.js';
+export { DEFAULT_EVAL_TOP_K, loadEvalSet, ndcg, runEval, scoreQuery } from './eval-runner.js';
 export {
+  answerCorrectness,
   answerRelevance,
   contextPrecision,
+  contextRecall,
   cosineSimilarity,
   faithfulness,
 } from './judges.js';
 export type {
+  AnswerCorrectnessResult,
+  AnswerCorrectnessStatement,
   AnswerRelevanceInput,
   AnswerRelevanceResult,
   ClaimVerdict,
   ContextPrecisionResult,
+  ContextRecallResult,
+  CorrectnessLabel,
   EvalExpected,
   EvalQuery,
   EvalQueryResult,
@@ -36,4 +42,5 @@ export type {
   EvalSet,
   EvalSummary,
   FaithfulnessResult,
+  NdcgResult,
 } from './types.js';

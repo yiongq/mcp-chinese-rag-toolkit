@@ -4,9 +4,11 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { EvalFrameworkError } from '../../../src/eval/errors.js';
 import {
   DEFAULT_EVAL_TOP_K,
   loadEvalSet,
+  ndcg,
   runEval,
   scoreQuery,
 } from '../../../src/eval/eval-runner.js';
@@ -476,4 +478,108 @@ describe('runEval', () => {
     expect(summary.perQuery[0]?.error).toMatch(/result\[0\] without a string 'source'/);
     expect(summary.hitRate).toBe(0);
   });
+});
+
+describe('ndcg', () => {
+  it('scores a perfectly-ordered ranking as 1', () => {
+    const result = ndcg([3, 2, 1]);
+    expect(result.score).toBe(1);
+    expect(result.dcg).toBeCloseTo(result.idcg, 12);
+    expect(result.k).toBe(3);
+  });
+
+  it('scores a single-element ranking as 1', () => {
+    const result = ndcg([2]);
+    expect(result.score).toBe(1);
+    expect(result.k).toBe(1);
+  });
+
+  it('penalizes a reverse-ordered ranking below 1 (known closed form)', () => {
+    const result = ndcg([1, 2, 3]);
+    // DCG  = 1/log2(2) + 2/log2(3) + 3/log2(4)
+    // IDCG = 3/log2(2) + 2/log2(3) + 1/log2(4)  (ideal descending order)
+    const dcg = 1 / Math.log2(2) + 2 / Math.log2(3) + 3 / Math.log2(4);
+    const idcg = 3 / Math.log2(2) + 2 / Math.log2(3) + 1 / Math.log2(4);
+    expect(result.dcg).toBeCloseTo(dcg, 12);
+    expect(result.idcg).toBeCloseTo(idcg, 12);
+    expect(result.score).toBeCloseTo(dcg / idcg, 12);
+    expect(result.score).toBeLessThan(1);
+  });
+
+  it('ranks a front-loaded ordering above a back-loaded one (graded-label contrast)', () => {
+    const front = ndcg([3, 2, 1]);
+    const back = ndcg([1, 2, 3]);
+    expect(front.score).toBeGreaterThan(back.score);
+  });
+
+  it('returns 0 for an all-zero-gain ranking (no ideal gain to normalize by)', () => {
+    const result = ndcg([0, 0, 0]);
+    expect(result.score).toBe(0);
+    expect(result.idcg).toBe(0);
+  });
+
+  it('returns all-zero auditable fields for an empty ranking', () => {
+    expect(ndcg([])).toEqual({ score: 0, dcg: 0, idcg: 0, k: 0 });
+  });
+
+  it('truncates the ranking at opts.k, changing the score', () => {
+    // Relevant items sit at both ends; cutting to the first position scores a
+    // perfect 1, while the full list dilutes with a discounted late hit.
+    const atOne = ndcg([3, 0, 0, 3], { k: 1 });
+    expect(atOne.score).toBe(1);
+    expect(atOne.k).toBe(1);
+    const full = ndcg([3, 0, 0, 3], { k: 4 });
+    expect(full.k).toBe(4);
+    expect(full.score).toBeLessThan(1);
+    expect(full.score).not.toBeCloseTo(atOne.score, 6);
+  });
+
+  it('is deterministic: same input yields an equal result twice', () => {
+    const gains = [2, 0, 3, 1];
+    expect(ndcg(gains)).toEqual(ndcg(gains));
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT for a non-array input', () => {
+    const bad = null as unknown as number[];
+    expect(() => ndcg(bad)).toThrow(EvalFrameworkError);
+    try {
+      ndcg(bad);
+    } catch (e) {
+      expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    }
+  });
+
+  const nonFiniteCases: Array<{ label: string; gains: number[] }> = [
+    { label: 'NaN', gains: [1, Number.NaN, 2] },
+    { label: '+Infinity', gains: [Number.POSITIVE_INFINITY, 1] },
+    { label: '-Infinity', gains: [1, Number.NEGATIVE_INFINITY] },
+  ];
+  for (const c of nonFiniteCases) {
+    it(`throws EVAL_INVALID_METRIC_INPUT on a ${c.label} gain`, () => {
+      let caught: unknown;
+      try {
+        ndcg(c.gains);
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(EvalFrameworkError);
+      expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    });
+  }
+
+  const badKCases: Array<{ label: string; k: number }> = [
+    { label: 'zero', k: 0 },
+    { label: 'negative', k: -1 },
+    { label: 'non-integer', k: 1.5 },
+  ];
+  for (const c of badKCases) {
+    it(`throws EVAL_INVALID_METRIC_INPUT when opts.k is ${c.label}`, () => {
+      expect(() => ndcg([1, 2, 3], { k: c.k })).toThrow(EvalFrameworkError);
+      try {
+        ndcg([1, 2, 3], { k: c.k });
+      } catch (e) {
+        expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+      }
+    });
+  }
 });

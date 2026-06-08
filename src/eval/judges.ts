@@ -1,14 +1,16 @@
 // ---------------------------------------------------------------------------
-// — Reference-free answer-quality scoring (RAGAS metric family, pure math)
+// — Answer-quality scoring (RAGAS metric family, pure math)
 // ---------------------------------------------------------------------------
 //
 // faithfulness / answerRelevance / contextPrecision score answer quality
-// WITHOUT a gold reference. They are intentionally pure: deterministic (same
-// input → same output), synchronous, free of I/O, free of model calls and
-// embedding calls. Each consumes an already-extracted, structured input (see
-// the contract types in `types.ts`) — the language-model extraction (splitting
-// an answer into claims, generating reverse questions, judging chunk
-// usefulness) and the embedding of text both happen upstream in the caller.
+// WITHOUT a gold reference; answerCorrectness / contextRecall score it AGAINST
+// a gold reference. They are all intentionally pure: deterministic (same input
+// → same output), synchronous, free of I/O, free of model calls and embedding
+// calls. Each consumes an already-extracted, structured input (see the contract
+// types in `types.ts`) — the language-model extraction (splitting an answer
+// into claims, generating reverse questions, judging chunk usefulness,
+// classifying statements against the reference, judging sentence attribution)
+// and the embedding of text both happen upstream in the caller.
 //
 // This separation is what lets the metric formulas be tested offline with no
 // API keys and no network, and keeps the scoring layer independent of which
@@ -16,10 +18,13 @@
 
 import { evalError } from './errors.js';
 import type {
+  AnswerCorrectnessResult,
+  AnswerCorrectnessStatement,
   AnswerRelevanceInput,
   AnswerRelevanceResult,
   ClaimVerdict,
   ContextPrecisionResult,
+  ContextRecallResult,
   FaithfulnessResult,
 } from './types.js';
 
@@ -206,4 +211,103 @@ export function contextPrecision(usefulFlags: readonly boolean[]): ContextPrecis
   }
   const score = usefulCount === 0 ? 0 : precisionSum / usefulCount;
   return { score, usefulCount, total };
+}
+
+/**
+ * Answer correctness — the statement-level F1 between an answer and a gold
+ * reference. Each statement is classified upstream as a true positive (in both),
+ * a false positive (only in the answer), or a false negative (only in the
+ * reference); this function aggregates those labels into precision, recall, and
+ * their harmonic mean.
+ *
+ * ```
+ * precision = tp / (tp + fp)            // 0 when there are no positives
+ * recall    = tp / (tp + fn)            // 0 when there is nothing to recall
+ * score(F1) = tp / (tp + 0.5·(fp + fn)) // = 2·tp / (2·tp + fp + fn); 0 when tp = 0
+ * ```
+ *
+ * The score is the FACTUAL F1 component only. The full RAGAS answer-correctness
+ * metric blends it with answer–reference semantic similarity
+ * (`0.75·F1 + 0.25·similarity`); the similarity term needs an embedding, so it
+ * is left to the caller to combine and this function stays embedding-free.
+ *
+ * A statement counts toward a bucket only when its `label` is exactly `'TP'`,
+ * `'FP'`, or `'FN'`; a missing or unrecognized label from injected data is
+ * ignored rather than throwing or distorting the score. An empty list (or one
+ * with no true positives) scores `0`.
+ *
+ * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when
+ *   `statements` is not an array — the input comes from injected data and is not
+ *   guaranteed by the static type at runtime.
+ */
+export function answerCorrectness(
+  statements: readonly AnswerCorrectnessStatement[],
+): AnswerCorrectnessResult {
+  if (!Array.isArray(statements)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `answerCorrectness: expected an array of classified statements, got ${typeof statements}`,
+    );
+  }
+  let truePositives = 0;
+  let falsePositives = 0;
+  let falseNegatives = 0;
+  for (const s of statements) {
+    switch (s?.label) {
+      case 'TP':
+        truePositives += 1;
+        break;
+      case 'FP':
+        falsePositives += 1;
+        break;
+      case 'FN':
+        falseNegatives += 1;
+        break;
+      // Any other / missing label is a malformed element: ignore it rather than
+      // counting it, matching the strict-membership discipline of the other
+      // scoring functions.
+    }
+  }
+  const precision =
+    truePositives + falsePositives === 0 ? 0 : truePositives / (truePositives + falsePositives);
+  const recall =
+    truePositives + falseNegatives === 0 ? 0 : truePositives / (truePositives + falseNegatives);
+  const score =
+    truePositives === 0
+      ? 0
+      : truePositives / (truePositives + 0.5 * (falsePositives + falseNegatives));
+  return { score, precision, recall, truePositives, falsePositives, falseNegatives };
+}
+
+/**
+ * Context recall — the fraction of reference sentences that the retrieved
+ * context can account for. Each reference sentence is judged upstream as
+ * attributable to the context (or not); this function aggregates those flags.
+ *
+ * `score = attributedSentences / totalSentences`, or `0` when there are no
+ * sentences (the empty-list and all-unattributed cases both score `0`, matching
+ * the common reference implementation).
+ *
+ * A sentence counts as attributed only when its flag is strictly `true`, so a
+ * missing or non-boolean flag from injected data degrades to "not attributable"
+ * rather than inflating the score.
+ *
+ * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when
+ *   `attributedFlags` is not an array — the input comes from injected data and
+ *   is not guaranteed by the static type at runtime.
+ */
+export function contextRecall(attributedFlags: readonly boolean[]): ContextRecallResult {
+  if (!Array.isArray(attributedFlags)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `contextRecall: expected an array of attribution flags, got ${typeof attributedFlags}`,
+    );
+  }
+  let attributedSentences = 0;
+  for (const flag of attributedFlags) {
+    if (flag === true) attributedSentences += 1;
+  }
+  const totalSentences = attributedFlags.length;
+  const score = totalSentences === 0 ? 0 : attributedSentences / totalSentences;
+  return { score, attributedSentences, totalSentences };
 }

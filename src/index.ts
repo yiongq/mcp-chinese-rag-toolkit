@@ -7,10 +7,14 @@ export const TOOLKIT_NAME = 'mcp-chinese-rag-toolkit' as const;
 export type ToolkitName = typeof TOOLKIT_NAME;
 
 export type {
+  AnswerCorrectnessResult,
+  AnswerCorrectnessStatement,
   AnswerRelevanceInput,
   AnswerRelevanceResult,
   ClaimVerdict,
   ContextPrecisionResult,
+  ContextRecallResult,
+  CorrectnessLabel,
   EvalErrorCode,
   EvalExpected,
   EvalQuery,
@@ -21,12 +25,15 @@ export type {
   EvalSet,
   EvalSummary,
   FaithfulnessResult,
+  NdcgResult,
   WriteArtifactsOptions,
 } from './eval/index.js';
 export {
+  answerCorrectness,
   answerRelevance,
   assertContentPopulated,
   contextPrecision,
+  contextRecall,
   cosineSimilarity,
   DEFAULT_EVAL_TOP_K,
   DEFAULT_HIT_RATE_MIN,
@@ -37,6 +44,7 @@ export {
   evalError,
   faithfulness,
   loadEvalSet,
+  ndcg,
   passesGate,
   renderMarkdownReport,
   resolveHitRateMin,
