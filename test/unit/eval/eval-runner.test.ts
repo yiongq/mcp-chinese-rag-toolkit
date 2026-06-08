@@ -182,6 +182,22 @@ describe('loadEvalSet', () => {
     expect(() => loadEvalSet(wrongType)).toThrow(
       /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
     );
+    // An empty YAML value (`referenceAnswer:` with nothing after it) parses to
+    // null — the key is present, so it must error rather than be silently dropped.
+    const nullVal = writeYaml(
+      'null-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer:\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(nullVal)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+    const boolVal = writeYaml(
+      'bool-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: true\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(boolVal)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
   });
 });
 

@@ -53,12 +53,18 @@ describe('assertContentPopulated', () => {
     expect(r.content.length).toBeGreaterThan(0);
   });
 
-  // Each blank shape must be rejected so a benchmark is never silently poisoned.
+  // Each blank or non-string shape must be rejected so a benchmark is never
+  // silently poisoned. A search result comes from a provider-injected searchFn
+  // that is not runtime type-checked, so a non-string content (number / boolean
+  // / object) must throw the same coded error, not a raw TypeError from .trim().
   const blankCases: Array<{ label: string; content: EvalSearchResult['content'] }> = [
     { label: 'null content', content: null as unknown as undefined },
     { label: 'undefined content', content: undefined },
     { label: 'empty string content', content: '' },
     { label: 'whitespace-only content', content: '   \n\t ' },
+    { label: 'numeric content', content: 42 as unknown as undefined },
+    { label: 'boolean content', content: true as unknown as undefined },
+    { label: 'object content', content: {} as unknown as undefined },
   ];
 
   for (const { label, content } of blankCases) {

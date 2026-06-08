@@ -74,18 +74,24 @@ export function evalError(
  * benchmark. Calling this at the entry to those metrics turns that silent
  * corruption into a loud, locatable {@link EvalFrameworkError}.
  *
- * Throws {@link EvalFrameworkError} with code `EVAL_CONTENT_MISSING` when `content` is
- * `null`, `undefined`, empty, or whitespace-only. The message includes the
- * row's `source` (and `section` / `page` when set) so the offending chunk is
- * easy to locate.
+ * Throws {@link EvalFrameworkError} with code `EVAL_CONTENT_MISSING` when `content`
+ * is unusable — `null`, `undefined`, a non-string value, empty, or
+ * whitespace-only. Results come from a provider-injected `searchFn` and are not
+ * runtime type-checked, so a non-string `content` can slip past the static type;
+ * the `typeof` guard turns that into the same loud error rather than a raw
+ * `TypeError`. The message includes the row's `source` (and `section` / `page`
+ * when set) so the offending chunk is easy to locate.
  */
 export function assertContentPopulated(
   r: EvalSearchResult,
 ): asserts r is EvalSearchResult & { content: string } {
-  if (r.content == null || r.content.trim() === '') {
+  if (typeof r.content !== 'string' || r.content.trim() === '') {
     const where = `source="${r.source}"${r.section ? ` section="${r.section}"` : ''}${
       r.page != null ? ` page=${r.page}` : ''
     }`;
-    throw evalError('EVAL_CONTENT_MISSING', `eval result chunk (${where}) has empty content`);
+    throw evalError(
+      'EVAL_CONTENT_MISSING',
+      `eval result chunk (${where}) has missing, blank, or non-string content`,
+    );
   }
 }
