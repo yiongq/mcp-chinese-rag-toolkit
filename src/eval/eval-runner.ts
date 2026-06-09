@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Document } from 'yaml';
 import { isMap, isScalar, parseDocument } from 'yaml';
 
+import { evalError } from './errors.js';
 import type {
   EvalExpected,
   EvalQuery,
@@ -11,6 +12,7 @@ import type {
   EvalSearchResult,
   EvalSet,
   EvalSummary,
+  NdcgResult,
 } from './types.js';
 
 /**
@@ -92,6 +94,7 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
       expected?: unknown;
       category?: unknown;
       reason?: unknown;
+      referenceAnswer?: unknown;
     };
     if (typeof item.query !== 'string' || item.query.trim().length === 0) {
       throw new Error(`loadEvalSet: queries[${i}].query must be a non-empty string`);
@@ -133,13 +136,24 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
     }
     // Inline `reason` wins; fall back to extracted leading `# reason:` comment.
     // Empty / whitespace-only inline reason is treated as absent so it does
-    // not silently override the comment fallback and defeat .
+    // not silently override the comment fallback.
     const rawInline = typeof item.reason === 'string' ? item.reason : undefined;
     const inlineReason =
       rawInline !== undefined && rawInline.trim().length > 0 ? rawInline : undefined;
     const commentReason = commentReasons[i];
     const reason = inlineReason ?? commentReason;
     if (reason !== undefined) out.reason = reason;
+    // Optional gold reference answer. Only attach when present so existing eval
+    // sets stay byte-identical after a round-trip; when present it must be a
+    // non-empty string (a blank value is an authoring mistake, not "absent").
+    if (item.referenceAnswer !== undefined) {
+      if (typeof item.referenceAnswer !== 'string' || item.referenceAnswer.trim().length === 0) {
+        throw new Error(
+          `loadEvalSet: queries[${i}].referenceAnswer must be a non-empty string when present`,
+        );
+      }
+      out.referenceAnswer = item.referenceAnswer;
+    }
     return out;
   });
 
@@ -212,16 +226,38 @@ function extractReasonComments(doc: Document): Array<string | undefined> {
 }
 
 /**
+ * Whether a single retrieved result satisfies one of a query's expected hits —
+ * the SINGLE source of truth for "does this result count as a hit". Shared by the
+ * retrieval scorer ({@link scoreQuery}) and the multi-config comparison's ranking
+ * gain derivation so the two never drift into two divergent match rules.
+ *
+ * Semantics:
+ *   - `strict: false` (default): a source match is enough.
+ *   - `strict: true`: when an expected entry declares a `page`, the result's
+ *     `page` must match exactly; expected entries without a page still match on
+ *     source alone.
+ */
+export function expectedMatches(
+  query: EvalQuery,
+  result: { source: string; page?: number },
+  strict?: boolean,
+): boolean {
+  return query.expected.some((e) => {
+    if (e.source !== result.source) return false;
+    if (strict === true && e.page !== undefined) {
+      return e.page === result.page;
+    }
+    return true;
+  });
+}
+
+/**
  * Score a single query: returns hit rank (1-indexed, undefined = miss) +
  * reciprocal rank. Pure function — easy to test without spinning up a
  * RAG pipeline.
  *
- * Semantics:
- *   - First match in topResults wins (subsequent expected matches ignored).
- *   - `strict: false` (default): source-only match.
- *   - `strict: true`: when `expected.page` is set, the result's `page` must
- *     match exactly; expected entries without a page still match on source
- *     alone.
+ * First match in topResults wins (subsequent expected matches ignored); the
+ * per-result hit rule itself lives in {@link expectedMatches}.
  */
 export function scoreQuery(
   query: EvalQuery,
@@ -231,14 +267,7 @@ export function scoreQuery(
   for (let i = 0; i < topResults.length; i += 1) {
     const result = topResults[i];
     if (!result) continue;
-    const matched = query.expected.some((e) => {
-      if (e.source !== result.source) return false;
-      if (opts.strict === true && e.page !== undefined) {
-        return e.page === result.page;
-      }
-      return true;
-    });
-    if (matched) {
+    if (expectedMatches(query, result, opts.strict)) {
       const rank = i + 1;
       return { hitRank: rank, reciprocalRank: 1 / rank };
     }
@@ -247,9 +276,96 @@ export function scoreQuery(
 }
 
 /**
+ * Sum of discounted gains over the first `k` positions of a ranking, using the
+ * standard linear gain with a 1-indexed log2 position discount:
+ * `Σ gain(i) / log2(i + 1)`. Inputs are assumed already validated as finite.
+ */
+function discountedCumulativeGain(gains: readonly number[], k: number): number {
+  let sum = 0;
+  const limit = Math.min(k, gains.length);
+  for (let i = 0; i < limit; i += 1) {
+    const gain = gains[i];
+    // `gains` is pre-validated finite, but `noUncheckedIndexedAccess` still
+    // types the read as `number | undefined`; guard to satisfy it.
+    if (gain === undefined) continue;
+    // 0-indexed loop variable `i` maps to 1-indexed position `i + 1`, so the
+    // discount is `1 / log2((i + 1) + 1)` — position 1 gets `1 / log2(2) = 1`.
+    sum += gain / Math.log2(i + 2);
+  }
+  return sum;
+}
+
+/**
+ * nDCG@k — Normalized Discounted Cumulative Gain over a ranked list of graded
+ * relevance labels. A retrieval (information-retrieval) metric that complements
+ * the binary Hit Rate@K / MRR@K: instead of hit-or-miss it rewards putting the
+ * MORE relevant results first, where each position's gain is discounted by its
+ * rank (Järvelin–Kekäläinen 2002; matches scikit-learn's `ndcg_score` default).
+ *
+ * ```
+ * discount(i) = 1 / log2(i + 1)                       // 1-indexed; position 1 → 1
+ * DCG@k  = Σ_{i=1..min(k,N)} gains[i-1] · discount(i)
+ * IDCG@k = the same sum over gains sorted descending  // the best achievable order
+ * score  = idcg === 0 ? 0 : dcg / idcg                // ∈ [0, 1]
+ * ```
+ *
+ * `gains` is the graded relevance of each result in retrieved order; labels must
+ * be `≥ 0` (e.g. `{0, 1, 2, 3}`) — a negative gain is rejected (see `@throws`)
+ * because it would push `score` outside `[0, 1]`. `opts.k` truncates the ranking to
+ * its first `k` positions; it defaults to the full list length. An empty list
+ * and an all-zero list both score `0` (there is no ideal gain to normalize by).
+ *
+ * Uses the LINEAR gain `gains[i]`; the exponential variant `2^gains[i] − 1`
+ * (which weights highly-relevant results more steeply) is a one-line swap if a
+ * calibration later calls for it.
+ *
+ * @throws {@link EvalFrameworkError} (`EVAL_INVALID_METRIC_INPUT`) when `gains`
+ *   is not an array, contains a non-finite (`NaN` / `±Infinity`) or negative
+ *   value, or when `opts.k` is provided but is not a positive integer. Graded
+ *   labels come from
+ *   injected / hand-authored data and are not guaranteed by the static type at
+ *   runtime, so these structural faults fail loudly rather than silently produce
+ *   a meaningless number.
+ */
+export function ndcg(gains: readonly number[], opts?: { k?: number }): NdcgResult {
+  if (!Array.isArray(gains)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `ndcg: expected an array of graded relevance gains, got ${typeof gains}`,
+    );
+  }
+  for (let i = 0; i < gains.length; i += 1) {
+    const gain = gains[i];
+    // Graded relevance must be a finite, non-negative number. A negative gain
+    // would let `dcg`/`idcg` flip sign and drive `score` outside the documented
+    // `[0, 1]` range (e.g. a stray `-1` "irrelevant" label scoring `< 0` or
+    // `> 1`), so reject it loudly rather than emit a meaningless number.
+    if (gain === undefined || !Number.isFinite(gain) || gain < 0) {
+      throw evalError(
+        'EVAL_INVALID_METRIC_INPUT',
+        `ndcg: gains contains a non-finite or negative value at index ${i}`,
+      );
+    }
+  }
+  const requestedK = opts?.k;
+  if (requestedK !== undefined && (!Number.isInteger(requestedK) || requestedK < 1)) {
+    throw evalError(
+      'EVAL_INVALID_METRIC_INPUT',
+      `ndcg: opts.k must be a positive integer when provided, got ${String(requestedK)}`,
+    );
+  }
+  const k = requestedK ?? gains.length;
+  const dcg = discountedCumulativeGain(gains, k);
+  const ideal = [...gains].sort((a, b) => b - a);
+  const idcg = discountedCumulativeGain(ideal, k);
+  const score = idcg === 0 ? 0 : dcg / idcg;
+  return { score, dcg, idcg, k };
+}
+
+/**
  * Run an eval set against a `searchFn`, returning the full {@link EvalSummary}
  * for serialization by ci-helper.ts. Provider-injection — toolkit does NOT
- * bind to any specific MCP tool (a downstream consumer package / a downstream consumer package
+ * bind to any specific MCP tool (a downstream consumer package / third-party
  * each wire their own).
  *
  * Hit Rate@K is defined as `hits / totalQueries`; MRR@K is the average of

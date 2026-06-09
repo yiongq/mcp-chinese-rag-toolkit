@@ -1,3 +1,11 @@
+export { runAnswerEval } from './answer-eval.js';
+export {
+  DEFAULT_SMOKE_SAMPLE_SIZE,
+  estimateJudgeCalls,
+  renderBenchmarkTable,
+  runBenchmark,
+  sampleQueries,
+} from './benchmark.js';
 export type { WriteArtifactsOptions } from './ci-helper.js';
 export {
   DEFAULT_HIT_RATE_MIN,
@@ -8,8 +16,57 @@ export {
   resolveHitRateMin,
   writeArtifacts,
 } from './ci-helper.js';
-export { DEFAULT_EVAL_TOP_K, loadEvalSet, runEval, scoreQuery } from './eval-runner.js';
+export type { EvalErrorCode, EvalErrorCore } from './errors.js';
+export {
+  assertContentPopulated,
+  EVAL_ERROR_CODES,
+  EvalFrameworkError,
+  evalError,
+} from './errors.js';
+export { DEFAULT_EVAL_TOP_K, loadEvalSet, ndcg, runEval, scoreQuery } from './eval-runner.js';
+export {
+  answerCorrectness,
+  answerRelevance,
+  contextPrecision,
+  contextRecall,
+  cosineSimilarity,
+  faithfulness,
+} from './judges.js';
+export type { JudgeCacheOptions, JudgeCacheStore } from './judge-cache.js';
+export {
+  computeJudgeCacheKey,
+  createMemoryJudgeCacheStore,
+  withJudgeCache,
+} from './judge-cache.js';
+export {
+  callJudge,
+  DEFAULT_JUDGE_TIMEOUT_MS,
+  JUDGE_PROMPT_VERSION,
+  judgeClaimSupport,
+  judgeContextAttribution,
+  judgeContextUsefulness,
+  judgeReverseQuestions,
+  judgeStatementClassification,
+} from './llm-judge.js';
 export type {
+  AnswerCorrectnessResult,
+  AnswerCorrectnessStatement,
+  AnswerEvalMetrics,
+  AnswerEvalOptions,
+  AnswerEvalQueryResult,
+  AnswerEvalSummary,
+  AnswerEvalVersionMeta,
+  AnswerRelevanceInput,
+  AnswerRelevanceResult,
+  BenchmarkConfig,
+  BenchmarkConfigResult,
+  BenchmarkOptions,
+  BenchmarkSummary,
+  ClaimVerdict,
+  ContextPrecisionResult,
+  ContextRecallResult,
+  CorrectnessLabel,
+  EmbedFn,
   EvalExpected,
   EvalQuery,
   EvalQueryResult,
@@ -18,4 +75,10 @@ export type {
   EvalSearchResult,
   EvalSet,
   EvalSummary,
+  FaithfulnessResult,
+  GenerateFn,
+  JudgeCallOptions,
+  JudgeFn,
+  JudgeOutcome,
+  NdcgResult,
 } from './types.js';

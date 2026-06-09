@@ -62,7 +62,9 @@ These are **framework-methodology** numbers measured against the toolkit's own 1
 pnpm add @yiong/mcp-chinese-rag-toolkit
 ```
 
-Requires Node.js `>=20.0.0`. Ships ESM + CJS + `.d.ts` / `.d.cts` so both `import` and `require` consumers (and TypeScript strict mode) resolve without dual-module hazard.
+Requires Node.js `>=22.0.0`. Ships ESM + CJS + `.d.ts` / `.d.cts` so both `import` and `require` consumers (and TypeScript strict mode) resolve without dual-module hazard.
+
+> **Behind a proxy?** On Node `>=22` the built-in `fetch` ignores `HTTPS_PROXY` unless you also set `NODE_USE_ENV_PROXY=1`. Set both when the first-run embedding / reranker model downloads must go through a proxy, otherwise the download hangs.
 
 ## Quick start
 

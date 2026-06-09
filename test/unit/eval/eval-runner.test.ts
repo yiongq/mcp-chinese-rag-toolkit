@@ -4,9 +4,11 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { EvalFrameworkError } from '../../../src/eval/errors.js';
 import {
   DEFAULT_EVAL_TOP_K,
   loadEvalSet,
+  ndcg,
   runEval,
   scoreQuery,
 } from '../../../src/eval/eval-runner.js';
@@ -150,6 +152,54 @@ describe('loadEvalSet', () => {
     expect(set.version).toBe('v1-mini');
     expect(set.description).toBe('smoke');
     expect(set.queries[0]?.category).toBe('leave-policy');
+  });
+
+  it('attaches referenceAnswer when present as a non-empty string', () => {
+    const body = `version: v1\nqueries:\n  - query: 试用期多久\n    referenceAnswer: 试用期为六个月。\n    expected:\n      - source: bench-fixture.md\n`;
+    const p = writeYaml('ref-answer.yml', body);
+    const set = loadEvalSet(p);
+    expect(set.queries[0]?.referenceAnswer).toBe('试用期为六个月。');
+  });
+
+  it('omits referenceAnswer entirely when absent (no undefined key)', () => {
+    const body = `version: v1\nqueries:\n  - query: a\n    expected:\n      - source: x\n`;
+    const p = writeYaml('no-ref-answer.yml', body);
+    const set = loadEvalSet(p);
+    const q = set.queries[0];
+    expect(q && 'referenceAnswer' in q).toBe(false);
+  });
+
+  it('throws when referenceAnswer is present but blank or the wrong type', () => {
+    const blank = writeYaml(
+      'blank-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: '   '\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(blank)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+    const wrongType = writeYaml(
+      'num-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: 42\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(wrongType)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+    // An empty YAML value (`referenceAnswer:` with nothing after it) parses to
+    // null — the key is present, so it must error rather than be silently dropped.
+    const nullVal = writeYaml(
+      'null-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer:\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(nullVal)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
+    const boolVal = writeYaml(
+      'bool-ref.yml',
+      `version: v1\nqueries:\n  - query: a\n    referenceAnswer: true\n    expected:\n      - source: x\n`,
+    );
+    expect(() => loadEvalSet(boolVal)).toThrow(
+      /queries\[0\]\.referenceAnswer must be a non-empty string when present/,
+    );
   });
 });
 
@@ -428,4 +478,121 @@ describe('runEval', () => {
     expect(summary.perQuery[0]?.error).toMatch(/result\[0\] without a string 'source'/);
     expect(summary.hitRate).toBe(0);
   });
+});
+
+describe('ndcg', () => {
+  it('scores a perfectly-ordered ranking as 1', () => {
+    const result = ndcg([3, 2, 1]);
+    expect(result.score).toBe(1);
+    expect(result.dcg).toBeCloseTo(result.idcg, 12);
+    expect(result.k).toBe(3);
+  });
+
+  it('scores a single-element ranking as 1', () => {
+    const result = ndcg([2]);
+    expect(result.score).toBe(1);
+    expect(result.k).toBe(1);
+  });
+
+  it('penalizes a reverse-ordered ranking below 1 (known closed form)', () => {
+    const result = ndcg([1, 2, 3]);
+    // DCG  = 1/log2(2) + 2/log2(3) + 3/log2(4)
+    // IDCG = 3/log2(2) + 2/log2(3) + 1/log2(4)  (ideal descending order)
+    const dcg = 1 / Math.log2(2) + 2 / Math.log2(3) + 3 / Math.log2(4);
+    const idcg = 3 / Math.log2(2) + 2 / Math.log2(3) + 1 / Math.log2(4);
+    expect(result.dcg).toBeCloseTo(dcg, 12);
+    expect(result.idcg).toBeCloseTo(idcg, 12);
+    expect(result.score).toBeCloseTo(dcg / idcg, 12);
+    expect(result.score).toBeLessThan(1);
+  });
+
+  it('ranks a front-loaded ordering above a back-loaded one (graded-label contrast)', () => {
+    const front = ndcg([3, 2, 1]);
+    const back = ndcg([1, 2, 3]);
+    expect(front.score).toBeGreaterThan(back.score);
+  });
+
+  it('returns 0 for an all-zero-gain ranking (no ideal gain to normalize by)', () => {
+    const result = ndcg([0, 0, 0]);
+    expect(result.score).toBe(0);
+    expect(result.idcg).toBe(0);
+  });
+
+  it('returns all-zero auditable fields for an empty ranking', () => {
+    expect(ndcg([])).toEqual({ score: 0, dcg: 0, idcg: 0, k: 0 });
+  });
+
+  it('truncates the ranking at opts.k, changing the score', () => {
+    // Relevant items sit at both ends; cutting to the first position scores a
+    // perfect 1, while the full list dilutes with a discounted late hit.
+    const atOne = ndcg([3, 0, 0, 3], { k: 1 });
+    expect(atOne.score).toBe(1);
+    expect(atOne.k).toBe(1);
+    const full = ndcg([3, 0, 0, 3], { k: 4 });
+    expect(full.k).toBe(4);
+    expect(full.score).toBeLessThan(1);
+    expect(full.score).not.toBeCloseTo(atOne.score, 6);
+  });
+
+  it('is deterministic: same input yields an equal result twice', () => {
+    const gains = [2, 0, 3, 1];
+    expect(ndcg(gains)).toEqual(ndcg(gains));
+  });
+
+  it('handles opts.k larger than the ranking length and keeps score in [0, 1]', () => {
+    // No position beyond the list contributes, so an over-length k matches the
+    // un-truncated score; the result must still respect the documented range.
+    const clamped = ndcg([3, 2, 1], { k: 10 });
+    const full = ndcg([3, 2, 1]);
+    expect(clamped.score).toBe(full.score);
+    expect(clamped.score).toBeGreaterThanOrEqual(0);
+    expect(clamped.score).toBeLessThanOrEqual(1);
+  });
+
+  it('throws EVAL_INVALID_METRIC_INPUT for a non-array input', () => {
+    const bad = null as unknown as number[];
+    expect(() => ndcg(bad)).toThrow(EvalFrameworkError);
+    try {
+      ndcg(bad);
+    } catch (e) {
+      expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    }
+  });
+
+  const invalidGainCases: Array<{ label: string; gains: number[] }> = [
+    { label: 'NaN', gains: [1, Number.NaN, 2] },
+    { label: '+Infinity', gains: [Number.POSITIVE_INFINITY, 1] },
+    { label: '-Infinity', gains: [1, Number.NEGATIVE_INFINITY] },
+    // A negative graded label would flip the sign of dcg/idcg and drive `score`
+    // outside the documented `[0, 1]` range, so it must be rejected loudly.
+    { label: 'negative', gains: [1, -1, 2] },
+  ];
+  for (const c of invalidGainCases) {
+    it(`throws EVAL_INVALID_METRIC_INPUT on a ${c.label} gain`, () => {
+      let caught: unknown;
+      try {
+        ndcg(c.gains);
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(EvalFrameworkError);
+      expect((caught as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+    });
+  }
+
+  const badKCases: Array<{ label: string; k: number }> = [
+    { label: 'zero', k: 0 },
+    { label: 'negative', k: -1 },
+    { label: 'non-integer', k: 1.5 },
+  ];
+  for (const c of badKCases) {
+    it(`throws EVAL_INVALID_METRIC_INPUT when opts.k is ${c.label}`, () => {
+      expect(() => ndcg([1, 2, 3], { k: c.k })).toThrow(EvalFrameworkError);
+      try {
+        ndcg([1, 2, 3], { k: c.k });
+      } catch (e) {
+        expect((e as EvalFrameworkError).code).toBe('EVAL_INVALID_METRIC_INPUT');
+      }
+    });
+  }
 });
