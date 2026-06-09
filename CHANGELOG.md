@@ -1,5 +1,68 @@
 # @yiong/mcp-chinese-rag-toolkit
 
+## 0.3.0
+
+### Minor Changes
+
+- ee1a569: Add `runAnswerEval` — a single provider-injection entry point that runs a whole answer-quality evaluation (additive, no breaking changes). It wires the existing layers into one flow: retrieve context, generate an answer from it, drive the judge tasks, feed their structured output to the pure scoring functions, and stamp the run with reproducible version metadata. It is an orchestrator only — it does not build prompts, parse model output, or compute any metric formula.
+
+  - `runAnswerEval(evalSet, opts)` — for each query it retrieves top-K context, generates an answer, and computes up to five RAGAS metrics: faithfulness, answer relevance and context precision (reference-free), plus answer correctness and context recall (reference-based, computed only when the query carries a reference answer). Retrieval, generation, judging and embedding are all caller-injected, so a deterministic mock drives the whole thing in CI with no API key and no network.
+  - Graceful skips, never faked scores: the reference-based pair is skipped (`NO_REFERENCE_ANSWER`) when a query has no reference answer, and answer relevance is skipped (`NO_EMBED_FN`) when no embed function is injected. A degraded judge call (timeout or malformed output) skips just its own metric.
+  - Resilient per query, like the retrieval runner: a fault fatal to one query — a throwing search/generate function, a missing chunk, or a judge infrastructure rejection — is recorded on that query's row and the run continues. An embed-function failure is localized to answer relevance, its only consumer.
+  - Reproducible version metadata `{ generateModel, judgeModel, judgePromptVersion, toolkitVersion, evalSpecVersion }` is stamped onto every run, with each field carrying its own provenance (model names are caller-injected, the toolkit version is read from package.json, never hardcoded), so scores stay comparable and auditable across time and configurations.
+  - New types `GenerateFn`, `EmbedFn`, `AnswerEvalOptions`, `AnswerEvalMetrics`, `AnswerEvalQueryResult`, `AnswerEvalSummary` and `AnswerEvalVersionMeta` are exported from the package root.
+
+  `answerCorrectness` reports the statement-level F1 component only; the full RAGAS metric blends it with an answer–reference semantic similarity term, which needs another embedding pass and is left to a later calibration step.
+
+- 69e9ac4: Add `runBenchmark` — run one eval set through several named retrieval configurations and lay the results out as a single comparison table (additive, no breaking changes). It is an orchestrator only: it reuses the retrieval runner, the answer-eval orchestrator and the ranking-gain metric, and reimplements none of their formulas.
+
+  - `runBenchmark(evalSet, opts)` — for each `{ name, searchFn }` configuration it scores retrieval (Hit Rate@K, MRR, and a mean nDCG@K derived from the existing expected-hit labels) and answer quality (the five RAGAS metrics), keeping the full per-config sub-results alongside the aggregates. Each row is stamped with the same reproducible version metadata, so the table is comparable and auditable across runs.
+  - Stays provider-agnostic: the toolkit never learns how a retrieval configuration is built (reranking, lexical vs vector, tokenizer choices). The caller pre-wires each configuration as a `searchFn`; the toolkit only iterates over them.
+  - `renderBenchmarkTable(summary)` — render the comparison as deterministic GitHub-flavoured markdown, one row per configuration. A never-measured answer metric renders as `n/a` (never faked to `0`), and there is deliberately no aggregate "overall" column — the metrics measure different things on different scales.
+  - New types `BenchmarkConfig`, `BenchmarkOptions`, `BenchmarkConfigResult` and `BenchmarkSummary` are exported from the package root.
+
+  The mean nDCG@K is derived from the existing binary expected-hit labels (a hit scores gain `1`, a miss `0`); even so it is informative, rewarding a configuration that ranks a hit higher — something Hit Rate@K and MRR do not capture. Graded relevance labels are a future, purely-additive extension.
+
+- c389b63: Extend the eval framework (additive, no breaking changes):
+
+  - `EvalQuery` gains an optional `referenceAnswer` field, parsed and validated by `loadEvalSet` (must be a non-empty string when present). Reference-based answer metrics can consume it; retrieval scoring ignores it.
+  - New `assertContentPopulated(result)` content guard plus a lean eval error layer (`EvalFrameworkError`, `evalError`, `EVAL_ERROR_CODES` with `EVAL_CONTENT_MISSING`). It throws on missing/blank chunk content so answer-quality metrics fail loudly instead of silently scoring low.
+  - Raise the supported Node engine to `>=22`.
+
+- 9cbcdfa: Add a judge result cache and benchmark query sampling (additive, no breaking changes).
+
+  - `withJudgeCache(judgeFn, opts)` wraps a judge function so identical calls are memoized. The cache key is a content hash of the prompt (via `computeJudgeCacheKey`), so only hashes are stored — never the raw prompt or output. `createMemoryJudgeCacheStore(max?)` provides a default bounded in-memory store, and the `JudgeCacheStore` / `JudgeCacheOptions` types let callers plug in their own. Caching is opt-in at the call site, so variance sampling (which must drive the raw judge) is never collapsed to a single cached value.
+  - `sampleQueries(evalSet, n, opts?)` deterministically selects a subset of an eval-set, so a benchmark can run a cheap PR-smoke subset and the full set on a nightly schedule from the same data.
+
+  Both are exported from the package root.
+
+- 7ba049f: Add the LLM-facing judge layer to the eval framework (additive, no breaking changes). This is the impure counterpart to the pure scoring functions: it builds a prompt, calls an injected judge, and parses the model's text into the structured inputs the scoring layer consumes — keeping that scoring layer pure.
+
+  - `callJudge(judgeFn, prompt, parse, opts?)` — drives a judge function, racing it against a wall-clock timeout and parsing the result. It NEVER throws for the two judge-output failure modes: a timeout degrades to `EVAL_JUDGE_TIMEOUT` (retryable) and unparseable / wrong-shape output degrades to `EVAL_JUDGE_MALFORMED_OUTPUT` (not retryable), both returned as a discriminated `JudgeOutcome`. A non-timeout rejection from the judge itself (e.g. a provider error) propagates unchanged.
+  - Five judge tasks — `judgeClaimSupport`, `judgeReverseQuestions`, `judgeContextUsefulness`, `judgeStatementClassification`, `judgeContextAttribution` — each build a prompt and parse the judge's JSON (tolerant of code fences and surrounding prose) into the structured input one scoring metric consumes. Output is validated against the target shape (required fields and value types are enforced; unrecognized extra keys are ignored).
+  - New types `JudgeFn` (`(prompt: string) => Promise<string>`), `JudgeCallOptions`, `JudgeOutcome<T>`, and the lean degrade core `EvalErrorCore`, plus the `JUDGE_PROMPT_VERSION` and `DEFAULT_JUDGE_TIMEOUT_MS` constants and the two new error codes, are exported from the package root.
+
+  The judge signature is provider-agnostic and free of any business / envelope fields, so the layer can be exercised in CI with a deterministic mock judge — no API keys and no network.
+
+  Also reject negative graded labels in `ndcg` (alongside the existing non-finite guard), since a negative gain would push the score outside the documented `[0, 1]` range.
+
+- 219adc1: Add reference-based answer-quality scoring and a graded-relevance ranking metric to the eval framework (additive, no breaking changes):
+
+  - `answerCorrectness(statements)` — statement-level F1 between an answer and a gold reference, from per-statement TP/FP/FN classifications (`2·tp / (2·tp + fp + fn)`). Returns precision, recall, and the raw counts for auditing. Implements the factual F1 component only; the optional semantic-similarity term is left to the caller so the function stays embedding-free.
+  - `contextRecall(attributedFlags)` — fraction of reference sentences attributable to the retrieved context. A sentence counts only when its flag is strictly `true`.
+  - `ndcg(gains, opts?)` — Normalized Discounted Cumulative Gain over a ranked list of graded relevance labels, complementing the existing binary Hit Rate@K / MRR@K. Uses the standard linear gain with a log2 position discount (`DCG@k / IDCG@k`); `opts.k` truncates the ranking. Returns the raw `dcg` / `idcg` / effective `k` for auditing.
+
+  All three are deterministic pure functions (no model calls, no embedding calls, no I/O), so they can be regression-tested offline with no API keys. New result/input types (`AnswerCorrectnessStatement`, `AnswerCorrectnessResult`, `ContextRecallResult`, `NdcgResult`, `CorrectnessLabel`) are exported from the package root. Structurally malformed input (a non-array, a non-finite gain, or a bad `k`) throws the existing coded `EvalFrameworkError` (`EVAL_INVALID_METRIC_INPUT`).
+
+- e115b92: Add reference-free answer-quality scoring to the eval framework (additive, no breaking changes):
+
+  - `faithfulness(verdicts)` — fraction of an answer's atomic claims supported by the retrieved context (`0/0 → 0`).
+  - `answerRelevance({ queryEmbedding, generatedQuestionEmbeddings })` — mean cosine similarity between the original query and reverse questions generated from the answer (unclamped, ∈ [-1, 1]).
+  - `contextPrecision(usefulFlags)` — order-sensitive average precision over a ranked list of useful/not-useful chunks.
+  - `cosineSimilarity(a, b)` helper — zero-norm vectors yield `0`; length mismatch or non-finite values throw a coded `EvalFrameworkError`.
+
+  All four are deterministic pure functions (no model calls, no embedding calls, no I/O), so they can be regression-tested offline with no API keys. New result/input types (`ClaimVerdict`, `FaithfulnessResult`, `AnswerRelevanceInput`, `AnswerRelevanceResult`, `ContextPrecisionResult`) and a new `EVAL_INVALID_METRIC_INPUT` error code are exported from the package root.
+
 ## 0.2.1
 
 ### Patch Changes
