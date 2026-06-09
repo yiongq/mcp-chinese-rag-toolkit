@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint (Biome)
+        run: pnpm lint
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -52,7 +55,7 @@ jobs:
         env:
           # Integration tests that hit huggingface.co are skipped in CI by
           # default — they require ~2GB model downloads and HF can rate-limit.
-          # The rag-eval workflow (TODO) handles the heavy path.
+          # The separate `rag-eval` job below handles that heavy model path.
           SKIP_MODEL_DOWNLOAD: '1'
         run: pnpm test
 
@@ -64,3 +67,73 @@ jobs:
       # does not publish.
       - name: Size guard (unpacked < 100MB)
         run: node scripts/check-pack-size.mjs
+
+  # Retrieval regression gate. Runs the real hybrid + rerank pipeline against
+  # the in-repo fixture eval set and fails the build when Hit Rate@5 drops below
+  # the floor. Kept as its own job (not folded into `build`) because it downloads
+  # the public BGE models (~700 MB) and takes a few minutes — the `build` job
+  # must stay a fast, network-free unit pass. Zero-secret does NOT mean
+  # zero-network: the models are public, keyless artifacts, so no API credential
+  # is ever needed here.
+  rag-eval:
+    name: RAG Eval (fixture Hit Rate@5 ≥ 90% blocking gate)
+    runs-on: ubuntu-latest
+    # Hit Rate@5 < 90% MUST block merge — unlike warn-only benchmark jobs, this
+    # gate sets continue-on-error explicitly to false.
+    continue-on-error: false
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # bin/run-eval.ts executes the TypeScript sources directly via tsx, so a
+      # build is not strictly required — kept as a cheap safety net so a broken
+      # bundle surfaces here too.
+      - name: Build
+        run: pnpm build
+
+      - name: Run fixture eval (downloads bge-large-zh + bge-reranker-v2-m3)
+        env:
+          # Explicit empty string so the pipeline's
+          # `process.env.SKIP_MODEL_DOWNLOAD === '1'` check evaluates false and
+          # the real BGE models download. The `build` job sets it to '1' for its
+          # fast network-free unit pass; GitHub Actions does NOT leak env across
+          # jobs, so this job starts with the var unset — '' documents intent.
+          SKIP_MODEL_DOWNLOAD: ''
+          # Hit Rate@5 floor. Keep the threshold in this file; do not expose it
+          # as a workflow_dispatch input.
+          RAG_EVAL_HIT_RATE_MIN: '0.9'
+        run: pnpm test:eval
+
+      - name: Upload fixture eval report
+        if: always()
+        # Best-effort diagnostic upload — the Hit Rate gate is decided by the
+        # "Run fixture eval" step above, NOT by whether this report uploads. An
+        # artifact-storage hiccup must not turn a passing gate red.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixture-rag-eval-report
+          path: |
+            eval-results/summary.json
+            eval-results/report.md
+            eval-results/per-query.json
+          retention-days: 30
+          # Hard-fail when the path matches nothing — e.g. bin/run-eval.ts ever
+          # changes its default out-dir, or the eval step crashes before writing
+          # artifacts — instead of silently uploading an empty archive.
+          if-no-files-found: error
