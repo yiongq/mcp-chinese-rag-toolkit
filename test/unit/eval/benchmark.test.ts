@@ -387,6 +387,37 @@ describe('renderBenchmarkTable', () => {
     expect((row.match(/(?<!\\)\|/g) ?? []).length).toBe(10);
   });
 
+  it('escapes a backslash so a name like a\\|b cannot split the row', async () => {
+    // Regression: before the backslash was escaped FIRST, a name `a\|b` rendered
+    // as `a\\|b`, whose bare trailing `|` opened a spurious extra column and
+    // shifted every metric in the row one cell to the right.
+    const summary = await runBenchmark(
+      EVAL_SET,
+      makeOpts({ configs: [{ name: 'a\\|b', searchFn: searchFnReturning([DOC_A, DOC_B]) }] }),
+    );
+    const rows = dataRows(renderBenchmarkTable(summary));
+    const row = rows[0] ?? '';
+
+    expect(rows).toHaveLength(1);
+    // Nine cells → ten unescaped column separators; the name's own pipe is
+    // preceded by a backslash and is not counted.
+    expect((row.match(/(?<!\\)\|/g) ?? []).length).toBe(10);
+  });
+
+  it('collapses carriage returns / CRLF in a config name to a single space', async () => {
+    const summary = await runBenchmark(
+      EVAL_SET,
+      makeOpts({ configs: [{ name: 'win\r\nname', searchFn: searchFnReturning([DOC_A, DOC_B]) }] }),
+    );
+    const rows = dataRows(renderBenchmarkTable(summary));
+    const row = rows[0] ?? '';
+
+    expect(rows).toHaveLength(1);
+    expect(row).toContain('win name');
+    expect(row).not.toContain('\r');
+    expect(row).not.toContain('\n');
+  });
+
   it('carries a metadata block with the version fields and run context', async () => {
     const summary = await runBenchmark(EVAL_SET, makeOpts());
     const table = renderBenchmarkTable(summary);
@@ -397,6 +428,21 @@ describe('renderBenchmarkTable', () => {
     expect(table).toContain('mock-judge-model');
     expect(table).toContain(JUDGE_PROMPT_VERSION);
     expect(table).toContain('Configs compared');
+  });
+
+  it('escapes a backtick in a metadata value so its inline-code span stays intact', async () => {
+    // A model name with a backtick would otherwise close the `...` span early and
+    // garble the deterministic metadata block.
+    const summary = await runBenchmark(
+      EVAL_SET,
+      makeOpts({
+        generateModel: 'model`x',
+        configs: [{ name: 'c', searchFn: searchFnReturning([DOC_A, DOC_B]) }],
+      }),
+    );
+    const table = renderBenchmarkTable(summary);
+
+    expect(table).toContain('`model\\`x`');
   });
 });
 

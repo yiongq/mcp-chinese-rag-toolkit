@@ -271,15 +271,18 @@ export function renderBenchmarkTable(summary: BenchmarkSummary): string {
   lines.push('');
 
   // Metadata block so the table carries its own cross-run comparison context.
+  // Caller-provided strings are rendered inside inline-code spans, so they get
+  // the same escaping discipline as the table cells (a stray backtick would
+  // otherwise close the span early).
   const meta = summary.versionMeta;
-  lines.push(`- **Eval set version**: \`${summary.evalSpecVersion}\``);
+  lines.push(`- **Eval set version**: \`${escapeInlineCode(summary.evalSpecVersion)}\``);
   lines.push(`- **Timestamp (UTC)**: ${summary.timestamp}`);
   lines.push(`- **Top-K**: ${k}`);
   lines.push(`- **Configs compared**: ${summary.configs.length}`);
-  lines.push(`- **Generation model**: \`${meta.generateModel}\``);
-  lines.push(`- **Judge model**: \`${meta.judgeModel}\``);
-  lines.push(`- **Judge prompt version**: \`${meta.judgePromptVersion}\``);
-  lines.push(`- **Toolkit version**: \`${meta.toolkitVersion}\``);
+  lines.push(`- **Generation model**: \`${escapeInlineCode(meta.generateModel)}\``);
+  lines.push(`- **Judge model**: \`${escapeInlineCode(meta.judgeModel)}\``);
+  lines.push(`- **Judge prompt version**: \`${escapeInlineCode(meta.judgePromptVersion)}\``);
+  lines.push(`- **Toolkit version**: \`${escapeInlineCode(meta.toolkitVersion)}\``);
   lines.push('');
 
   return lines.join('\n');
@@ -291,11 +294,28 @@ function meanCell(value: number | undefined): string {
 }
 
 /**
- * Minimal markdown-table-cell escaping for a configuration name — the three
- * characters that would otherwise corrupt a row: `|` (column separator), a
- * backtick (code-span opener) and a newline (row terminator). Inlined here to
- * keep the change local; the report renderer applies the same escaping.
+ * Escape a value rendered inside an inline-code span (`` `...` ``): a backtick
+ * would close the span early and a line break would split the bullet across
+ * lines, so both are neutralized. Keeps the metadata block's escaping policy
+ * consistent with {@link escapeCell}.
+ */
+function escapeInlineCode(s: string): string {
+  return s.replace(/`/g, '\\`').replace(/[\r\n]+/g, ' ');
+}
+
+/**
+ * Minimal markdown-table-cell escaping for a configuration name. `|` (the column
+ * separator) and any line break (`\r` / `\n`, the row terminators) corrupt the
+ * row STRUCTURE; a backtick is escaped too so a name never opens an unintended
+ * inline-code span. The backslash is escaped FIRST so a later `|`→`\|` rewrite
+ * cannot be re-merged into a corrupting `\\|` sequence (which GFM reads as a
+ * literal backslash followed by an UNescaped column separator). Inlined here to
+ * keep the change local; the report renderer applies the same idea.
  */
 function escapeCell(s: string): string {
-  return s.replace(/\|/g, '\\|').replace(/`/g, '\\`').replace(/\n/g, ' ');
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/`/g, '\\`')
+    .replace(/[\r\n]+/g, ' ');
 }

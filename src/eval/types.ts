@@ -576,7 +576,12 @@ export interface BenchmarkConfigResult {
  * they measure different things on different scales.
  */
 export interface BenchmarkSummary {
-  /** Eval-set version (echoed from EvalSet.version). */
+  /**
+   * Eval-set version (echoed from EvalSet.version). Intentionally mirrors
+   * `versionMeta.evalSpecVersion`: surfaced at the top level for the renderer and
+   * direct consumers, while `versionMeta` keeps the field for a self-contained
+   * metadata record. Both derive from the same EvalSet, so they never disagree.
+   */
   evalSpecVersion: string;
   /** When the run executed (ISO 8601 UTC). */
   timestamp: string;
