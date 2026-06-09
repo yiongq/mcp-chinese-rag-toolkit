@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   aggregateAnswerMeans,
+  DEFAULT_SMOKE_SAMPLE_SIZE,
+  estimateJudgeCalls,
   meanNdcg,
   renderBenchmarkTable,
   runBenchmark,
+  sampleQueries,
 } from '../../../src/eval/benchmark.js';
 import { expectedMatches } from '../../../src/eval/eval-runner.js';
+import { withJudgeCache } from '../../../src/eval/judge-cache.js';
 import { JUDGE_PROMPT_VERSION } from '../../../src/eval/llm-judge.js';
 import type {
   AnswerCorrectnessStatement,
@@ -516,5 +520,143 @@ describe('expectedMatches (shared hit rule)', () => {
     expect(expectedMatches(query, { source: 'a', page: 9 }, true)).toBe(false); // strict: page wrong
     expect(expectedMatches(query, { source: 'a', page: 2 }, true)).toBe(true);
     expect(expectedMatches(query, { source: 'z' }, true)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// — Cost tier (full nightly run vs sampled smoke run) + cost estimate + cache wiring.
+// ---------------------------------------------------------------------------
+
+// A 10-query set; every config returns the same two-chunk result so usefulFlags
+// stays length-2 aligned and the prompts are identical across queries/configs.
+const TEN_QUERIES: EvalSet = {
+  version: 'bench-eval-v1',
+  queries: Array.from({ length: 10 }, (_, i) => ({
+    query: `q${i}`,
+    expected: [{ source: 'doc-a.md' }],
+  })),
+};
+
+describe('sampleQueries (reproducible smoke sampling)', () => {
+  const xs = Array.from({ length: 10 }, (_, i) => i);
+
+  it('takes a fixed stride for sampleSize and is reproducible', () => {
+    expect(sampleQueries(xs, { sampleSize: 5 })).toEqual([0, 2, 4, 6, 8]);
+    expect(sampleQueries(xs, { sampleSize: 5 })).toEqual(sampleQueries(xs, { sampleSize: 5 }));
+  });
+
+  it('keeps every Nth when sampleEvery is set (takes precedence over sampleSize)', () => {
+    expect(sampleQueries(xs, { sampleEvery: 3 })).toEqual([0, 3, 6, 9]);
+    expect(sampleQueries(xs, { sampleEvery: 3, sampleSize: 5 })).toEqual([0, 3, 6, 9]);
+  });
+
+  it('returns the whole list when the subset covers it', () => {
+    expect(sampleQueries(xs, { sampleSize: 10 })).toHaveLength(10);
+    expect(sampleQueries(xs, { sampleSize: 99 })).toHaveLength(10);
+  });
+
+  it('defaults to DEFAULT_SMOKE_SAMPLE_SIZE when no option is given', () => {
+    expect(sampleQueries(xs, {})).toHaveLength(DEFAULT_SMOKE_SAMPLE_SIZE);
+  });
+
+  it('throws (never infinite-loops) on a non-positive / non-integer sampleEvery', () => {
+    // The `i += sampleEvery` stride would otherwise hang: 0 never advances, a
+    // negative step runs backward. sampleQueries is public, so it guards itself.
+    expect(() => sampleQueries(xs, { sampleEvery: 0 })).toThrow(/positive integer/);
+    expect(() => sampleQueries(xs, { sampleEvery: -2 })).toThrow(/positive integer/);
+    expect(() => sampleQueries(xs, { sampleEvery: 1.5 })).toThrow(/positive integer/);
+  });
+});
+
+describe('estimateJudgeCalls', () => {
+  it('is queries × metricsPerQuery(5) × configs × varianceSamples', () => {
+    expect(estimateJudgeCalls({ evaluatedQueries: 10, configs: 3 })).toBe(150); // 10×5×3×1
+    expect(estimateJudgeCalls({ evaluatedQueries: 10, configs: 3, varianceSamples: 4 })).toBe(600);
+    expect(estimateJudgeCalls({ evaluatedQueries: 4, configs: 2, metricsPerQuery: 5 })).toBe(40);
+  });
+});
+
+describe('runBenchmark — cost tier', () => {
+  it('defaults to the full tier (every query evaluated)', async () => {
+    const summary = await runBenchmark(TEN_QUERIES, makeOpts());
+    expect(summary.tier).toBe('full');
+    expect(summary.evaluatedQueries).toBe(10);
+    expect(summary.configs[0]?.retrieval.totalQueries).toBe(10);
+    expect(summary.estimatedJudgeCalls).toBe(estimateJudgeCalls({ evaluatedQueries: 10, configs: 1 }));
+  });
+
+  it('smoke tier evaluates only the reproducible subset', async () => {
+    const summary = await runBenchmark(
+      TEN_QUERIES,
+      makeOpts({ tier: 'smoke', sampleSize: 4 }),
+    );
+    expect(summary.tier).toBe('smoke');
+    expect(summary.evaluatedQueries).toBe(4);
+    expect(summary.configs[0]?.retrieval.totalQueries).toBe(4);
+    expect(summary.estimatedJudgeCalls).toBe(estimateJudgeCalls({ evaluatedQueries: 4, configs: 1 }));
+  });
+
+  it('threads varianceSamples into the cost estimate only (the run still judges once)', async () => {
+    const summary = await runBenchmark(EVAL_SET, makeOpts({ varianceSamples: 3 }));
+    // 1 query × 5 metrics × 1 config × 3 samples = 15.
+    expect(summary.estimatedJudgeCalls).toBe(15);
+    expect(summary.evaluatedQueries).toBe(1);
+  });
+
+  it('surfaces the tier + estimate in the rendered table metadata', async () => {
+    const summary = await runBenchmark(TEN_QUERIES, makeOpts({ tier: 'smoke', sampleSize: 4 }));
+    const table = renderBenchmarkTable(summary);
+    expect(table).toContain('Cost tier');
+    expect(table).toContain('smoke');
+    expect(table).toContain('Estimated judge calls');
+    expect(table).toContain('Queries evaluated');
+  });
+
+  it('rejects a bad tier / non-positive sampling option', async () => {
+    await expect(
+      runBenchmark(EVAL_SET, makeOpts({ tier: 'nope' as unknown as 'full' })),
+    ).rejects.toThrow('tier');
+    await expect(runBenchmark(EVAL_SET, makeOpts({ sampleSize: 0 }))).rejects.toThrow('sampleSize');
+    await expect(
+      runBenchmark(EVAL_SET, makeOpts({ varianceSamples: 1.5 })),
+    ).rejects.toThrow('varianceSamples');
+  });
+});
+
+describe('runBenchmark — judge cache wiring (caller injects a withJudgeCache judge)', () => {
+  it('dedupes identical judge prompts across configs (5 underlying calls, not 10)', async () => {
+    let underlyingCalls = 0;
+    const base = mockJudgeFn({ ...FULL_RESPONSES });
+    const counting: JudgeFn = (prompt) => {
+      underlyingCalls += 1;
+      return base(prompt);
+    };
+    const cached = withJudgeCache(counting, {
+      model: 'mock-judge-model',
+      promptVersion: JUDGE_PROMPT_VERSION,
+    });
+
+    // Two configs returning the SAME chunks → byte-identical judge prompts, so the
+    // second config's five judge calls are all served from cache.
+    const refSet: EvalSet = {
+      version: 'bench-eval-v1',
+      queries: [
+        { query: 'q', expected: [{ source: 'doc-a.md' }], referenceAnswer: '参考答案。' },
+      ],
+    };
+    await runBenchmark(
+      refSet,
+      makeOpts({
+        judgeFn: cached,
+        configs: [
+          { name: 'cfg-a', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+          { name: 'cfg-b', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+        ],
+      }),
+    );
+
+    // One query × five judge-bearing metrics = 5 distinct prompts; the second
+    // config reuses every one. Without the cache this would be 10.
+    expect(underlyingCalls).toBe(5);
   });
 });

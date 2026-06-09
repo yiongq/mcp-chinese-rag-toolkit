@@ -1,5 +1,11 @@
 export { runAnswerEval } from './answer-eval.js';
-export { renderBenchmarkTable, runBenchmark } from './benchmark.js';
+export {
+  DEFAULT_SMOKE_SAMPLE_SIZE,
+  estimateJudgeCalls,
+  renderBenchmarkTable,
+  runBenchmark,
+  sampleQueries,
+} from './benchmark.js';
 export type { WriteArtifactsOptions } from './ci-helper.js';
 export {
   DEFAULT_HIT_RATE_MIN,
@@ -26,6 +32,12 @@ export {
   cosineSimilarity,
   faithfulness,
 } from './judges.js';
+export type { JudgeCacheOptions, JudgeCacheStore } from './judge-cache.js';
+export {
+  computeJudgeCacheKey,
+  createMemoryJudgeCacheStore,
+  withJudgeCache,
+} from './judge-cache.js';
 export {
   callJudge,
   DEFAULT_JUDGE_TIMEOUT_MS,

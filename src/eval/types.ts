@@ -545,6 +545,32 @@ export interface BenchmarkOptions {
   judgeTimeoutMs?: number;
   /** Forwarded to retrieval scoring and ranking-gain derivation (page-exact match). */
   strict?: boolean;
+  /**
+   * Cost tier (AD-10). `'full'` evaluates every query (the nightly full run);
+   * `'smoke'` evaluates a reproducible subset (the cheap PR signal). Additive and
+   * backward-compatible — omitting it runs `'full'`, exactly as before. @default 'full'
+   */
+  tier?: 'full' | 'smoke';
+  /**
+   * Smoke subset size (number of queries kept). Applies ONLY when `tier: 'smoke'`.
+   * Selection is a fixed stride over the query order, so the same `sampleSize`
+   * always picks the same queries (reproducible, no RNG). Defaults to
+   * `DEFAULT_SMOKE_SAMPLE_SIZE` when `tier: 'smoke'` and neither sampling option is set.
+   */
+  sampleSize?: number;
+  /**
+   * Smoke stride: keep every Nth query (indices 0, N, 2N, …). Applies ONLY when
+   * `tier: 'smoke'`; takes precedence over `sampleSize` when both are set. Also
+   * fully reproducible.
+   */
+  sampleEvery?: number;
+  /**
+   * Variance samples per judged input — used ONLY to compute the run's cost
+   * estimate (the benchmark itself judges each input once; a separate variance
+   * harness drives the repeats). Mirrors the `queries × metrics × configs ×
+   * variance-samples` cost model (AD-12). @default 1
+   */
+  varianceSamples?: number;
 }
 
 /**
@@ -589,6 +615,20 @@ export interface BenchmarkSummary {
   topK: number;
   /** Reproducible version metadata, identical across configurations. */
   versionMeta: AnswerEvalVersionMeta;
+  /** The cost tier this run used (`'full'` | `'smoke'`). */
+  tier: 'full' | 'smoke';
+  /**
+   * Queries actually evaluated after smoke sampling — equals the eval set size on
+   * a `'full'` run, and the (smaller) sampled count on a `'smoke'` run.
+   */
+  evaluatedQueries: number;
+  /**
+   * Estimated judge calls for this run: `evaluatedQueries × metricsPerQuery ×
+   * configs × varianceSamples` (AD-12). This is the UN-CACHED upper bound — a
+   * `withJudgeCache`-wrapped judge serves identical calls from cache, so the real
+   * count is ≤ this. Surfaced so a run's cost is predictable before it executes.
+   */
+  estimatedJudgeCalls: number;
   /** One result row per configuration, in input order. */
   configs: BenchmarkConfigResult[];
 }

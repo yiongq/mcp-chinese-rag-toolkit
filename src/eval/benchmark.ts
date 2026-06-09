@@ -22,9 +22,13 @@
 // than refactor either entry point to share a single retrieval pass — both a mock
 // and a real retriever are idempotent, and an offline comparison can afford it.
 //
-// Cost note (documentation only): a run costs roughly
-// `queries × metrics × configs` judge calls. Caching, concurrency limiting and
-// variance sampling are deliberately out of scope here.
+// Cost model (AD-10 / AD-12): a run costs roughly `evaluatedQueries ×
+// metricsPerQuery × configs × varianceSamples` judge calls. Two levers keep that
+// affordable and predictable: a COST TIER (`'full'` nightly vs `'smoke'` PR subset,
+// reproducibly sampled) shrinks the `evaluatedQueries` factor, and an injected
+// `withJudgeCache`-wrapped judge dedupes identical calls (the same answer judged
+// under multiple configs is paid once). The estimate below is the UN-CACHED upper
+// bound, surfaced on every summary so a run's cost is known before it executes.
 
 import { runAnswerEval } from './answer-eval.js';
 import { DEFAULT_EVAL_TOP_K, expectedMatches, ndcg, runEval } from './eval-runner.js';
@@ -47,6 +51,79 @@ const METRIC_KEYS: ReadonlyArray<keyof AnswerEvalMetrics> = [
   'answerCorrectness',
   'contextRecall',
 ];
+
+/**
+ * Judge calls a single query can drive — one per RAGAS metric. Used as the
+ * `metricsPerQuery` factor of the cost estimate; it is the UPPER bound (a query
+ * with no reference answer / no embed function drives fewer), which is the right
+ * basis for a worst-case cost prediction.
+ */
+const JUDGE_CALLS_PER_QUERY = METRIC_KEYS.length;
+
+/** Default smoke-tier subset size when `tier: 'smoke'` is set with no explicit sampling option. */
+export const DEFAULT_SMOKE_SAMPLE_SIZE = 5;
+
+/**
+ * The un-cached judge-call cost estimate: `evaluatedQueries × metricsPerQuery ×
+ * configs × varianceSamples` (AD-12). PURE. `varianceSamples` defaults to 1 (the
+ * benchmark judges each input once); a caller modelling a variance sweep passes
+ * the repeat count to see the full sweep cost.
+ */
+export function estimateJudgeCalls(args: {
+  evaluatedQueries: number;
+  configs: number;
+  varianceSamples?: number | undefined;
+  metricsPerQuery?: number | undefined;
+}): number {
+  const variance = args.varianceSamples ?? 1;
+  const metrics = args.metricsPerQuery ?? JUDGE_CALLS_PER_QUERY;
+  return args.evaluatedQueries * metrics * args.configs * variance;
+}
+
+/**
+ * Reproducibly sample a query list for the smoke tier — NO RNG, so the same
+ * options always select the same queries (a PR signal must be replayable). When
+ * `sampleEvery` is set, keep every Nth query (indices 0, N, 2N, …); otherwise keep
+ * `sampleSize` queries on a fixed stride across the full order. Returns the list
+ * unchanged when the requested subset covers it. PURE.
+ */
+export function sampleQueries<T>(
+  queries: readonly T[],
+  opts: { sampleSize?: number | undefined; sampleEvery?: number | undefined },
+): T[] {
+  // This is a top-level PUBLIC export, so it validates its own precondition rather
+  // than trusting the caller-side `validateBenchmarkOptions` (which only runs inside
+  // runBenchmark). A non-positive / non-integer `sampleEvery` would otherwise make the
+  // `i += sampleEvery` stride below loop forever (0 never advances; a negative step
+  // runs backward and stays `< total`). Mirrors the validator's positive-integer rule.
+  if (opts.sampleEvery !== undefined && (!Number.isInteger(opts.sampleEvery) || opts.sampleEvery < 1)) {
+    throw new Error(
+      `sampleQueries: sampleEvery must be a positive integer, got ${String(opts.sampleEvery)}`,
+    );
+  }
+  const total = queries.length;
+  if (opts.sampleEvery !== undefined) {
+    const out: T[] = [];
+    for (let i = 0; i < total; i += opts.sampleEvery) {
+      const q = queries[i];
+      if (q !== undefined) out.push(q);
+    }
+    return out;
+  }
+  const size = opts.sampleSize ?? DEFAULT_SMOKE_SAMPLE_SIZE;
+  if (size >= total || size <= 0) return [...queries];
+  const stride = total / size;
+  const out: T[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < size; i += 1) {
+    const idx = Math.min(total - 1, Math.floor(i * stride));
+    if (seen.has(idx)) continue;
+    seen.add(idx);
+    const q = queries[idx];
+    if (q !== undefined) out.push(q);
+  }
+  return out;
+}
 
 /**
  * Run an eval set through every retrieval configuration and aggregate the results
@@ -72,15 +149,30 @@ export async function runBenchmark(
   const topK = opts.topK ?? DEFAULT_EVAL_TOP_K;
   validateBenchmarkOptions(opts, topK);
 
+  // Cost tier: 'smoke' evaluates a reproducible subset; 'full' (default) keeps the
+  // whole set. The sampling happens ONCE at the entry — the per-config loop below is
+  // untouched, so every resilience / metric property is identical to a full run.
+  const tier: 'full' | 'smoke' = opts.tier ?? 'full';
+  const evaluatedSet: EvalSet =
+    tier === 'smoke'
+      ? {
+          ...evalSet,
+          queries: sampleQueries(evalSet.queries, {
+            sampleSize: opts.sampleSize,
+            sampleEvery: opts.sampleEvery,
+          }),
+        }
+      : evalSet;
+
   const configs: BenchmarkConfigResult[] = [];
   for (const config of opts.configs) {
     // Retrieval pass: Hit Rate@K / MRR + the per-query top results nDCG needs.
-    const retrieval = await runEval(evalSet, {
+    const retrieval = await runEval(evaluatedSet, {
       searchFn: config.searchFn,
       topK,
       strict: opts.strict ?? false,
     });
-    const ndcgMean = meanNdcg(evalSet, retrieval, topK, opts.strict);
+    const ndcgMean = meanNdcg(evaluatedSet, retrieval, topK, opts.strict);
 
     // Answer-eval pass: the five RAGAS metrics + reproducible version metadata.
     // Optional fields are attached only when present (exactOptionalPropertyTypes).
@@ -94,7 +186,7 @@ export async function runBenchmark(
     };
     if (opts.embedFn !== undefined) answerOpts.embedFn = opts.embedFn;
     if (opts.judgeTimeoutMs !== undefined) answerOpts.judgeTimeoutMs = opts.judgeTimeoutMs;
-    const answer = await runAnswerEval(evalSet, answerOpts);
+    const answer = await runAnswerEval(evaluatedSet, answerOpts);
 
     configs.push({
       name: config.name,
@@ -116,11 +208,19 @@ export async function runBenchmark(
     throw new Error('runBenchmark: internal invariant violated — no configuration results');
   }
 
+  const evaluatedQueries = evaluatedSet.queries.length;
   return {
     evalSpecVersion: evalSet.version,
     timestamp: new Date().toISOString(),
     topK,
     versionMeta: first.answer.versionMeta,
+    tier,
+    evaluatedQueries,
+    estimatedJudgeCalls: estimateJudgeCalls({
+      evaluatedQueries,
+      configs: opts.configs.length,
+      varianceSamples: opts.varianceSamples,
+    }),
     configs,
   };
 }
@@ -168,6 +268,20 @@ function validateBenchmarkOptions(opts: BenchmarkOptions, topK: number): void {
   }
   if (!Number.isInteger(topK) || topK < 1) {
     throw new Error(`runBenchmark: topK must be a positive integer, got ${String(topK)}`);
+  }
+  if (opts.tier !== undefined && opts.tier !== 'full' && opts.tier !== 'smoke') {
+    throw new Error(`runBenchmark: opts.tier must be 'full' or 'smoke', got ${String(opts.tier)}`);
+  }
+  // Smoke-sampling and variance-sample counts feed query selection / the cost
+  // estimate, so a non-positive-integer would silently corrupt either — fail loudly.
+  for (const [k, v] of [
+    ['sampleSize', opts.sampleSize],
+    ['sampleEvery', opts.sampleEvery],
+    ['varianceSamples', opts.varianceSamples],
+  ] as const) {
+    if (v !== undefined && (!Number.isInteger(v) || v < 1)) {
+      throw new Error(`runBenchmark: opts.${k} must be a positive integer, got ${String(v)}`);
+    }
   }
 }
 
@@ -279,6 +393,11 @@ export function renderBenchmarkTable(summary: BenchmarkSummary): string {
   lines.push(`- **Timestamp (UTC)**: ${summary.timestamp}`);
   lines.push(`- **Top-K**: ${k}`);
   lines.push(`- **Configs compared**: ${summary.configs.length}`);
+  lines.push(`- **Cost tier**: ${summary.tier}`);
+  lines.push(`- **Queries evaluated**: ${summary.evaluatedQueries}`);
+  lines.push(
+    `- **Estimated judge calls** (un-cached upper bound): ${summary.estimatedJudgeCalls}`,
+  );
   lines.push(`- **Generation model**: \`${escapeInlineCode(meta.generateModel)}\``);
   lines.push(`- **Judge model**: \`${escapeInlineCode(meta.judgeModel)}\``);
   lines.push(`- **Judge prompt version**: \`${escapeInlineCode(meta.judgePromptVersion)}\``);

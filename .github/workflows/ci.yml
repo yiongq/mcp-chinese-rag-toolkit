@@ -133,7 +133,10 @@ jobs:
             eval-results/report.md
             eval-results/per-query.json
           retention-days: 30
-          # Hard-fail when the path matches nothing — e.g. bin/run-eval.ts ever
-          # changes its default out-dir, or the eval step crashes before writing
-          # artifacts — instead of silently uploading an empty archive.
-          if-no-files-found: error
+          # `warn`, not `error`, on purpose: this step is `continue-on-error: true`
+          # (best-effort diagnostic upload), so an `error` here would be SWALLOWED
+          # anyway — a dead setting that reads as a hard gate it can never be. A
+          # missing report (e.g. bin/run-eval.ts changes its out-dir, or the eval
+          # crashes before writing) is surfaced as a step WARNING in the logs; the
+          # actual build verdict is the Hit Rate gate in "Run fixture eval" above.
+          if-no-files-found: warn
