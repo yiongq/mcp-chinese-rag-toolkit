@@ -660,3 +660,141 @@ describe('runBenchmark — judge cache wiring (caller injects a withJudgeCache j
     expect(underlyingCalls).toBe(5);
   });
 });
+
+describe('runBenchmark — per-config generation override', () => {
+  it('calls a config-level generateFn for its own config only; others keep the shared default', async () => {
+    let sharedCalls = 0;
+    let overrideCalls = 0;
+    const sharedGenerate: GenerateFn = () => {
+      sharedCalls += 1;
+      return Promise.resolve(ANSWER);
+    };
+    const overrideGenerate: GenerateFn = () => {
+      overrideCalls += 1;
+      return Promise.resolve(ANSWER);
+    };
+
+    await runBenchmark(
+      EVAL_SET,
+      makeOpts({
+        generateFn: sharedGenerate,
+        configs: [
+          { name: 'default-path', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+          {
+            name: 'override-path',
+            searchFn: searchFnReturning([DOC_A, DOC_B]),
+            generateFn: overrideGenerate,
+            generateModel: 'override-model',
+          },
+        ],
+      }),
+    );
+
+    // One query → exactly one generate call per config, each through its own fn.
+    expect(sharedCalls).toBe(1);
+    expect(overrideCalls).toBe(1);
+  });
+
+  it('stamps per-config version metadata honestly and aggregates differing models at the summary level', async () => {
+    const summary = await runBenchmark(
+      EVAL_SET,
+      makeOpts({
+        configs: [
+          { name: 'default-path', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+          {
+            name: 'override-path',
+            searchFn: searchFnReturning([DOC_A, DOC_B]),
+            generateFn: okGenerateFn(ANSWER),
+            generateModel: 'override-model',
+          },
+        ],
+      }),
+    );
+
+    // Each config's own answer metadata carries its RESOLVED model.
+    expect(configByName(summary, 'default-path').answer.versionMeta.generateModel).toBe(
+      'mock-generate-model',
+    );
+    expect(configByName(summary, 'override-path').answer.versionMeta.generateModel).toBe(
+      'override-model',
+    );
+    // The summary never pretends a single model produced both: explicit aggregate.
+    expect(summary.versionMeta.generateModel).toBe(
+      'default-path=mock-generate-model; override-path=override-model',
+    );
+    // The judge-side fields stay the genuinely-shared values.
+    expect(summary.versionMeta.judgeModel).toBe('mock-judge-model');
+  });
+
+  it('keeps the single-model summary form when every config resolves to the same model', async () => {
+    const summary = await runBenchmark(
+      EVAL_SET,
+      makeOpts({
+        configs: [
+          { name: 'cfg-a', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+          {
+            name: 'cfg-b',
+            searchFn: searchFnReturning([DOC_A, DOC_B]),
+            generateFn: okGenerateFn(ANSWER),
+            // Same model name as the run-level default → no aggregate form.
+            generateModel: 'mock-generate-model',
+          },
+        ],
+      }),
+    );
+    expect(summary.versionMeta.generateModel).toBe('mock-generate-model');
+  });
+
+  it('renders per-config generation-model lines when models differ, single line otherwise', async () => {
+    const mixed = await runBenchmark(
+      EVAL_SET,
+      makeOpts({
+        configs: [
+          { name: 'default-path', searchFn: searchFnReturning([DOC_A, DOC_B]) },
+          {
+            name: 'override-path',
+            searchFn: searchFnReturning([DOC_A, DOC_B]),
+            generateFn: okGenerateFn(ANSWER),
+            generateModel: 'override-model',
+          },
+        ],
+      }),
+    );
+    const mixedTable = renderBenchmarkTable(mixed);
+    expect(mixedTable).toContain('- **Generation model**: per configuration —');
+    expect(mixedTable).toContain('  - `default-path`: `mock-generate-model`');
+    expect(mixedTable).toContain('  - `override-path`: `override-model`');
+
+    const uniform = await runBenchmark(EVAL_SET, makeOpts());
+    const uniformTable = renderBenchmarkTable(uniform);
+    expect(uniformTable).toContain('- **Generation model**: `mock-generate-model`');
+    expect(uniformTable).not.toContain('per configuration');
+  });
+
+  it('rejects a non-function config generateFn and a blank config generateModel', async () => {
+    await expect(
+      runBenchmark(
+        EVAL_SET,
+        makeOpts({
+          configs: [
+            {
+              name: 'bad-fn',
+              searchFn: searchFnReturning([DOC_A]),
+              generateFn: 'nope' as unknown as GenerateFn,
+            },
+          ],
+        }),
+      ),
+    ).rejects.toThrow('configs[0].generateFn');
+    await expect(
+      runBenchmark(
+        EVAL_SET,
+        makeOpts({
+          configs: [
+            { name: 'bad-model', searchFn: searchFnReturning([DOC_A]), generateModel: '  ' },
+          ],
+        }),
+      ),
+    ).rejects.toThrow('configs[0].generateModel');
+  });
+});

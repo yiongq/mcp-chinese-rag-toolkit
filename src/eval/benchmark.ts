@@ -175,13 +175,18 @@ export async function runBenchmark(
     const ndcgMean = meanNdcg(evaluatedSet, retrieval, topK, opts.strict);
 
     // Answer-eval pass: the five RAGAS metrics + reproducible version metadata.
+    // Per-config generation override: a configuration that generates answers
+    // differently (different model, different orchestration) brings its own
+    // generateFn/generateModel pair; everything else falls back to the shared
+    // run-level pair. The per-config `answer.versionMeta` is stamped from the
+    // RESOLVED pair, so each row's metadata is honest on its own.
     // Optional fields are attached only when present (exactOptionalPropertyTypes).
     const answerOpts: AnswerEvalOptions = {
       searchFn: config.searchFn,
-      generateFn: opts.generateFn,
+      generateFn: config.generateFn ?? opts.generateFn,
       judgeFn: opts.judgeFn,
       topK,
-      generateModel: opts.generateModel,
+      generateModel: config.generateModel ?? opts.generateModel,
       judgeModel: opts.judgeModel,
     };
     if (opts.embedFn !== undefined) answerOpts.embedFn = opts.embedFn;
@@ -197,23 +202,38 @@ export async function runBenchmark(
     });
   }
 
-  // Version metadata is identical across configurations (same models, toolkit,
-  // judge prompt and eval spec), so it is pinned once from the first config rather
-  // than re-assembled here — re-assembling would reintroduce the hardcoding risk
-  // the answer-eval orchestrator already eliminated.
+  // Summary-level version metadata. The judge / toolkit / eval-spec fields are
+  // identical across configurations by construction (single judgeFn / judge
+  // model / toolkit / eval set per run), so they are pinned from the first
+  // config rather than re-assembled — re-assembling would reintroduce the
+  // hardcoding risk the answer-eval orchestrator already eliminated. The
+  // generation model may now differ per configuration: when it does, the
+  // summary field becomes an explicit `name=model; name=model` aggregate
+  // (never silently the first config's model — that would misattribute every
+  // other configuration's answers in the audit trail).
   const first = configs[0];
   if (first === undefined) {
     // Unreachable: validateBenchmarkOptions guarantees a non-empty configs array,
     // but noUncheckedIndexedAccess types the read as possibly-undefined.
     throw new Error('runBenchmark: internal invariant violated — no configuration results');
   }
+  const generateModels = configs.map((c) => c.answer.versionMeta.generateModel);
+  const versionMeta =
+    new Set(generateModels).size <= 1
+      ? first.answer.versionMeta
+      : {
+          ...first.answer.versionMeta,
+          generateModel: configs
+            .map((c) => `${c.name}=${c.answer.versionMeta.generateModel}`)
+            .join('; '),
+        };
 
   const evaluatedQueries = evaluatedSet.queries.length;
   return {
     evalSpecVersion: evalSet.version,
     timestamp: new Date().toISOString(),
     topK,
-    versionMeta: first.answer.versionMeta,
+    versionMeta,
     tier,
     evaluatedQueries,
     estimatedJudgeCalls: estimateJudgeCalls({
@@ -247,6 +267,19 @@ function validateBenchmarkOptions(opts: BenchmarkOptions, topK: number): void {
     seenNames.add(config.name);
     if (typeof config.searchFn !== 'function') {
       throw new Error(`runBenchmark: opts.configs[${i}].searchFn must be a function`);
+    }
+    // Per-config generation overrides get the same posture as their run-level
+    // counterparts below: a function when provided, a non-empty model name.
+    if (config.generateFn !== undefined && typeof config.generateFn !== 'function') {
+      throw new Error(`runBenchmark: opts.configs[${i}].generateFn must be a function when provided`);
+    }
+    if (
+      config.generateModel !== undefined &&
+      (typeof config.generateModel !== 'string' || config.generateModel.trim() === '')
+    ) {
+      throw new Error(
+        `runBenchmark: opts.configs[${i}].generateModel must be a non-empty string when provided`,
+      );
     }
   }
   if (typeof opts.generateFn !== 'function') {
@@ -398,7 +431,21 @@ export function renderBenchmarkTable(summary: BenchmarkSummary): string {
   lines.push(
     `- **Estimated judge calls** (un-cached upper bound): ${summary.estimatedJudgeCalls}`,
   );
-  lines.push(`- **Generation model**: \`${escapeInlineCode(meta.generateModel)}\``);
+  // Generation model: a single line when every configuration resolved to the
+  // same model; one line PER configuration when they differ — the reader must
+  // see which row's answers came from which generation path, never a single
+  // model name silently standing in for all of them.
+  const generationModels = summary.configs.map((c) => c.answer.versionMeta.generateModel);
+  if (new Set(generationModels).size <= 1) {
+    lines.push(`- **Generation model**: \`${escapeInlineCode(meta.generateModel)}\``);
+  } else {
+    lines.push('- **Generation model**: per configuration —');
+    for (const config of summary.configs) {
+      lines.push(
+        `  - \`${escapeInlineCode(config.name)}\`: \`${escapeInlineCode(config.answer.versionMeta.generateModel)}\``,
+      );
+    }
+  }
   lines.push(`- **Judge model**: \`${escapeInlineCode(meta.judgeModel)}\``);
   lines.push(`- **Judge prompt version**: \`${escapeInlineCode(meta.judgePromptVersion)}\``);
   lines.push(`- **Toolkit version**: \`${escapeInlineCode(meta.toolkitVersion)}\``);

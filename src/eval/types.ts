@@ -517,19 +517,40 @@ export interface AnswerEvalOptions {
  * One named retrieval configuration to compare. The caller pre-wires `searchFn`
  * to a specific retrieval variant; the toolkit does not know how that variant is
  * constructed and never inspects it beyond calling it.
+ *
+ * Comparing configurations that also GENERATE answers differently (e.g. a
+ * different generation model, or a different end-to-end orchestration of
+ * retrieval + generation) is a general benchmark need — the optional
+ * `generateFn` / `generateModel` pair overrides the run-level defaults for
+ * THIS configuration only. Omitting them keeps the shared run-level pair, so
+ * existing callers are untouched.
  */
 export interface BenchmarkConfig {
   /** Display name for this configuration's row in the comparison table. */
   name: string;
   /** The retrieval variant under evaluation, injected by the caller. */
   searchFn: EvalSearchFn;
+  /**
+   * Optional per-configuration answer generation override. Falls back to
+   * `BenchmarkOptions.generateFn` when omitted.
+   */
+  generateFn?: GenerateFn;
+  /**
+   * Optional per-configuration generation model name, stamped into this
+   * configuration's answer-eval version metadata. Falls back to
+   * `BenchmarkOptions.generateModel` when omitted. Non-empty when provided.
+   */
+  generateModel?: string;
 }
 
 /** Options for `runBenchmark`. */
 export interface BenchmarkOptions {
   /** Named retrieval configurations to compare; non-empty, names must be unique. */
   configs: BenchmarkConfig[];
-  /** Answer generation function, shared across all configurations. Caller-injected. */
+  /**
+   * Default answer generation function — used by every configuration that does
+   * not provide its own `BenchmarkConfig.generateFn`. Caller-injected.
+   */
   generateFn: GenerateFn;
   /** Judge function driving the answer-quality judge tasks. Caller-injected. */
   judgeFn: JudgeFn;
@@ -537,7 +558,11 @@ export interface BenchmarkOptions {
   embedFn?: EmbedFn;
   /** Top-K for retrieval, ranking gain and answer context. @default DEFAULT_EVAL_TOP_K */
   topK?: number;
-  /** Generation model name, stamped into version metadata. Required, non-empty. */
+  /**
+   * Default generation model name, stamped into the version metadata of every
+   * configuration that does not provide its own `BenchmarkConfig.generateModel`.
+   * Required, non-empty.
+   */
   generateModel: string;
   /** Judge model name, stamped into version metadata. Required, non-empty. */
   judgeModel: string;
@@ -596,8 +621,10 @@ export interface BenchmarkConfigResult {
 
 /**
  * Aggregate result of a multi-config comparison run, returned by `runBenchmark`.
- * The version metadata is pinned ONCE at the summary level because every
- * configuration shares the same models, toolkit, judge prompt and eval spec. The
+ * Version metadata is surfaced at the summary level; when configurations use
+ * per-config generation overrides, the summary's `generateModel` becomes an
+ * explicit per-config aggregate (see {@link BenchmarkSummary.versionMeta}) and
+ * each configuration's own `answer.versionMeta` stays the per-config truth. The
  * many metrics are intentionally NOT collapsed into a single "overall" score —
  * they measure different things on different scales.
  */
@@ -613,7 +640,15 @@ export interface BenchmarkSummary {
   timestamp: string;
   /** Top-K used across retrieval, ranking gain and answer context. */
   topK: number;
-  /** Reproducible version metadata, identical across configurations. */
+  /**
+   * Reproducible version metadata. The judge / toolkit / eval-spec fields are
+   * identical across configurations by construction. `generateModel` is the
+   * shared model name when every configuration resolved to the same one;
+   * when per-config generation overrides differ, it is an explicit
+   * `name=model; name=model` aggregate (never silently the first config's
+   * model) — each configuration's true model stays on its own
+   * `configs[].answer.versionMeta.generateModel`.
+   */
   versionMeta: AnswerEvalVersionMeta;
   /** The cost tier this run used (`'full'` | `'smoke'`). */
   tier: 'full' | 'smoke';
