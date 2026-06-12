@@ -128,14 +128,49 @@ describe('rewriteQuery — output cleaning', () => {
     { name: 'curly double quotes', raw: `“${bare}”` },
     { name: 'ASCII double quotes', raw: `"${bare}"` },
     { name: 'ASCII single quotes', raw: `'${bare}'` },
+    { name: 'curly single quotes', raw: `‘${bare}’` },
+    { name: 'inline backticks', raw: `\`${bare}\`` },
     { name: 'nested quotes', raw: `"「${bare}」"` },
     { name: 'markdown code fence', raw: `\`\`\`\n${bare}\n\`\`\`` },
     { name: 'language-tagged fence', raw: `\`\`\`text\n${bare}\n\`\`\`` },
+    { name: 'tilde fence', raw: `~~~\n${bare}\n~~~` },
+    { name: 'single-line fence', raw: `\`\`\`${bare}\`\`\`` },
+    // The inter-Han space a mid-sentence line wrap would leave is dropped, not kept.
     { name: 'surrounding whitespace and inner newline', raw: `  病假一共有\n多少天？  ` },
   ])('cleans wrapping noise ($name)', async ({ raw }) => {
     const outcome = await rewriteQuery({ history: HISTORY, query: '那它呢', generateFn: okGenerate(raw) });
-    expect(outcome.source).toBe('model');
-    expect(outcome.query).toBe(raw.includes('\n多少天') ? '病假一共有 多少天？' : bare);
+    expect(outcome).toEqual({ query: bare, source: 'model' });
+  });
+
+  it('keeps the space between CJK and ASCII segments when collapsing whitespace', async () => {
+    const outcome = await rewriteQuery({
+      history: HISTORY,
+      query: '那它呢',
+      generateFn: okGenerate('病假 policy\n文档在哪里？'),
+    });
+    expect(outcome).toEqual({ query: '病假 policy 文档在哪里？', source: 'model' });
+  });
+
+  it('treats a lone ASCII word in a single-line fence as content, not a language tag', async () => {
+    const outcome = await rewriteQuery({
+      history: HISTORY,
+      query: '那它呢',
+      generateFn: okGenerate('```vacation```'),
+    });
+    expect(outcome).toEqual({ query: 'vacation', source: 'model' });
+  });
+});
+
+describe('rewriteQuery — quote-pair integrity (content quotes are not a wrapper)', () => {
+  // A rewrite that merely starts and ends on quote characters must not be
+  // spliced apart: only a genuine wrapper (no same quotes inside) is stripped.
+  it.each([
+    { name: 'CJK corner quotes as content', raw: '「年假」与「病假」' },
+    { name: 'ASCII double quotes as content', raw: '"年假"和"病假"' },
+    { name: 'content quotes with a tail', raw: '「年假」与「病假」的区别' },
+  ])('preserves interior quote pairs untouched ($name)', async ({ raw }) => {
+    const outcome = await rewriteQuery({ history: HISTORY, query: '那它呢', generateFn: okGenerate(raw) });
+    expect(outcome).toEqual({ query: raw, source: 'model' });
   });
 });
 
@@ -155,6 +190,36 @@ describe('rewriteQuery — timeout budget validation (same discipline as the jud
       expect(outcome).toEqual({ query: '病假一共有多少天？', source: 'model' });
     },
   );
+
+  it('caps an over-large finite budget instead of letting setTimeout clamp it to ~1ms', async () => {
+    // setTimeout treats delays above 2^31-1 as ~1ms; uncapped, this huge budget
+    // would lose against a 25ms model and spuriously degrade every call.
+    const outcome = await rewriteQuery({
+      history: HISTORY,
+      query: '那它呢',
+      generateFn: delayedGenerate('病假一共有多少天？', 25),
+      timeoutMs: Number.MAX_SAFE_INTEGER,
+    });
+    expect(outcome).toEqual({ query: '病假一共有多少天？', source: 'model' });
+  });
+
+  it('swallows a generateFn rejection that arrives after the timeout already degraded', async () => {
+    const err = new Error('late infrastructure failure');
+    const generateFn = vi.fn(
+      (_prompt: string) =>
+        new Promise<string>((_resolve, reject) => setTimeout(() => reject(err), 20)),
+    );
+    const outcome = await rewriteQuery({
+      history: HISTORY,
+      query: '那它呢',
+      generateFn,
+      timeoutMs: 5,
+    });
+    expect(outcome).toEqual({ query: '那它呢', source: 'degraded', reason: 'timeout' });
+    // Give the late rejection time to fire — were it unobserved, the runner
+    // would fail the suite with an unhandled rejection.
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  });
 
   it('exposes a positive default budget constant', () => {
     expect(DEFAULT_REWRITE_TIMEOUT_MS).toBeGreaterThan(0);

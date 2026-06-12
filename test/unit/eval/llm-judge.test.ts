@@ -124,6 +124,29 @@ describe('callJudge', () => {
     }
   });
 
+  it('caps an over-large finite budget instead of letting setTimeout clamp it to ~1ms', async () => {
+    // setTimeout treats delays above 2^31-1 as ~1ms; uncapped, a huge budget
+    // meant as "effectively no timeout" would spuriously time out a 25ms judge.
+    const slowJudge: JudgeFn = () =>
+      new Promise((resolve) => setTimeout(() => resolve('{"x":1}'), 25));
+    const outcome = await callJudge(slowJudge, 'p', (raw) => JSON.parse(raw), {
+      timeoutMs: Number.MAX_SAFE_INTEGER,
+    });
+    expect(expectOk(outcome)).toEqual({ x: 1 });
+  });
+
+  it('swallows a judge rejection that arrives after the timeout already degraded', async () => {
+    const lateRejectJudge: JudgeFn = () =>
+      new Promise((_resolve, reject) =>
+        setTimeout(() => reject(new Error('late infrastructure failure')), 20),
+      );
+    const outcome = await callJudge(lateRejectJudge, 'p', (raw) => raw, { timeoutMs: 5 });
+    expect(expectDegrade(outcome).error).toBe('EVAL_JUDGE_TIMEOUT');
+    // Give the late rejection time to fire — were it unobserved, the runner
+    // would fail the suite with an unhandled rejection.
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  });
+
   it('exposes a default timeout constant and a dated prompt version', () => {
     expect(DEFAULT_JUDGE_TIMEOUT_MS).toBeGreaterThan(0);
     // ISO date with an optional `.N` same-day revision suffix (a prose-hardening

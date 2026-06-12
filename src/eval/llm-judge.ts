@@ -29,6 +29,10 @@ import type {
 /** Default wall-clock budget for a judge call before it degrades to a timeout. */
 export const DEFAULT_JUDGE_TIMEOUT_MS = 30_000;
 
+/** `setTimeout` clamps any delay above 2^31-1 to ~1ms — a huge "effectively no
+ *  timeout" budget must not turn into an instant spurious timeout. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
 /**
  * Version stamp for the judge prompt prose, bumped whenever the prompt wording
  * changes so a run can record which prompt produced its scores. A judge's output
@@ -60,8 +64,10 @@ export const JUDGE_PROMPT_VERSION = '2026-06-09.1';
  * either judge code would blur their precise meaning.
  *
  * The judge function carries no abort signal, so a timeout only stops the
- * waiting: a slow `judgeFn` promise that resolves later is ignored. That is
- * acceptable for an eval call.
+ * waiting: a slow `judgeFn` promise that settles later is ignored — a late
+ * rejection is observed by a no-op handler, so it can never surface as an
+ * unhandled rejection and crash the process. That is acceptable for an eval
+ * call.
  */
 export async function callJudge<T>(
   judgeFn: JudgeFn,
@@ -71,21 +77,29 @@ export async function callJudge<T>(
 ): Promise<JudgeOutcome<T>> {
   // Fall back to the default for any budget that is not a usable wall-clock
   // deadline. A `0`, negative, `NaN`, or `Infinity` value would otherwise be
-  // coerced by `setTimeout` to ~1ms (or overflow with a warning) and degrade
-  // even a fast judge to a spurious timeout; `??` alone only guards `undefined`.
-  // There is no "disable the timeout" sentinel — omit the option for the default.
+  // coerced by `setTimeout` to ~1ms and degrade even a fast judge to a spurious
+  // timeout; `??` alone only guards `undefined`. Finite values above 2^31-1
+  // would be clamped by `setTimeout` to ~1ms the same way, so they are capped
+  // instead. There is no "disable the timeout" sentinel — omit the option for
+  // the default.
   const requested = opts?.timeoutMs;
   const timeoutMs =
     typeof requested === 'number' && Number.isFinite(requested) && requested > 0
-      ? requested
+      ? Math.min(requested, MAX_TIMEOUT_MS)
       : DEFAULT_JUDGE_TIMEOUT_MS;
   // A resolved sentinel (not a rejection) keeps "timed out" a definite value
   // check, never confused with a genuine `judgeFn` rejection.
   const TIMEOUT = Symbol('judge-timeout');
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    // Pin a no-op rejection observer BEFORE racing: if the timeout wins, a
+    // rejection arriving afterwards has lost its only awaiter and would
+    // otherwise be an unhandled rejection (a process crash by default).
+    // A rejection that wins the race still propagates through `raced` below.
+    const judgePromise = judgeFn(prompt);
+    judgePromise.catch(() => {});
     const raced = await Promise.race([
-      judgeFn(prompt),
+      judgePromise,
       new Promise<typeof TIMEOUT>((resolve) => {
         timer = setTimeout(() => resolve(TIMEOUT), timeoutMs);
       }),

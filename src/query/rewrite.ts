@@ -56,7 +56,8 @@ export interface RewriteQueryInput {
   /**
    * Wall-clock budget in ms before the call degrades to a timeout. Same
    * validation discipline as `JudgeCallOptions.timeoutMs`: must be a finite,
-   * positive number; any other value falls back to the default.
+   * positive number; any other value falls back to the default. Values above
+   * 2^31-1 (the largest delay `setTimeout` honours) are capped, not rejected.
    * @default DEFAULT_REWRITE_TIMEOUT_MS
    */
   timeoutMs?: number;
@@ -103,6 +104,10 @@ export const REWRITE_PROMPT_VERSION = '2026-06-12';
  */
 const MAX_REWRITTEN_QUERY_CHARS = 512;
 
+/** `setTimeout` clamps any delay above 2^31-1 to ~1ms — a huge "effectively no
+ *  timeout" budget must not turn into an instant spurious timeout. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
 const ROLE_LABELS: Record<ConversationTurn['role'], string> = {
   user: '用户',
   assistant: '助手',
@@ -122,7 +127,9 @@ export function buildRewritePrompt(input: {
   query: string;
 }): string {
   const historyText = input.history
-    .map((turn) => `${ROLE_LABELS[turn.role]}：${turn.content}`)
+    // The role union is closed in TypeScript, but a plain-JS caller can pass
+    // anything — fall back to the raw role rather than embedding "undefined：".
+    .map((turn) => `${ROLE_LABELS[turn.role] ?? turn.role}：${turn.content}`)
     .join('\n');
   return [
     '你是检索查询改写助手。结合「对话历史」，把「当前问题」改写为不依赖上文、可独立用于检索的自包含问题。',
@@ -147,33 +154,53 @@ const QUOTE_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['「', '」'],
   ['『', '』'],
   ['“', '”'],
+  ['‘', '’'],
   ['"', '"'],
   ["'", "'"],
+  ['`', '`'],
 ];
 
 /**
  * Clean a raw model response into a usable retrieval query, or throw when the
  * output is unusable (the throw is the degrade signal — `callJudge` maps it to
  * a malformed-output degrade, it never escapes `rewriteQuery`):
- * trim → strip a wrapping Markdown code fence → strip wrapping quote pairs →
- * collapse all whitespace runs (incl. newlines) to single spaces → reject
+ * trim → strip a wrapping Markdown code fence → strip wrapping quote pairs
+ * (only genuine wrappers — quote characters that reappear inside the text are
+ * content and stay) → collapse all whitespace runs (incl. newlines) to single
+ * spaces, dropping the spaces that lands between two Han characters → reject
  * empty or implausibly long output.
  */
 function parseRewriteOutput(raw: string): string {
   let text = raw.trim();
-  const fenced = text.match(/^```[\w-]*\s*\n?([\s\S]*?)\n?```$/);
-  if (fenced?.[1] !== undefined) text = fenced[1].trim();
+  // A wrapping code fence (``` or ~~~): the tagged multi-line form first, then
+  // a bare single-line wrap — there a lone ASCII word is content, not a
+  // language tag, so the tag is only stripped when whitespace separates it.
+  const fenced =
+    text.match(/^(```|~~~)[\w-]*\n([\s\S]*?)\n?\1$/) ??
+    text.match(/^(```|~~~)(?:[\w-]+[ \t]+)?([\s\S]*?)\s*\1$/);
+  if (fenced?.[2] !== undefined) text = fenced[2].trim();
   let stripped = true;
   while (stripped && text.length > 1) {
     stripped = false;
     for (const [open, close] of QUOTE_PAIRS) {
-      if (text.startsWith(open) && text.endsWith(close) && text.length > open.length) {
-        text = text.slice(open.length, text.length - close.length).trim();
-        stripped = true;
+      if (!(text.startsWith(open) && text.endsWith(close) && text.length > open.length)) {
+        continue;
       }
+      // Only strip a GENUINE wrapper: when the same quote characters also
+      // appear in the interior (「年假」与「病假」), the outer pair is content
+      // and stripping would splice the text apart mid-string.
+      const inner = text.slice(open.length, text.length - close.length);
+      if (inner.includes(open) || inner.includes(close)) continue;
+      text = inner.trim();
+      stripped = true;
     }
   }
+  // Collapse whitespace runs to single spaces, then drop the spaces this puts
+  // BETWEEN two Han characters — Chinese prose carries no inter-word spaces,
+  // and a model's mid-sentence line wrap must not leak an ASCII space into the
+  // retrieval query.
   text = text.replace(/\s+/g, ' ').trim();
+  text = text.replace(/(\p{Script=Han}) (?=\p{Script=Han})/gu, '$1');
   if (text === '') throw new Error('rewrite output is empty after cleaning');
   if ([...text].length > MAX_REWRITTEN_QUERY_CHARS) {
     throw new Error(
@@ -205,11 +232,13 @@ export async function rewriteQuery(input: RewriteQueryInput): Promise<RewriteQue
   }
 
   // Same validation discipline as callJudge, but applied here so the rewrite
-  // default (not the judge default) backs an absent/invalid budget.
+  // default (not the judge default) backs an absent/invalid budget. Capped at
+  // MAX_TIMEOUT_MS: setTimeout would clamp anything larger to ~1ms and degrade
+  // every call to a spurious timeout.
   const requested = input.timeoutMs;
   const timeoutMs =
     typeof requested === 'number' && Number.isFinite(requested) && requested > 0
-      ? requested
+      ? Math.min(requested, MAX_TIMEOUT_MS)
       : DEFAULT_REWRITE_TIMEOUT_MS;
 
   const prompt = buildRewritePrompt({ history: input.history, query: input.query });
