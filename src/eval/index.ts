@@ -1,5 +1,6 @@
 export { runAnswerEval } from './answer-eval.js';
 export {
+  aggregateAnswerMeans,
   DEFAULT_SMOKE_SAMPLE_SIZE,
   estimateJudgeCalls,
   renderBenchmarkTable,

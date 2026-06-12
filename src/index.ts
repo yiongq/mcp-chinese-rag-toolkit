@@ -46,6 +46,7 @@ export type {
   WriteArtifactsOptions,
 } from './eval/index.js';
 export {
+  aggregateAnswerMeans,
   answerCorrectness,
   answerRelevance,
   assertContentPopulated,
