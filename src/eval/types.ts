@@ -5,6 +5,7 @@
 // `import type` is erased at compile time (verbatimModuleSyntax), so referencing
 // the error core here introduces no runtime import cycle with `errors.ts`.
 import type { EvalErrorCore } from './errors.js';
+import type { ConversationTurn } from '../query/rewrite.js';
 
 /**
  * Result row returned by an evaluatable `searchFn`. Field naming mirrors
@@ -36,7 +37,19 @@ export interface EvalSearchResult {
  * NOT bind to any specific MCP tool; a downstream consumer package or
  * third-party each wire their own.
  */
-export type EvalSearchFn = (query: string, opts?: { topK?: number }) => Promise<EvalSearchResult[]>;
+export type EvalSearchFn = (
+  query: string,
+  opts?: {
+    topK?: number;
+    /**
+     * Prior conversation turns for multi-turn eval cases, oldest-first. The
+     * eval harness only passes this through from {@link EvalQuery.history};
+     * whether retrieval is history-aware is entirely the caller's decision —
+     * a history-agnostic searchFn can simply ignore it.
+     */
+    history?: readonly ConversationTurn[];
+  },
+) => Promise<EvalSearchResult[]>;
 
 /**
  * Expected hit declaration — `source` is REQUIRED, `page` is optional (when
@@ -77,6 +90,15 @@ export interface EvalQuery {
    * additive — existing eval sets and callers that never set it are unaffected.
    */
   referenceAnswer?: string;
+  /**
+   * Optional prior conversation turns for multi-turn conversational eval
+   * cases, oldest-first (role alternation is NOT enforced — the harness
+   * validates shape only: role ∈ user|assistant, non-empty string content).
+   * The harness merely passes it through to the injected searchFn/generateFn;
+   * it never consumes history itself. Purely additive — single-turn eval sets
+   * and history-agnostic callers are unaffected.
+   */
+  history?: ConversationTurn[];
 }
 
 /** Top-level eval-set.yml document shape. */
@@ -375,7 +397,16 @@ export type JudgeOutcome<T> = { ok: true; value: T } | { ok: false; error: EvalE
  * caller wires a real language model behind this single shape, or a deterministic
  * mock in CI.
  */
-export type GenerateFn = (input: { query: string; context: string }) => Promise<string>;
+export type GenerateFn = (input: {
+  query: string;
+  context: string;
+  /**
+   * Prior conversation turns for multi-turn eval cases, oldest-first. Passed
+   * through verbatim from {@link EvalQuery.history}; a history-agnostic
+   * generate function can ignore it. Absent for single-turn cases.
+   */
+  history?: readonly ConversationTurn[];
+}) => Promise<string>;
 
 /**
  * Embed a batch of texts into vectors, one row per input in the same order.

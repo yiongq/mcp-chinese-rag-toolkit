@@ -160,7 +160,12 @@ async function evaluateQuery(
     // 1. Retrieve context. A throw or a non-array is fatal for this query.
     let rawResults: EvalSearchResult[];
     try {
-      rawResults = await opts.searchFn(query.query, { topK });
+      rawResults = await opts.searchFn(query.query, {
+        topK,
+        // Conditional spread keeps single-turn calls byte-identical under
+        // exactOptionalPropertyTypes (no `history: undefined` key).
+        ...(query.history !== undefined ? { history: query.history } : {}),
+      });
     } catch (err) {
       row.error = errorMessage(err);
       return finalize(row, skipped);
@@ -190,7 +195,11 @@ async function evaluateQuery(
     //    guard on retrieved chunks. (An empty string IS a valid answer — a model
     //    abstention scores 0 by design — so only the type, not the length, is
     //    enforced here.)
-    const answer = await opts.generateFn({ query: query.query, context });
+    const answer = await opts.generateFn({
+      query: query.query,
+      context,
+      ...(query.history !== undefined ? { history: query.history } : {}),
+    });
     if (typeof answer !== 'string') {
       throw new Error(
         `runAnswerEval: generateFn for query="${query.query}" returned a non-string answer ` +

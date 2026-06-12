@@ -4,6 +4,7 @@ import type { Document } from 'yaml';
 import { isMap, isScalar, parseDocument } from 'yaml';
 
 import { evalError } from './errors.js';
+import type { ConversationTurn } from '../query/rewrite.js';
 import type {
   EvalExpected,
   EvalQuery,
@@ -95,6 +96,7 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
       category?: unknown;
       reason?: unknown;
       referenceAnswer?: unknown;
+      history?: unknown;
     };
     if (typeof item.query !== 'string' || item.query.trim().length === 0) {
       throw new Error(`loadEvalSet: queries[${i}].query must be a non-empty string`);
@@ -153,6 +155,35 @@ export function loadEvalSet(evalSetPath: string): EvalSet {
         );
       }
       out.referenceAnswer = item.referenceAnswer;
+    }
+    // Optional multi-turn conversation history. Only attach when present so
+    // single-turn eval sets stay untouched; when present every turn must be a
+    // { role: user|assistant, content: non-empty string } mapping — a malformed
+    // turn is an authoring mistake the run must surface, not silently drop.
+    if (item.history !== undefined) {
+      if (!Array.isArray(item.history)) {
+        throw new Error(`loadEvalSet: queries[${i}].history must be an array when present`);
+      }
+      const history: ConversationTurn[] = item.history.map((rawTurn, j) => {
+        if (rawTurn === null || typeof rawTurn !== 'object' || Array.isArray(rawTurn)) {
+          throw new Error(
+            `loadEvalSet: queries[${i}].history[${j}] must be a mapping { role, content }`,
+          );
+        }
+        const t = rawTurn as { role?: unknown; content?: unknown };
+        if (t.role !== 'user' && t.role !== 'assistant') {
+          throw new Error(
+            `loadEvalSet: queries[${i}].history[${j}].role must be 'user' or 'assistant'`,
+          );
+        }
+        if (typeof t.content !== 'string' || t.content.trim().length === 0) {
+          throw new Error(
+            `loadEvalSet: queries[${i}].history[${j}].content must be a non-empty string`,
+          );
+        }
+        return { role: t.role, content: t.content };
+      });
+      out.history = history;
     }
     return out;
   });
@@ -392,7 +423,12 @@ export async function runEval(evalSet: EvalSet, opts: EvalRunnerOptions): Promis
 
     let rawResults: EvalSearchResult[];
     try {
-      rawResults = await opts.searchFn(q.query, { topK });
+      rawResults = await opts.searchFn(q.query, {
+        topK,
+        // Conditional spread keeps single-turn calls byte-identical under
+        // exactOptionalPropertyTypes (no `history: undefined` key).
+        ...(q.history !== undefined ? { history: q.history } : {}),
+      });
     } catch (err) {
       // searchFn threw: record the error on the row and keep going so the
       // remaining queries still produce a per-query record. CI reviewer needs
