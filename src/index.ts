@@ -96,6 +96,19 @@ export {
   withLruCache,
 } from './middleware/with-lru-cache.js';
 export type {
+  ConversationTurn,
+  RewriteDegradeReason,
+  RewriteGenerateFn,
+  RewriteQueryInput,
+  RewriteQueryOutcome,
+} from './query/rewrite.js';
+export {
+  buildRewritePrompt,
+  DEFAULT_REWRITE_TIMEOUT_MS,
+  REWRITE_PROMPT_VERSION,
+  rewriteQuery,
+} from './query/rewrite.js';
+export type {
   CacheOptions,
   CacheStatus,
   CaptionCache,
