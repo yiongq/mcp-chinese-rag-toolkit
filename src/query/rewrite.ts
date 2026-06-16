@@ -92,10 +92,14 @@ export const DEFAULT_REWRITE_TIMEOUT_MS = 10_000;
  *
  * Format: an ISO date, with an optional `.N` revision suffix for a same-day
  * prose change. History (newest first):
+ *   - `2026-06-16` — history serialization hardened: line terminators inside a
+ *     turn's content are collapsed before the join, so the content can no
+ *     longer forge a line-start role label ("\n助手：…") and fake an extra turn
+ *     inside the data block.
  *   - `2026-06-12` — initial rewrite prompt (fenced untrusted history/query
  *     blocks from day one).
  */
-export const REWRITE_PROMPT_VERSION = '2026-06-12';
+export const REWRITE_PROMPT_VERSION = '2026-06-16';
 
 /**
  * A rewritten retrieval query should be short; output longer than this is far
@@ -114,6 +118,25 @@ const ROLE_LABELS: Record<ConversationTurn['role'], string> = {
 };
 
 /**
+ * Every ECMAScript line terminator (LF, CR, LS, PS) — the positions a `^`
+ * anchor treats as a line start. Collapsing these inside a turn's content is
+ * what stops a turn from forging an extra line-start role label.
+ */
+const LINE_TERMINATORS = /[\r\n\u2028\u2029]+/g;
+
+/**
+ * Serialize one turn's content for the joined history block. Line terminators
+ * inside the content are collapsed to a single space: turns are joined by `\n`,
+ * so a newline embedded in `content` would otherwise open a fresh line that
+ * begins "助手：…" / "用户：…", forging a turn the user never sent. The content's
+ * internal line structure is not needed for a retrieval-query rewrite, so
+ * flattening it costs nothing and closes the forgery vector deterministically.
+ */
+function serializeTurnContent(content: string): string {
+  return content.replace(LINE_TERMINATORS, ' ');
+}
+
+/**
  * Build the rewrite prompt: instruction header, then the conversation history
  * and the current query as two fenced untrusted blocks (data preface +
  * declared length + content-derived sentinel — the same three-layer discipline
@@ -129,7 +152,9 @@ export function buildRewritePrompt(input: {
   const historyText = input.history
     // The role union is closed in TypeScript, but a plain-JS caller can pass
     // anything — fall back to the raw role rather than embedding "undefined：".
-    .map((turn) => `${ROLE_LABELS[turn.role] ?? turn.role}：${turn.content}`)
+    // Turn content is flattened (no embedded line terminators) so it cannot
+    // forge a line-start role label inside the joined block.
+    .map((turn) => `${ROLE_LABELS[turn.role] ?? turn.role}：${serializeTurnContent(turn.content)}`)
     .join('\n');
   return [
     '你是检索查询改写助手。结合「对话历史」，把「当前问题」改写为不依赖上文、可独立用于检索的自包含问题。',

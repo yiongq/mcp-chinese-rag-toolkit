@@ -87,6 +87,13 @@ export {
   withJudgeCache,
   writeArtifacts,
 } from './eval/index.js';
+export type {
+  InjectionCategory,
+  InjectionDetection,
+  SanitizeOptions,
+  SanitizeResult,
+} from './guard/sanitize.js';
+export { SANITIZE_RULES_VERSION, sanitizeRetrievedContent } from './guard/sanitize.js';
 export type { ToolHandler } from './middleware/with-lru-cache.js';
 export {
   canonicalize,
