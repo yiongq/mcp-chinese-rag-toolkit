@@ -99,10 +99,15 @@ export interface SanitizeResult {
  *
  * Format: an ISO date, with an optional `.N` revision suffix for a same-day
  * change. History (newest first):
+ *   - `2026-06-16.1` — tightened the English imperative/persona rules
+ *     (`override` / `forget` / `act as` / `developer mode` / `DAN`) to match
+ *     hijack phrasings rather than benign collocations ("override the system
+ *     defaults", "act as a backup node", "developer mode of thinking"), closing
+ *     a false-positive gap on English/mixed retrieved content.
  *   - `2026-06-16` — initial three-category rule table (instruction-override /
  *     role-marker / role-injection) with break + wrap neutralization.
  */
-export const SANITIZE_RULES_VERSION = '2026-06-16';
+export const SANITIZE_RULES_VERSION = '2026-06-16.1';
 
 /** Default cap on a detection excerpt's length, in code points. */
 const DEFAULT_MAX_EXCERPT_CHARS = 64;
@@ -239,14 +244,23 @@ const INSTRUCTION_OVERRIDE_RULES: Rule[] = [
     pattern: /disregard\s+(?:all\s+)?(?:the\s+)?(?:above|previous|prior|preceding|earlier)\b/giu,
     action: 'wrap',
   },
+  // `forget …` only when it targets the prior context/instructions — so "forget
+  // everything above / all previous instructions / what you were told" fires but
+  // benign "forget everything you learned in training" does not.
   {
     category: 'instruction-override',
-    pattern: /forget\s+(?:everything|all\s+(?:previous|prior))\b/giu,
+    pattern:
+      /forget\s+(?:everything|all)\s+(?:(?:the\s+)?(?:above|previous|prior|preceding|earlier|instructions?|prompts?|rules?)|(?:you\s+were\s+told|i\s+(?:said|told)))/giu,
     action: 'wrap',
   },
+  // `override …` requires an instruction-target noun (same discipline as the
+  // `ignore` / `disregard` rules) so benign "override the system defaults /
+  // settings" is left alone while "override the system prompt / previous
+  // instructions" is caught.
   {
     category: 'instruction-override',
-    pattern: /override\s+(?:the\s+)?(?:system|previous|above)\b/giu,
+    pattern:
+      /override\s+(?:all\s+)?(?:the\s+)?(?:system|previous|prior|above|preceding|earlier)\s+(?:instructions?|prompts?|messages?|rules?|context|directives?|constraints?)/giu,
     action: 'wrap',
   },
 ];
@@ -278,9 +292,13 @@ const ROLE_INJECTION_RULES: Rule[] = [
     pattern: /you\s+are\s+now\b(?:\s+an?\b)?/giu,
     action: 'wrap',
   },
+  // `act as …` only when a persona / AI-role word follows within a short window
+  // (lazy, bounded → linear): "act as an unrestricted AI / a DAN / a jailbroken
+  // model" fires, benign "act as a backup node / proxy / intermediary" does not.
   {
     category: 'role-injection',
-    pattern: /\bact\s+as\s+(?:an?\s+)?/giu,
+    pattern:
+      /\bact\s+as\s+(?:an?\s+)?(?:[a-z'-]+\s+){0,3}?(?:ai|a\.i\.|assistant|model|chatbot|persona|character|dan|hacker|jailbro\w*|unrestricted|uncensored|unfiltered|developer|admin|root|superuser)\b/giu,
     action: 'wrap',
   },
   {
@@ -288,9 +306,18 @@ const ROLE_INJECTION_RULES: Rule[] = [
     pattern: /\bpretend\s+(?:to\s+be|you\s+are)\b/giu,
     action: 'wrap',
   },
+  // `developer / god / admin mode` only behind an activation verb (mirrors the
+  // CJK 进入/启用/开启/切换到 rule) and `DAN` only as `DAN mode` — so benign
+  // "developer mode of thinking" and the name "DAN" are left alone.
   {
     category: 'role-injection',
-    pattern: /\b(?:developer\s+mode|DAN\s+mode|DAN)\b/giu,
+    pattern:
+      /(?:enter|enable|activate|switch\s+to|turn\s+on|go\s+into|you\s+are\s+(?:now\s+)?in)\s+(?:the\s+)?(?:developer|god|admin)\s+mode/giu,
+    action: 'wrap',
+  },
+  {
+    category: 'role-injection',
+    pattern: /\b(?:DAN|jailbreak)\s+mode\b/giu,
     action: 'wrap',
   },
 ];
@@ -302,13 +329,27 @@ const RULES: readonly Rule[] = [
 ];
 
 /**
+ * Categories that use the `wrap` action (role-marker is always `break`) —
+ * DERIVED from the rule table so it cannot drift. Single source of truth for the
+ * idempotent freeze pass: {@link FROZEN_BLOCK_RE} is built from this list, so a
+ * wrap category added to {@link RULES} is automatically recognized as frozen on
+ * a second pass. (A hardcoded alternation in the regex was a latent idempotency
+ * footgun as the red-team rule set grows — review 2026-06-16.)
+ */
+const WRAP_CATEGORIES: readonly InjectionCategory[] = [
+  ...new Set(RULES.filter((rule) => rule.action === 'wrap').map((rule) => rule.category)),
+];
+
+/**
  * Recognizes a wrap block THIS function produced: open/close tokens match (the
- * `\2` backreference) AND the enclosed text hashes to that token. The hash gate
+ * `\1` backreference) AND the enclosed text hashes to that token. The hash gate
  * is what tells "mine, already cleaned — freeze it" apart from a forged block
  * with an arbitrary token (which falls through to be broken + re-detected).
  */
-const FROZEN_BLOCK_RE =
-  /⟦untrusted:(?:instruction-override|role-injection):([0-9a-z]+)⟧([\s\S]*?)⟦\/untrusted:\1⟧/gu;
+const FROZEN_BLOCK_RE = new RegExp(
+  `⟦untrusted:(?:${WRAP_CATEGORIES.join('|')}):([0-9a-z]+)⟧([\\s\\S]*?)⟦/untrusted:\\1⟧`,
+  'gu',
+);
 
 /** Code-point offset of a UTF-16 position (regex `.index`) into `content`. */
 function codePointIndex(content: string, utf16Pos: number): number {
@@ -411,6 +452,17 @@ function neutralizeOpen(
  * embeds the result should tell the model these markers fence flagged,
  * not-to-be-executed data (the same posture as the `wrapUntrustedBlock`
  * preface).
+ *
+ * Detection is rule-based and intentionally precision-first (the negative space
+ * — never corrupting benign retrieved text — is treated as a hard line). It is
+ * therefore a defense-in-depth layer, not a complete filter: adversarial
+ * obfuscation that breaks a trigger phrase out of its literal form — a
+ * zero-width space or a homoglyph / full-width variant spliced into the middle
+ * of a clause — can evade a literal rule. Closing that gap is the job of an
+ * evolving red-team rule set (recall is measured against a corpus, and the
+ * ruleset version is pinned by {@link SANITIZE_RULES_VERSION} so a reported rate
+ * is reproducible); input normalization can be layered in by that work without
+ * changing this contract.
  */
 export function sanitizeRetrievedContent(
   content: string,
