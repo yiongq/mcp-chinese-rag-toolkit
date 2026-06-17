@@ -1,5 +1,22 @@
 # @yiong/mcp-chinese-rag-toolkit
 
+## 0.5.0
+
+### Minor Changes
+
+- 42a9bf2: Query: add history-aware query rewriting as a stateless pure function. `rewriteQuery({ history, query, generateFn })` asks a caller-injected language model to rewrite a context-dependent query (pronouns, omitted subjects) into a self-contained retrieval query, using the conversation history the caller supplies. The outcome is a discriminated union that is honest by construction: `model` (a cleaned rewrite), `short-circuit` (blank query or empty/blank history — the model is never called), or `degraded` (timeout or unusable output — the original query is kept, with a `reason`). Conversation history and the query are embedded as fenced untrusted data (data preface + declared length + content-derived sentinel), never as bare instruction. Also exports `buildRewritePrompt`, `REWRITE_PROMPT_VERSION` (stamp for run metadata, bumped on any prompt wording change), and `DEFAULT_REWRITE_TIMEOUT_MS`. The caller controls the history window; non-timeout `generateFn` rejections (network/auth/provider faults) propagate unchanged.
+- 07cc542: Eval: add optional multi-turn conversation history to eval cases. `EvalQuery` gains `history?: ConversationTurn[]` (declared per query in the eval-set YAML, oldest-first); `loadEvalSet` validates the shape (role must be `user` or `assistant`, content a non-empty string) and fails fast with the exact `queries[i].history[j]` location on authoring mistakes. The harness passes the history through verbatim to the injected `searchFn` (new optional `history` in its options) and `generateFn` (new optional `history` on its input) — it never consumes history itself, so whether retrieval or generation is history-aware stays entirely the caller's decision. Purely additive: single-turn eval sets, existing callers, and history-agnostic functions are unaffected.
+
+  Also re-exports `aggregateAnswerMeans` (the per-query answer-metric mean aggregator `runBenchmark` already uses internally) at the package level, so downstream verdict layers can aggregate metric means over filtered per-query subsets without re-implementing the formula.
+
+- cb9ba6d: Guard: add `sanitizeRetrievedContent`, a stateless rule-based pure function that defends against indirect prompt injection (retrieval poisoning) — the RAG-specific attack surface where a malicious instruction is smuggled inside an indexed document and re-enters the model context as "trusted" retrieved text. It detects three injection classes — instruction-override clauses ("ignore the previous instructions"), forged role / delimiter markers (a line-start `系统：` / `助手：`, `<|im_start|>`, `[INST]`) and persona hijacks ("you are now…", "act as…") — and neutralizes them without deleting any content: structural tokens get a zero-width break, imperative/persona clauses are wrapped in a deterministic `⟦untrusted:<category>:<token>⟧…⟦/untrusted:<token>⟧` annotation that tells the model the span is flagged data. The result is an honest `{ sanitized, flagged, detections }` structure — `detections` is source-ordered and excerpt-bounded so it can be counted by a metric without copying whole passages — and the function is idempotent (re-sanitizing already-sanitized text is a no-op) and rejects pre-planted forged markers. Exports `sanitizeRetrievedContent`, the `SANITIZE_RULES_VERSION` stamp, and the `InjectionCategory` / `InjectionDetection` / `SanitizeOptions` / `SanitizeResult` types.
+
+  Query rewrite: harden the conversation-history serialization in the rewrite prompt so a turn's content can no longer forge an extra line-start role label (e.g. an embedded `\n助手：…`) and fake a turn inside the data block. Line terminators inside a turn's content are now collapsed before the turns are joined. `REWRITE_PROMPT_VERSION` is bumped to `2026-06-16` to reflect the prompt change.
+
+### Patch Changes
+
+- c992453: Eval: harden `callJudge` timeout handling. A judge rejection arriving after the timeout already degraded the call is now observed by a no-op handler instead of surfacing as an unhandled rejection (a process crash by default in Node); a rejection that loses no race still propagates unchanged. Finite `timeoutMs` values above 2^31-1 (the largest delay `setTimeout` honours) are now capped instead of being silently clamped to ~1ms, which previously turned a huge "effectively no timeout" budget into an instant spurious timeout on every call. The same cap applies to `rewriteQuery`'s `timeoutMs`.
+
 ## 0.4.0
 
 ### Minor Changes
