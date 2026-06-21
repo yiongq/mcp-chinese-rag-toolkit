@@ -21,7 +21,7 @@ const ROOT = join(import.meta.dirname, '..');
 
 // Roots to scan — the public/published + source surface. `scripts/` is excluded
 // (this gate lives there and necessarily names the patterns it bans).
-const TARGETS = ['README.md', 'src', 'bin', 'templates', 'docs', 'test'];
+const TARGETS = ['README.md', 'package.json', 'src', 'bin', 'templates', 'docs', 'eval', 'test'];
 const SCAN_EXT = new Set(['.md', '.ts', '.tsx', '.mjs', '.cjs', '.js', '.yml', '.yaml']);
 
 // Each rule: a human label + a RegExp. Word boundaries keep false positives out
@@ -58,16 +58,33 @@ function* walk(abs) {
 }
 
 const violations = [];
-for (const target of TARGETS) {
-  for (const file of walk(join(ROOT, target))) {
-    const lines = readFileSync(file, 'utf8').split('\n');
-    lines.forEach((line, i) => {
-      for (const [label, re] of RULES) {
-        if (re.test(line)) {
-          violations.push({ file: relative(ROOT, file), line: i + 1, label, text: line.trim() });
-        }
+
+function scanFile(abs) {
+  const lines = readFileSync(abs, 'utf8').split('\n');
+  lines.forEach((line, i) => {
+    for (const [label, re] of RULES) {
+      if (re.test(line)) {
+        violations.push({ file: relative(ROOT, abs), line: i + 1, label, text: line.trim() });
       }
-    });
+    }
+  });
+}
+
+for (const target of TARGETS) {
+  const absTarget = join(ROOT, target);
+  let st;
+  try {
+    st = statSync(absTarget);
+  } catch {
+    continue; // a TARGET that does not exist (e.g. no templates/) is simply skipped
+  }
+  // An explicitly-listed file (e.g. package.json — published metadata, but not a
+  // SCAN_EXT extension) is scanned unconditionally; directories are walked with
+  // the SCAN_EXT filter.
+  if (st.isFile()) {
+    scanFile(absTarget);
+  } else {
+    for (const file of walk(absTarget)) scanFile(file);
   }
 }
 

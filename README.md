@@ -4,11 +4,11 @@
 [![npm downloads](https://img.shields.io/npm/dm/@yiong/mcp-chinese-rag-toolkit.svg)](https://www.npmjs.com/package/@yiong/mcp-chinese-rag-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/yiongq/mcp-chinese-rag-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/yiongq/mcp-chinese-rag-toolkit/actions/workflows/ci.yml)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org)
 
 > Reusable MCP server factory + Chinese RAG pipeline + eval framework for building production MCP servers in TypeScript.
 
-🚀 **v0.1.0 first public release.** Server factory + tool/resource builders + full Chinese RAG pipeline (FTS5+jieba / Hybrid Search RRF / BGE Reranker / Contextual Retrieval) all included.
+🚀 **v0.5.0.** MCP server factory + tool/resource builders + full Chinese RAG pipeline (FTS5+jieba / Hybrid Search RRF / BGE Reranker / Contextual Retrieval), an eval framework (retrieval metrics + RAGAS-style answer metrics + LLM-as-judge), history-aware query rewriting, and a rule-based retrieval-injection guard — all included. See the [CHANGELOG](./CHANGELOG.md) for the full 0.1 → 0.5 history.
 
 ## Architecture
 
@@ -50,8 +50,8 @@ The pipeline ships with measurable contracts rather than vibes:
 
 | Gate | Threshold | Enforced by |
 |---|---|---|
-| Retrieval quality | `Hit Rate@5 ≥ 90%` / `MRR ≥ 0.80` | `rag-eval` CI job, blocking on every PR |
-| stdio latency | `P95 < 200ms` per tool call | `runStdioLatencyHarness` bench — warn-not-block (`>50ms` drift); baseline committed after first `pnpm bench -- --write` |
+| Retrieval quality | `Hit Rate@5 ≥ 90%` / `MRR ≥ 0.80` | `rag-eval` CI job — exits 1 on regression on every PR |
+| stdio latency | `P95 < 200ms` per tool call | `runStdioLatencyHarness` local bench — warn-only, not in CI (baseline created on demand via `pnpm bench -- --write`) |
 | Embedding dim | `1024` (bge-large-zh-v1.5) | model manifest pin + SHA-256 attestation |
 
 These are **framework-methodology** numbers measured against the toolkit's own 12-chunk self-eval fixture — a smoke test that the pipeline integrates end-to-end, not a domain benchmark. Each downstream package owns its real-data eval set; see [Eval Framework + RAG Eval CI Gate](#eval-framework--rag-eval-ci-gate) for the adapter pattern.
@@ -251,6 +251,9 @@ Invariants you can rely on:
 | ✅ Chinese RAG pipeline (parser → chunk → embed → BM25 + vec + RRF + rerank) | `rag/*` exports + eval CI gate |
 | ✅ Vision caption plugin | `rag/vision-caption` |
 | ✅ `create-mcp-rag` CLI + Documentation Set | `bin/create-mcp-rag`, `docs/`, `templates/create-mcp-rag/` |
+| ✅ Answer-quality eval framework (RAGAS-style) | `runAnswerEval`, `runBenchmark`, `renderBenchmarkTable`, `sampleQueries`, LLM-as-judge + `withJudgeCache` |
+| ✅ History-aware query rewriting | `rewriteQuery` (stateless; caller-injected model) |
+| ✅ Retrieval prompt-injection guard | `sanitizeRetrievedContent` (rule-based, idempotent) |
 
 Each ✅ row maps to a shipped, tested slice of this public toolkit. Future directions are summarized in [What's next](#whats-next) below.
 
