@@ -1,6 +1,6 @@
 {
   "name": "@yiong/mcp-chinese-rag-toolkit",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "packageManager": "pnpm@10.30.2",
   "description": "Reusable MCP server + Chinese RAG pipeline toolkit (factory + Tool builder + error envelope + eval framework). Powers @yiong/mcp-hr, @yiong/mcp-modeling and third-party MCP servers.",
   "license": "MIT",

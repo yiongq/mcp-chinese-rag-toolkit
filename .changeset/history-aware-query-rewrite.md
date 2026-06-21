@@ -1,5 +1,0 @@
----
-'@yiong/mcp-chinese-rag-toolkit': minor
----
-
-Query: add history-aware query rewriting as a stateless pure function. `rewriteQuery({ history, query, generateFn })` asks a caller-injected language model to rewrite a context-dependent query (pronouns, omitted subjects) into a self-contained retrieval query, using the conversation history the caller supplies. The outcome is a discriminated union that is honest by construction: `model` (a cleaned rewrite), `short-circuit` (blank query or empty/blank history — the model is never called), or `degraded` (timeout or unusable output — the original query is kept, with a `reason`). Conversation history and the query are embedded as fenced untrusted data (data preface + declared length + content-derived sentinel), never as bare instruction. Also exports `buildRewritePrompt`, `REWRITE_PROMPT_VERSION` (stamp for run metadata, bumped on any prompt wording change), and `DEFAULT_REWRITE_TIMEOUT_MS`. The caller controls the history window; non-timeout `generateFn` rejections (network/auth/provider faults) propagate unchanged.
