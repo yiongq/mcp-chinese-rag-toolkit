@@ -1,21 +1,19 @@
-# Toolkit self-contained RAG eval set — smoke test against the Story 2.5
+# Toolkit self-contained RAG eval set — a smoke test against the built-in
 # 12-chunk bench fixture (bin/latency-harness.ts#FIXTURE_CHUNKS). Used by
-# the `rag-eval` CI job to enforce NFR14 (Hit Rate@5 ≥ 90% blocking gate)
-# WITHOUT waiting for Epic 4 mcp-hr eval set to land. Each query targets
+# the `rag-eval` CI job to enforce Hit Rate@5 ≥ 90% in CI. Each query targets
 # ONE specific fixture chunk; this is a sanity check that the toolkit
 # pipeline (jieba + FTS + sqlite-vec + RRF + bge-reranker) correctly
 # surfaces obvious-match documents — NOT a domain evaluation.
 #
 # When adding queries: every new query MUST have a leading `# reason:`
-# comment line (AI Agent Rule #9) explaining WHY this query matters.
-# CI report.md echoes the reason when a query goes MISS so reviewers
-# can immediately judge severity.
+# comment line explaining WHY this query matters. The CI report.md echoes
+# the reason when a query goes MISS so reviewers can immediately judge severity.
 
 version: v1-hr-mini-fixture
 description: |
   Toolkit self-contained eval set targeting the 12-chunk bench fixture.
-  Replaced by Epic 4 mcp-hr Story 4.5 (real PDF + 10+ domain queries)
-  for production-grade evaluation.
+  Downstream consumer packages own real-data eval sets (real PDFs + 10+
+  domain queries) for production-grade evaluation.
 
 queries:
   # reason: 直接命中"差旅报销"主关键词，验证 BM25 路径基础功能
@@ -32,7 +30,7 @@ queries:
       - source: bench-fixture.md
         page: 2
 
-  # reason: epics.md L704 标志性 BDD query；试用期是 HR 高频问题
+  # reason: 试用期是 HR 高频咨询问题，标志性 BDD 查询
   - query: 试用期多久
     category: probation
     expected:
