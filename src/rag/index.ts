@@ -8,6 +8,11 @@ export {
 export { loadEmbedder, writeEmbedderMeta } from './embedder.js';
 export { tokenize } from './fts-tokenizer.js';
 export { createHybridSearch } from './hybrid-search.js';
+export {
+  INDEX_STORE_ERROR_CODES,
+  IndexStoreError,
+  openIndexStore,
+} from './index-store.js';
 export { percentile, runStdioLatencyHarness } from './latency-harness.js';
 export {
   configureTransformersEnv,
@@ -25,6 +30,12 @@ export { rrfFuse } from './rrf.js';
 export { buildSchema } from './schema.js';
 export { openIndex } from './sqlite-store.js';
 export { JIEBA_VERSION, writeTokenizerMeta } from './tokenizer-meta.js';
+export type {
+  BuildVersionResult,
+  IndexStore,
+  IndexStoreErrorCode,
+  IndexStoreOptions,
+} from './index-store.js';
 export type {
   CacheOptions,
   CacheStatus,
