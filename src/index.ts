@@ -94,6 +94,14 @@ export type {
   SanitizeResult,
 } from './guard/sanitize.js';
 export { SANITIZE_RULES_VERSION, sanitizeRetrievedContent } from './guard/sanitize.js';
+export type {
+  IngestErrorCode,
+  ParseDocumentOptions,
+  ParsedDoc,
+  ParseResult,
+  SupportedMimeType,
+} from './ingest/index.js';
+export { DEFAULT_PARSE_TIMEOUT_MS, INGEST_ERROR_CODES, parseDocument } from './ingest/index.js';
 export type { ToolHandler } from './middleware/with-lru-cache.js';
 export {
   canonicalize,
