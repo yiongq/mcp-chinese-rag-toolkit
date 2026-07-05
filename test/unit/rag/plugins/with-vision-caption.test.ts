@@ -498,10 +498,14 @@ describe('withVisionCaption — enrichPdf core path', () => {
     const elapsed = Date.now() - start;
     expect(chunks).toHaveLength(1);
     expect(provider.caption).toHaveBeenCalledTimes(2);
-    // Without Retry-After we'd wait RETRY_BACKOFFS_MS[0] = 500ms; with
-    // it we wait ~10ms. Anything under 200ms is unambiguously the
-    // hinted path.
-    expect(elapsed).toBeLessThan(200);
+    // Without Retry-After we'd wait RETRY_BACKOFFS_MS[0] = 500ms; with the
+    // hint we wait ~10ms. The discriminator is "did we sleep ~500ms or ~10ms",
+    // so the threshold only needs to sit safely *below* the 500ms default
+    // floor — not near the ~10ms hinted wait. A tight <200ms bound flakes when
+    // a loaded CI runner adds fixed overhead (mock extract + PDF parse) on top
+    // of the 10ms backoff (observed ~286–301ms). <450ms keeps the hinted path
+    // unambiguous (default path is always ≥500ms) with generous runner headroom.
+    expect(elapsed).toBeLessThan(450);
   });
 
   it('retries empty caption from provider (treats as transient quirk)', async () => {
