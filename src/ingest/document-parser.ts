@@ -45,7 +45,16 @@ const SUPPORTED_MIME_TYPES = [
  */
 export const DEFAULT_PARSE_TIMEOUT_MS = 30_000;
 
-/** Max characters of an underlying library error surfaced in a diagnostic message. */
+/**
+ * Node's timer layer clamps any delay outside `1..2**31-1` down to 1ms — and
+ * emits a `TimeoutOverflowWarning` on stderr while doing so. Cap the caller
+ * budget at this maximum so an oversized or non-finite `timeoutMs` never
+ * silently degrades into a 1ms timer that times out every real parse, and never
+ * trips that stderr warning (which would violate the zero-side-effect contract).
+ */
+const MAX_TIMEOUT_MS = 2_147_483_647; // 2**31 - 1
+
+/** Max characters of untrusted text (a library error or a mimeType) surfaced in a diagnostic message. */
 const MAX_ERROR_MESSAGE_CHARS = 200;
 
 /**
@@ -80,24 +89,35 @@ export async function parseDocument(
   mimeType: string,
   opts: ParseDocumentOptions = {},
 ): Promise<ParseResult> {
-  if (!isSupportedMimeType(mimeType)) {
+  const canonicalMimeType = canonicalizeMimeType(mimeType);
+  if (canonicalMimeType === undefined) {
     return {
       ok: false,
       error: INGEST_ERROR_CODES.UNSUPPORTED_MIME_TYPE,
-      message: `unsupported mimeType "${mimeType}"; supported: ${SUPPORTED_MIME_TYPES.join(', ')}`,
+      message: `unsupported mimeType "${clipText(mimeType)}"; supported: ${SUPPORTED_MIME_TYPES.join(', ')}`,
     };
   }
 
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
+  // A zero-byte upload is an empty document, not a corrupt one — classify it the
+  // same across every format. (parsePdf / mammoth would otherwise throw on empty
+  // bytes and surface as PARSE_FAILED, splitting the empty boundary by format.)
+  if (buffer.byteLength === 0) return emptyDocument(canonicalMimeType);
 
-  // Catch native parser exceptions here so `parsePromise` never rejects — even
-  // if the timeout wins the race, the pending parse settles into a handled
-  // result and never surfaces as an unhandled rejection.
-  const parsePromise: Promise<ParseResult> = runParse(buffer, mimeType).catch((err) => ({
-    ok: false as const,
-    error: INGEST_ERROR_CODES.PARSE_FAILED,
-    message: `parse failed for mimeType "${mimeType}": ${describeError(err)}`,
-  }));
+  const timeoutMs = normalizeTimeoutMs(opts.timeoutMs);
+
+  // Wrap the dispatch in a resolved promise so BOTH asynchronous rejections and
+  // SYNCHRONOUS throws map to a handled PARSE_FAILED — the text branch decodes
+  // synchronously (a `TextDecoder('gbk')` on a small-ICU build, or a huge-input
+  // `RangeError`, throws before any `.catch` on a raw call could attach), and
+  // `parseDocument` must never reject. Even if the timeout wins the race, the
+  // pending parse still settles into a handled result, never an unhandled rejection.
+  const parsePromise: Promise<ParseResult> = Promise.resolve()
+    .then(() => runParse(buffer, canonicalMimeType))
+    .catch((err) => ({
+      ok: false as const,
+      error: INGEST_ERROR_CODES.PARSE_FAILED,
+      message: `parse failed for mimeType "${canonicalMimeType}": ${describeError(err)}`,
+    }));
 
   // §timeout: `setTimeout` + `Promise.race` bounds the CALLER's wait only. The
   // underlying libraries do CPU work with no AbortSignal, so a timed-out parse
@@ -140,8 +160,30 @@ export function decodeText(bytes: Uint8Array): { text: string; encoding: 'utf-8'
   }
 }
 
-function isSupportedMimeType(mimeType: string): mimeType is SupportedMimeType {
-  return (SUPPORTED_MIME_TYPES as readonly string[]).includes(mimeType);
+/**
+ * Normalize a declared content type to its canonical whitelisted form, or
+ * `undefined` if unsupported. Strips any `; charset=…`-style parameter, trims,
+ * and lower-cases (a content type's type/subtype is case-insensitive per the
+ * HTTP spec), so a real browser / HTTP value like `text/plain; charset=utf-8`
+ * or `Application/PDF` resolves to its whitelisted member instead of a spurious
+ * `UNSUPPORTED_MIME_TYPE`.
+ */
+function canonicalizeMimeType(mimeType: string): SupportedMimeType | undefined {
+  const bare = mimeType.split(';', 1)[0]?.trim().toLowerCase();
+  return SUPPORTED_MIME_TYPES.find((supported) => supported === bare);
+}
+
+/**
+ * Coerce an optional caller timeout into a safe `setTimeout` delay. A missing,
+ * non-finite (`NaN` / `Infinity`), or non-positive value falls back to the
+ * default; a value above Node's maximum delay is clamped to it (see
+ * {@link MAX_TIMEOUT_MS}) rather than silently collapsing to a 1ms timer.
+ */
+function normalizeTimeoutMs(timeoutMs: number | undefined): number {
+  if (timeoutMs === undefined || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return DEFAULT_PARSE_TIMEOUT_MS;
+  }
+  return Math.min(timeoutMs, MAX_TIMEOUT_MS);
 }
 
 /** Dispatch a whitelisted mimeType to its parser. Native exceptions propagate to the caller's catch. */
@@ -194,8 +236,23 @@ function emptyDocument(mimeType: SupportedMimeType): ParseResult {
   };
 }
 
+/**
+ * Clip untrusted text to a bounded length on a code-point boundary. Iterating as
+ * code points (not UTF-16 units) means a truncation never splits a surrogate
+ * pair into a lone surrogate.
+ */
+function clipText(text: string): string {
+  const chars = [...text];
+  return chars.length > MAX_ERROR_MESSAGE_CHARS
+    ? `${chars.slice(0, MAX_ERROR_MESSAGE_CHARS).join('')}…`
+    : text;
+}
+
 /** Extract a short, side-effect-free diagnostic from an unknown thrown value. */
 function describeError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err);
-  return raw.length > MAX_ERROR_MESSAGE_CHARS ? `${raw.slice(0, MAX_ERROR_MESSAGE_CHARS)}…` : raw;
+  // Guard `.message` being absent (an `Error` can be constructed with an
+  // undefined message) so this helper — invoked inside the PARSE_FAILED mapping —
+  // can never itself throw and turn a handled failure back into a rejection.
+  const raw = err instanceof Error && err.message ? err.message : String(err);
+  return clipText(raw);
 }

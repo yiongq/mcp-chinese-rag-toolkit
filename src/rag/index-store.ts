@@ -145,7 +145,11 @@ export interface IndexStore {
   currentVersion(): number | null;
   /** The retained versions, ascending. */
   listVersions(): number[];
-  /** Close every open handle. Idempotent. Version files remain on disk. */
+  /**
+   * Close all idle handles. A handle still held by an in-flight {@link withHandle}
+   * reader stays open until that reader releases (a running query is never
+   * interrupted). Idempotent. Version files remain on disk.
+   */
   close(): void;
 }
 
@@ -496,7 +500,18 @@ export function openIndexStore(corpusDir: string, opts: IndexStoreOptions = {}):
         return await fn(entry.handle);
       } finally {
         entry.refcount -= 1;
-        tryRetireHandle(version);
+        if (closed) {
+          // The store was closed while this read was in flight. Honor the
+          // read-to-completion contract: the handle stayed open for the running
+          // query, and this last in-flight reader closes it on release rather
+          // than leaking it (close() deliberately skips reader-held handles).
+          if (entry.refcount === 0 && handles.get(version) === entry) {
+            entry.handle.close();
+            handles.delete(version);
+          }
+        } else {
+          tryRetireHandle(version);
+        }
       }
     },
 
@@ -511,8 +526,16 @@ export function openIndexStore(corpusDir: string, opts: IndexStoreOptions = {}):
     close(): void {
       if (closed) return;
       closed = true;
-      for (const entry of handles.values()) entry.handle.close();
-      handles.clear();
+      // Close only idle handles. A handle still held by an in-flight `withHandle`
+      // reader is left open so that query reads to completion — that reader's
+      // finally closes it on release (reference-counted lifetime; close() never
+      // yanks a handle out from under a running query).
+      for (const [version, entry] of handles) {
+        if (entry.refcount === 0) {
+          entry.handle.close();
+          handles.delete(version);
+        }
+      }
       for (const version of pendingUnlink) unlinkVersionFiles(version);
       pendingUnlink.clear();
     },

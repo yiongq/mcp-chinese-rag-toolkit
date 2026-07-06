@@ -207,6 +207,42 @@ describe('openIndexStore', () => {
       }
     });
 
+    it('does not interrupt an in-flight reader when close() races the query, closing it on release', async () => {
+      const store = openIndexStore(dir);
+      store.buildVersion(makeFixtureChunks(5)); // v1 → 5 rows
+      store.swap(1);
+
+      let releaseGate!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        releaseGate = resolve;
+      });
+
+      let capturedHandle: IndexHandle | undefined;
+      const observed: { rows?: number; openDuringClose?: boolean } = {};
+
+      const reader = store.withHandle(async (h) => {
+        capturedHandle = h;
+        await gate; // suspend while still holding the v1 handle
+        observed.openDuringClose = h.db.open; // still open despite the close() below
+        observed.rows = docCount(h); // reads v1 to completion → 5
+        return observed.rows;
+      });
+
+      // Let the synchronous prefix run (refcount = 1, parked at the gate), then
+      // tear the store down while the query is still in flight.
+      await Promise.resolve();
+      store.close();
+      expect(capturedHandle?.db.open).toBe(true); // close() left the held handle open
+
+      releaseGate();
+      expect(await reader).toBe(5); // the query read to completion, uninterrupted
+      expect(observed.openDuringClose).toBe(true);
+      expect(observed.rows).toBe(5);
+
+      // Once the reader released it, close()'s deferred teardown finished the job.
+      expect(capturedHandle?.db.open).toBe(false);
+    });
+
     it('throws NO_CURRENT_VERSION when withHandle is called before any swap', async () => {
       const store = openIndexStore(dir);
       try {
@@ -339,7 +375,7 @@ describe('openIndexStore', () => {
     });
   });
 
-  describe('boundary + error semantics (AC4 / NFR)', () => {
+  describe('boundary + error semantics (AC4)', () => {
     it('refuses to build a version from an empty rows array and writes nothing', () => {
       const store = openIndexStore(dir);
       try {

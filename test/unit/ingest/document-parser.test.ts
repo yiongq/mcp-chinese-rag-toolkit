@@ -178,3 +178,52 @@ describe('DEFAULT_PARSE_TIMEOUT_MS', () => {
     expect(DEFAULT_PARSE_TIMEOUT_MS).toBeGreaterThan(0);
   });
 });
+
+describe('parseDocument — hardened input handling', () => {
+  it('treats an out-of-range timeoutMs (Infinity) as the default, not a 1ms timer', async () => {
+    // A raw Infinity / NaN / 0 reaching setTimeout clamps to ~1ms and would time
+    // out every real parse; the budget must fall back to the default instead.
+    const result = await parseDocument(await bytes(MD), MD_MIME, {
+      timeoutMs: Number.POSITIVE_INFINITY,
+    });
+
+    assertOk(result);
+  });
+
+  it('treats NaN / zero / negative timeoutMs as the default budget (parses succeed)', async () => {
+    for (const timeoutMs of [Number.NaN, 0, -1]) {
+      const result = await parseDocument(await bytes(UTF8_TXT), TXT_MIME, { timeoutMs });
+      assertOk(result);
+    }
+  });
+
+  it('accepts a Content-Type carrying a charset parameter', async () => {
+    const result = await parseDocument(await bytes(UTF8_TXT), 'text/plain; charset=utf-8');
+
+    assertOk(result);
+    expect(result.doc.mimeType).toBe(TXT_MIME);
+  });
+
+  it('accepts an upper-case mimeType (type/subtype are case-insensitive)', async () => {
+    const result = await parseDocument(await bytes(PDF), 'Application/PDF');
+
+    assertOk(result);
+    expect(result.doc.mimeType).toBe(PDF_MIME);
+    expect(result.doc.pages?.length).toBeGreaterThan(0);
+  });
+
+  it('classifies a zero-length buffer as EMPTY_DOCUMENT uniformly across formats', async () => {
+    for (const mime of [PDF_MIME, DOCX_MIME, MD_MIME, TXT_MIME]) {
+      const result = await parseDocument(new Uint8Array(0), mime);
+      assertFailed(result);
+      expect(result.error).toBe(INGEST_ERROR_CODES.EMPTY_DOCUMENT);
+    }
+  });
+
+  it('still rejects an unsupported mimeType even after parameter normalization', async () => {
+    const result = await parseDocument(new Uint8Array(0), 'image/png; foo=bar');
+
+    assertFailed(result);
+    expect(result.error).toBe(INGEST_ERROR_CODES.UNSUPPORTED_MIME_TYPE);
+  });
+});
