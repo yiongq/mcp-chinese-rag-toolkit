@@ -8,6 +8,7 @@
 // chunkers can consume as-is. It reuses `parsePdf` and the `PdfPage` type from
 // the rag layer; it deliberately does NOT re-implement chunking or indexing.
 
+import type { OnSpan } from '../observability/span.js';
 import type { PdfPage } from '../rag/types.js';
 import type { IngestErrorCode } from './errors.js';
 
@@ -54,6 +55,12 @@ export interface ParseDocumentOptions {
    * caller's wait, not the CPU work.
    */
   timeoutMs?: number;
+  /**
+   * Optional observability callback. When provided, the parse emits one
+   * `ingest.parse` span for every outcome (success and failure alike); when
+   * omitted, no clock is read and no span is allocated. See {@link OnSpan}.
+   */
+  onSpan?: OnSpan;
 }
 
 /**

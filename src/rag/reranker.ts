@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { AutoModelForSequenceClassification, AutoTokenizer } from '@huggingface/transformers';
 
+import { makeSpan, newSpanId, runSpanSafe } from '../observability/span.js';
 import { configureTransformersEnv, resolveCacheDir, verifyModelFiles } from './model-loader.js';
 import { BGE_RERANKER_V2_M3_MANIFEST } from './model-manifest.js';
 import type {
@@ -315,7 +316,31 @@ export function createReranker(deps: RerankerDeps): RerankFn {
     candidates: HybridHit[],
     opts: RerankOptions = {},
   ): Promise<RerankedHit[]> {
-    if (candidates.length === 0) return [];
+    const { onSpan } = opts;
+    if (candidates.length === 0) {
+      // A zero-candidate rerank still emits a span when a consumer is listening,
+      // so an empty retrieval shows up in the trace rather than silently absent.
+      if (onSpan) {
+        const startEpoch = Date.now();
+        const startPerf = performance.now();
+        runSpanSafe(
+          onSpan,
+          makeSpan(
+            'retrieve.rerank',
+            { id: newSpanId(), parentId: opts.parentSpanId },
+            startEpoch,
+            performance.now() - startPerf,
+            {
+              candidateCount: 0,
+              topK: opts.topK ?? frozenDefaults?.topK ?? DEFAULT_TOP_K,
+              returnedCount: 0,
+              ok: true,
+            },
+          ),
+        );
+      }
+      return [];
+    }
 
     const topK = opts.topK ?? frozenDefaults?.topK ?? DEFAULT_TOP_K;
     const batchSize = opts.batchSize ?? frozenDefaults?.batchSize ?? DEFAULT_BATCH_SIZE;
@@ -325,32 +350,67 @@ export function createReranker(deps: RerankerDeps): RerankFn {
     assertValidMaxLength(maxLength);
 
     const documents = candidates.map((c) => c.chunk.content);
-    const ranked = await reranker.rank(query, documents, { batchSize, maxLength });
 
-    const fused: RerankedHit[] = ranked.map((r) => {
-      const candidate = candidates[r.index];
-      if (!candidate) {
-        // Should be impossible — reranker.rank returns one entry per input doc,
-        // aligned by index. Defensive throw to keep the type narrowing honest.
-        throw new Error(
-          `createReranker: reranker returned index ${r.index} out of range for ${candidates.length} candidates`,
+    // Timing captured only when a consumer is listening — no clock read otherwise.
+    const startEpoch = onSpan ? Date.now() : 0;
+    const startPerf = onSpan ? performance.now() : 0;
+    try {
+      const ranked = await reranker.rank(query, documents, { batchSize, maxLength });
+
+      const fused: RerankedHit[] = ranked.map((r) => {
+        const candidate = candidates[r.index];
+        if (!candidate) {
+          // Should be impossible — reranker.rank returns one entry per input doc,
+          // aligned by index. Defensive throw to keep the type narrowing honest.
+          throw new Error(
+            `createReranker: reranker returned index ${r.index} out of range for ${candidates.length} candidates`,
+          );
+        }
+        return { ...candidate, rerankScore: r.score };
+      });
+
+      fused.sort((a, b) => {
+        if (b.rerankScore !== a.rerankScore) return b.rerankScore - a.rerankScore;
+        // Tie-break via symbol comparison instead of subtraction — docId can come
+        // straight from sqlite-vec / FTS5 ROWID and exceed Number.MAX_SAFE_INTEGER
+        // in pathological corpora.
+        if (a.docId < b.docId) return -1;
+        if (a.docId > b.docId) return 1;
+        return 0;
+      });
+
+      const results = topK === Number.POSITIVE_INFINITY ? fused : fused.slice(0, topK);
+      if (onSpan) {
+        runSpanSafe(
+          onSpan,
+          makeSpan(
+            'retrieve.rerank',
+            { id: newSpanId(), parentId: opts.parentSpanId },
+            startEpoch,
+            performance.now() - startPerf,
+            { candidateCount: candidates.length, topK, returnedCount: results.length, ok: true },
+          ),
         );
       }
-      return { ...candidate, rerankScore: r.score };
-    });
-
-    fused.sort((a, b) => {
-      if (b.rerankScore !== a.rerankScore) return b.rerankScore - a.rerankScore;
-      // Tie-break via symbol comparison instead of subtraction — docId can come
-      // straight from sqlite-vec / FTS5 ROWID and exceed Number.MAX_SAFE_INTEGER
-      // in pathological corpora.
-      if (a.docId < b.docId) return -1;
-      if (a.docId > b.docId) return 1;
-      return 0;
-    });
-
-    if (topK === Number.POSITIVE_INFINITY) return fused;
-    return fused.slice(0, topK);
+      return results;
+    } catch (err) {
+      // Surface a failed rerank stage through `ok: false` instead of a missing
+      // span, so a trace reflects the outcome. The original error still
+      // propagates unchanged.
+      if (onSpan) {
+        runSpanSafe(
+          onSpan,
+          makeSpan(
+            'retrieve.rerank',
+            { id: newSpanId(), parentId: opts.parentSpanId },
+            startEpoch,
+            performance.now() - startPerf,
+            { candidateCount: candidates.length, topK, returnedCount: 0, ok: false },
+          ),
+        );
+      }
+      throw err;
+    }
   };
 }
 

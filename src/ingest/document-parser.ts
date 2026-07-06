@@ -9,10 +9,12 @@
 // decode + pass-through. No parser is hand-rolled.
 //
 // Boundaries, deliberately narrow:
-//   - PURE, ZERO SIDE EFFECTS: input is in-memory bytes; no disk read/write, no
-//     env, no console, no wall-clock reads (`Date.now`), no randomness. The only
-//     timer used is a `setTimeout` for the caller-wait ceiling (see §timeout),
-//     which never leaks into the output value.
+//   - PURE BY DEFAULT: with no `onSpan`, input is in-memory bytes; no disk
+//     read/write, no env, no console, no wall-clock reads (`Date.now`), no
+//     randomness. The only timer used is a `setTimeout` for the caller-wait
+//     ceiling (see §timeout), which never leaks into the output value. When an
+//     `onSpan` consumer IS provided, the sole added effects are that callback and
+//     the clock reads its timing needs — the returned `ParseResult` is identical.
 //   - FAILURE IS RETURNED, NOT THROWN: a batch-ingest caller must survive one
 //     bad file, so every failure path resolves to a discriminated `ParseResult`
 //     carrying a stable code. This is a DELIBERATE departure from `parsePdf`'s
@@ -22,6 +24,8 @@
 //     honest structured result out.
 
 import mammoth from 'mammoth';
+import { makeSpan, newSpanId, runSpanSafe } from '../observability/span.js';
+import type { SpanAttributeValue } from '../observability/span.js';
 import { parsePdf } from '../rag/pdf-parser.js';
 import { INGEST_ERROR_CODES } from './errors.js';
 import type { ParseDocumentOptions, ParseResult, SupportedMimeType } from './types.js';
@@ -80,11 +84,68 @@ const mammothMd = mammoth as typeof mammoth & MarkdownConverter;
  * `PARSE_TIMEOUT`; a parse that yields no extractable text resolves to
  * `EMPTY_DOCUMENT`.
  *
+ * When `opts.onSpan` is provided, one `ingest.parse` span is emitted per call —
+ * for a successful and a failed parse alike — carrying metadata only (mime type,
+ * page / text counts, encoding, error code); never any document content.
+ *
  * @param buffer   In-memory document bytes.
  * @param mimeType Declared content type; validated against the whitelist.
  * @param opts     See {@link ParseDocumentOptions}.
  */
 export async function parseDocument(
+  buffer: Uint8Array,
+  mimeType: string,
+  opts: ParseDocumentOptions = {},
+): Promise<ParseResult> {
+  const { onSpan } = opts;
+  if (!onSpan) return parseDocumentCore(buffer, mimeType, opts);
+
+  // Single observability gate: one span per parse, emitted for success and
+  // failure alike (the core never throws — it always resolves a ParseResult).
+  const startedAtEpochMs = Date.now();
+  const startedPerfMs = performance.now();
+  const result = await parseDocumentCore(buffer, mimeType, opts);
+  runSpanSafe(
+    onSpan,
+    makeSpan(
+      'ingest.parse',
+      { id: newSpanId() },
+      startedAtEpochMs,
+      performance.now() - startedPerfMs,
+      buildParseAttributes(result, mimeType),
+    ),
+  );
+  return result;
+}
+
+/**
+ * Metadata-only attributes for an `ingest.parse` span. Uses the canonical mime
+ * type (a whitelisted enum) rather than the raw caller input, and counts rather
+ * than content — never the parsed text itself.
+ */
+function buildParseAttributes(
+  result: ParseResult,
+  rawMimeType: string,
+): Record<string, SpanAttributeValue> {
+  const attributes: Record<string, SpanAttributeValue> = { ok: result.ok };
+  const canonical = canonicalizeMimeType(rawMimeType);
+  if (canonical !== undefined) attributes.mimeType = canonical;
+
+  if (result.ok) {
+    const { doc } = result;
+    if (doc.pages !== undefined) {
+      attributes.pageCount = doc.pages.length;
+      attributes.textLength = doc.pages.reduce((sum, page) => sum + page.text.length, 0);
+    }
+    if (doc.text !== undefined) attributes.textLength = doc.text.length;
+    if (doc.encoding !== undefined) attributes.encoding = doc.encoding;
+  } else {
+    attributes.errorCode = result.error;
+  }
+  return attributes;
+}
+
+async function parseDocumentCore(
   buffer: Uint8Array,
   mimeType: string,
   opts: ParseDocumentOptions = {},

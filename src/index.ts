@@ -112,6 +112,12 @@ export {
   withLruCache,
 } from './middleware/with-lru-cache.js';
 export type {
+  OnSpan,
+  PipelineSpan,
+  PipelineSpanName,
+  SpanAttributeValue,
+} from './observability/span.js';
+export type {
   ConversationTurn,
   RewriteDegradeReason,
   RewriteGenerateFn,

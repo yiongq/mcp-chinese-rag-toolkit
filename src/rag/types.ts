@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3';
 
+import type { OnSpan } from '../observability/span.js';
+
 /**
  * A single page extracted from a PDF document.
  *
@@ -312,6 +314,19 @@ export interface HybridSearchOptions {
   topK?: number;
   /** RRF constant. @default 60 (Cormack 2009 convention) */
   rrfK?: number;
+  /**
+   * Optional observability callback. When provided, the search emits a
+   * `retrieve.hybrid` span with `retrieve.bm25` / `retrieve.vector` /
+   * `retrieve.rrf` child spans; when omitted, no clock is read and no span is
+   * allocated (zero overhead). See {@link OnSpan}.
+   */
+  onSpan?: OnSpan;
+  /**
+   * Optional id of an enclosing span. When set, the emitted `retrieve.hybrid`
+   * span carries it as `parentId`, letting a consumer graft the toolkit subtree
+   * under an outer trace. Ignored unless `onSpan` is also provided.
+   */
+  parentSpanId?: string;
 }
 
 /**
@@ -443,6 +458,18 @@ export interface RerankOptions {
   batchSize?: number;
   /** Forwarded to `reranker.rank()`. @default 512 */
   maxLength?: number;
+  /**
+   * Optional observability callback. When provided, the rerank emits a
+   * `retrieve.rerank` span (including a zero-candidate span when the input list
+   * is empty); when omitted, no clock is read and no span is allocated. See
+   * {@link OnSpan}.
+   */
+  onSpan?: OnSpan;
+  /**
+   * Optional id of an enclosing span, carried as the emitted span's `parentId`.
+   * Ignored unless `onSpan` is also provided.
+   */
+  parentSpanId?: string;
 }
 
 /**

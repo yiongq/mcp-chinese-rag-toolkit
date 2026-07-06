@@ -1,6 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { makeSpan, newSpanId, runSpanSafe } from '../observability/span.js';
+import type { OnSpan } from '../observability/span.js';
 import { openIndex } from './sqlite-store.js';
 import type { ChunkRow, IndexHandle, IndexStats } from './types.js';
 
@@ -124,8 +126,11 @@ export interface IndexStore {
    * Full-rebuild a new version from `rows` into `v<N>.db` and return its number.
    * Does NOT change the current serving version — call {@link swap} to make it
    * live. Rejects an empty `rows` array. Reuses the `openIndex` write path.
+   *
+   * Pass `opts.onSpan` to emit an `ingest.index` span on a successful build
+   * (metadata only — chunk / inserted counts); omit it for zero overhead.
    */
-  buildVersion(rows: ChunkRow[]): BuildVersionResult;
+  buildVersion(rows: ChunkRow[], opts?: { onSpan?: OnSpan }): BuildVersionResult;
   /**
    * Atomically make `version` (or the latest built version when omitted) the
    * current serving version. New {@link withHandle} calls read the new version;
@@ -430,7 +435,7 @@ export function openIndexStore(corpusDir: string, opts: IndexStoreOptions = {}):
   if (manifest.current !== null) getOrOpenHandle(manifest.current);
 
   return {
-    buildVersion(rows: ChunkRow[]): BuildVersionResult {
+    buildVersion(rows: ChunkRow[], opts?: { onSpan?: OnSpan }): BuildVersionResult {
       assertOpen();
       if (rows.length === 0) {
         throw new IndexStoreError(
@@ -444,6 +449,11 @@ export function openIndexStore(corpusDir: string, opts: IndexStoreOptions = {}):
       unlinkVersionFiles(version);
 
       const writer = openIndex(versionPath(version), { readonly: false, embeddingDim });
+      // Wall-clock start is captured only when a consumer is listening; the
+      // elapsed time itself is reused from the `indexChunks` stats below rather
+      // than wrapping the write in a second timer.
+      const onSpan = opts?.onSpan;
+      const startedAtEpochMs = onSpan ? Date.now() : 0;
       let stats: IndexStats;
       try {
         stats = writer.indexChunks(rows);
@@ -456,6 +466,17 @@ export function openIndexStore(corpusDir: string, opts: IndexStoreOptions = {}):
 
       const nextVersions = [...manifest.versions, version].sort((a, b) => a - b);
       writeManifest({ ...manifest, versions: nextVersions });
+
+      if (onSpan) {
+        runSpanSafe(
+          onSpan,
+          makeSpan('ingest.index', { id: newSpanId() }, startedAtEpochMs, stats.durationMs, {
+            chunkCount: rows.length,
+            inserted: stats.inserted,
+            ok: true,
+          }),
+        );
+      }
       return { version, stats };
     },
 
