@@ -100,6 +100,7 @@
     "@node-rs/jieba": "^2.0.1",
     "better-sqlite3": "^12.10.0",
     "lru-cache": "^11.3.6",
+    "mammoth": "^1.12.0",
     "p-limit": "^6.2.0",
     "sqlite-vec": "^0.1.9",
     "unpdf": "^1.6.2",

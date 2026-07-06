@@ -28,7 +28,7 @@ const SCAN_EXT = new Set(['.md', '.ts', '.tsx', '.mjs', '.cjs', '.js', '.yml', '
 // (e.g. "history" must not trip "Story"; "frame" must not trip "FR1").
 const RULES = [
   ['Story/Epic reference', /\b(?:stor(?:y|ies)|epics?)\b/i],
-  ['FR/NFR requirement id', /\bN?FR\d/],
+  ['FR/NFR requirement id', /\bN?FR\d|\bNFR\b/],
   ['AR-Ext requirement id', /\bAR-Ext-\d/i],
   ['AI Agent Rule', /\bAI Agent Rule\b/i],
   ['architecture rule', /\barchitecture rule\b/i],

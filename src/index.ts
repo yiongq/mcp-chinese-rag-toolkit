@@ -94,6 +94,14 @@ export type {
   SanitizeResult,
 } from './guard/sanitize.js';
 export { SANITIZE_RULES_VERSION, sanitizeRetrievedContent } from './guard/sanitize.js';
+export type {
+  IngestErrorCode,
+  ParseDocumentOptions,
+  ParsedDoc,
+  ParseResult,
+  SupportedMimeType,
+} from './ingest/index.js';
+export { DEFAULT_PARSE_TIMEOUT_MS, INGEST_ERROR_CODES, parseDocument } from './ingest/index.js';
 export type { ToolHandler } from './middleware/with-lru-cache.js';
 export {
   canonicalize,
@@ -117,6 +125,7 @@ export {
   rewriteQuery,
 } from './query/rewrite.js';
 export type {
+  BuildVersionResult,
   CacheOptions,
   CacheStatus,
   CaptionCache,
@@ -140,6 +149,9 @@ export type {
   IndexingPlugin,
   IndexingPluginContext,
   IndexStats,
+  IndexStore,
+  IndexStoreErrorCode,
+  IndexStoreOptions,
   LatencyHarnessOptions,
   LatencySnapshot,
   LlmProvider,
@@ -179,6 +191,8 @@ export {
   encodePng,
   ensureCanvasAvailable,
   generateChunkContext,
+  INDEX_STORE_ERROR_CODES,
+  IndexStoreError,
   JIEBA_VERSION,
   loadEmbedder,
   loadReranker,
@@ -187,6 +201,7 @@ export {
   OptionalDependencyMissingError,
   openCaptionCache,
   openIndex,
+  openIndexStore,
   parsePdf,
   percentile,
   renderChunkContextPrompt,
