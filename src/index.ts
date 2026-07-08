@@ -88,6 +88,26 @@ export {
   writeArtifacts,
 } from './eval/index.js';
 export type {
+  ExtractedEntity,
+  ExtractedGraph,
+  ExtractedRelation,
+  ExtractFn,
+  GraphChunk,
+  GraphErrorCode,
+  GraphExtractionOptions,
+  GraphStats,
+  RawEntity,
+  RawExtraction,
+  RawRelation,
+} from './graph/index.js';
+export {
+  buildGraphSchema,
+  extractGraph,
+  GRAPH_ERROR_CODES,
+  GraphError,
+  writeGraph,
+} from './graph/index.js';
+export type {
   InjectionCategory,
   InjectionDetection,
   SanitizeOptions,

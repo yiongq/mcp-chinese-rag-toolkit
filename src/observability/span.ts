@@ -30,8 +30,9 @@ export type SpanAttributeValue = string | number | boolean;
  * The fixed set of pipeline stage names a span can carry.
  *
  * `retrieve.*` cover the hybrid-search sub-stages plus reranking; `ingest.*`
- * cover document parsing and index building. The `retrieve.hybrid` span is the
- * parent of the `retrieve.bm25` / `retrieve.vector` / `retrieve.rrf` spans.
+ * cover document parsing, index building and graph extraction. The
+ * `retrieve.hybrid` span is the parent of the `retrieve.bm25` /
+ * `retrieve.vector` / `retrieve.rrf` spans.
  */
 export type PipelineSpanName =
   | 'retrieve.bm25'
@@ -40,7 +41,8 @@ export type PipelineSpanName =
   | 'retrieve.hybrid'
   | 'retrieve.rerank'
   | 'ingest.parse'
-  | 'ingest.index';
+  | 'ingest.index'
+  | 'ingest.graph';
 
 /**
  * A single pipeline-stage observation.
