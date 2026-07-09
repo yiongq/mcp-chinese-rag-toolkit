@@ -1,0 +1,191 @@
+# Multi-config benchmark eval set — the CI smoke set (eval-set.yml) PLUS a
+# hard tier of colloquial paraphrase queries with near-zero lexical overlap
+# against the 12-chunk bench fixture. The hard tier is what differentiates the
+# four retrieval configs: BM25 needs shared tokens, embeddings do not — on the
+# easy tier every config scores 1.0 and the comparison table says nothing.
+#
+# Used by bin/run-benchmark.ts ONLY. The CI gate (bin/run-eval.ts) keeps using
+# eval-set.yml — hard queries here must NOT tighten the CI threshold.
+#
+# When adding queries: every new query MUST have a leading `# reason:` comment
+# (same ruling as eval-set.yml).
+
+version: v2-hr-bench-hard-mix
+description: |
+  24-query benchmark set over the 12-chunk bench fixture: the 12 CI smoke
+  queries (easy tier, keyword-adjacent) + 12 paraphrase queries (hard tier,
+  near-zero lexical overlap) that require semantic retrieval. Retrieval-only;
+  answer metrics stay out until the faithfulness judge passes calibration.
+
+queries:
+  # ── easy tier: verbatim copy of eval-set.yml（基础题，四配置都应命中）──
+
+  # reason: 直接命中"差旅报销"主关键词，验证 BM25 路径基础功能
+  - query: 差旅报销需要保留什么凭证
+    category: leave-policy
+    expected:
+      - source: bench-fixture.md
+        page: 1
+
+  # reason: 同义改写——查询用"实习"chunk 用"实习期评估"——验证 jieba 中文分词
+  - query: 实习期评估怎么做
+    category: onboarding
+    expected:
+      - source: bench-fixture.md
+        page: 2
+
+  # reason: 试用期是 HR 高频咨询问题，标志性 BDD 查询
+  - query: 试用期多久
+    category: probation
+    expected:
+      - source: bench-fixture.md
+        page: 3
+
+  # reason: 验证"培训计划"语义检索，BGE embedding 不依赖关键词全匹配
+  - query: 员工培训怎么安排
+    category: training
+    expected:
+      - source: bench-fixture.md
+        page: 4
+
+  # reason: 短 query"请假"+流程类问句，覆盖典型 HR 短问句场景
+  - query: 请假怎么申请
+    category: leave-policy
+    expected:
+      - source: bench-fixture.md
+        page: 5
+
+  # reason: 复合语义（加班+换算+工资），验证 reranker 在多概念 query 上的排序
+  - query: 加班可以换调休吗
+    category: compensation
+    expected:
+      - source: bench-fixture.md
+        page: 6
+
+  # reason: 节假日是 HR 高频咨询；验证"国家公历"等不常见词汇召回
+  - query: 法定节假日怎么安排
+    category: holidays
+    expected:
+      - source: bench-fixture.md
+        page: 7
+
+  # reason: 保密协议——专有名词类 query，验证 BGE 对术语的 embedding 准确度
+  - query: 保密协议覆盖哪些内容
+    category: compliance
+    expected:
+      - source: bench-fixture.md
+        page: 8
+
+  # reason: 年终奖发放规则——经典 HR 问题，验证 RRF 融合在数字相关 query 上效果
+  - query: 年终奖怎么发
+    category: compensation
+    expected:
+      - source: bench-fixture.md
+        page: 9
+
+  # reason: 体检福利——验证短 query + 实体类（"体检"）的召回稳定性
+  - query: 体检每年几次
+    category: benefits
+    expected:
+      - source: bench-fixture.md
+        page: 10
+
+  # reason: 离职流程——验证 hybrid search 在程序类 query 上的表现
+  - query: 离职手续怎么办
+    category: offboarding
+    expected:
+      - source: bench-fixture.md
+        page: 11
+
+  # reason: 长 query（含限定条件"出差预订机票"）——验证 reranker 对长 query 的差异化排序
+  - query: 出差预订机票有什么要求
+    category: travel
+    expected:
+      - source: bench-fixture.md
+        page: 12
+
+  # ── hard tier: 口语改述，词面近零重叠（打 BM25 软肋，区分四配置）──
+
+  # reason: 报销的口语改述（"垫付的钱要回来"），且"出差"是 page 12 的词面陷阱——考排序
+  - query: 出差回来怎么把垫付的钱要回来
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 1
+
+  # reason: "见习/考核" vs "实习/评估"——同义不同词，BM25 零命中信号
+  - query: 见习期结束会有什么考核
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 2
+
+  # reason: "成为正式员工" vs "转正"——语义等价词面不同
+  - query: 刚入职的新人多久能成为正式员工
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 3
+
+  # reason: "学新技能" vs "培训"——上下位语义关联，纯语义题
+  - query: 想学点新技能公司有什么安排
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 4
+
+  # reason: "休两天假" vs "请假"——jieba 分词后无公共 token，考语义
+  - query: 想休两天假该走什么流程
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 5
+
+  # reason: "工作日之外干活/换休息" vs "加班/调休"——全同义改写零重叠
+  - query: 工作日之外干活能换休息吗
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 6
+
+  # reason: "过年过节放假" vs "法定节假日"——口语节庆表达
+  - query: 过年过节公司放不放假
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 7
+
+  # reason: "商业机密" vs "保密协议/客户资料"——近义术语替换
+  - query: 公司的商业机密范围包括什么
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 8
+
+  # reason: "奖金取决于什么" vs "年终奖/绩效/挂钩"——避开全部原词
+  - query: 发多少奖金取决于什么
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 9
+
+  # reason: "身体检查" vs "健康体检"——近义复合词拆分，BM25 难命中
+  - query: 公司提供身体检查福利吗
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 10
+
+  # reason: "辞职/步骤" vs "离职/手续"——同义替换零重叠
+  - query: 辞职要走哪些步骤
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 11
+
+  # reason: "住宿和交通/省钱" vs "机票酒店/折扣"——全语义映射，考 embedding 泛化
+  - query: 住宿和交通怎么订更省钱
+    category: hard-paraphrase
+    expected:
+      - source: bench-fixture.md
+        page: 12
