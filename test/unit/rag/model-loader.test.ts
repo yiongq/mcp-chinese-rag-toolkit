@@ -176,6 +176,29 @@ describe('configureTransformersEnv', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('honours HF_ENDPOINT as the remote host (mirror for reset-prone networks); untouched when unset', () => {
+    const dir = uniqueTmp('rag-loader-env-mirror');
+    mkdirSync(dir, { recursive: true });
+    const prior = process.env.HF_ENDPOINT;
+    const priorHost = env.remoteHost;
+    try {
+      process.env.HF_ENDPOINT = 'https://hf-mirror.com';
+      configureTransformersEnv({ cacheDir: dir, allowRemoteModels: true });
+      expect(env.remoteHost).toBe('https://hf-mirror.com');
+
+      // 未设（空串同缺席）→ 不覆盖既有 remoteHost（默认行为字节级不变）。
+      env.remoteHost = priorHost;
+      process.env.HF_ENDPOINT = '  ';
+      configureTransformersEnv({ cacheDir: dir, allowRemoteModels: true });
+      expect(env.remoteHost).toBe(priorHost);
+    } finally {
+      if (prior === undefined) delete process.env.HF_ENDPOINT;
+      else process.env.HF_ENDPOINT = prior;
+      env.remoteHost = priorHost;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('verifyModelFiles', () => {
