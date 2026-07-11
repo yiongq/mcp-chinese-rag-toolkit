@@ -95,6 +95,16 @@ export function configureTransformersEnv(opts: {
   env.allowLocalModels = true;
   // Node environments must never hit the in-browser cache adaptor.
   env.useBrowserCache = false;
+  // Mainland-China networks routinely ECONNRESET direct huggingface.co
+  // downloads (live incident 2026-07-11: empty model cache + reset connection
+  // = every query failed for 10s then INTERNAL_ERROR). Honour the HF
+  // ecosystem's conventional HF_ENDPOINT override (e.g.
+  // https://hf-mirror.com) — set only when present so default behaviour is
+  // byte-identical.
+  const hfEndpoint = process.env.HF_ENDPOINT?.trim();
+  if (hfEndpoint !== undefined && hfEndpoint !== '') {
+    env.remoteHost = hfEndpoint;
+  }
 }
 
 interface VerifyOptions {
