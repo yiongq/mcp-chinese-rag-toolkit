@@ -15,6 +15,7 @@ export {
   passesGate,
   renderMarkdownReport,
   resolveHitRateMin,
+  resolveMrrMin,
   writeArtifacts,
 } from './ci-helper.js';
 export type { EvalErrorCode, EvalErrorCore } from './errors.js';

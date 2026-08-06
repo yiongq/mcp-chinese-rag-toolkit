@@ -47,7 +47,10 @@ jobs:
 
       # Public-hygiene gate — this package is open source; its README, source
       # comments, generated API docs, templates and tests must read as
-      # user-facing docs, never as an internal story/epic/requirement tracker.
+      # user-facing docs, never as an internal planning tracker. The banned
+      # patterns live in a gitignored scripts/hygiene-patterns.local.json
+      # (committing them would itself leak the internal names); when that file
+      # is absent — as in CI — the script prints a notice and exits 0.
       - name: Public-hygiene gate (no internal jargon in user-facing files)
         run: node scripts/check-public-hygiene.mjs
 
@@ -69,8 +72,8 @@ jobs:
         run: node scripts/check-pack-size.mjs
 
   # Retrieval regression gate. Runs the real hybrid + rerank pipeline against
-  # the in-repo fixture eval set and fails the build when Hit Rate@5 drops below
-  # the floor. Kept as its own job (not folded into `build`) because it downloads
+  # the in-repo fixture eval set and fails the build when Hit Rate@5 or MRR
+  # drops below its floor. Kept as its own job (not folded into `build`) because it downloads
   # the public BGE models (~700 MB) and takes a few minutes — the `build` job
   # must stay a fast, network-free unit pass. Zero-secret does NOT mean
   # zero-network: the models are public, keyless artifacts, so no API credential
@@ -117,6 +120,9 @@ jobs:
           # Hit Rate@5 floor. Keep the threshold in this file; do not expose it
           # as a workflow_dispatch input.
           RAG_EVAL_HIT_RATE_MIN: '0.9'
+          # MRR floor — the gate only enforces MRR when this is set, so unset
+          # local runs stay hit-rate-only while CI enforces both metrics.
+          RAG_EVAL_MRR_MIN: '0.8'
         run: pnpm test:eval
 
       - name: Upload fixture eval report

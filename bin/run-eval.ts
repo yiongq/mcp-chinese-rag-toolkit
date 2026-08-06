@@ -8,12 +8,13 @@
  * Usage:
  *   pnpm test:eval                                           # default
  *   RAG_EVAL_HIT_RATE_MIN=0.85 pnpm test:eval                # dev override
+ *   RAG_EVAL_MRR_MIN=0.8 pnpm test:eval                      # also gate on MRR
  *   pnpm test:eval -- --eval-set eval/eval-set.yml           # explicit path
  *   pnpm test:eval -- --out-dir custom-results               # explicit out dir
  *
  * Exit codes:
- *   0 — Hit Rate@5 ≥ threshold
- *   1 — Hit Rate@5 < threshold ( gate failed; CI must surface as `build failed`)
+ *   0 — all gates pass (Hit Rate@5, plus MRR when RAG_EVAL_MRR_MIN is set)
+ *   1 — gate failed; CI must surface as `build failed`
  *   2 — runtime error (model load failed / eval set parse failed / etc.)
  */
 
@@ -26,6 +27,7 @@ import {
   loadEvalSet,
   passesGate,
   resolveHitRateMin,
+  resolveMrrMin,
   runEval,
   writeArtifacts,
 } from '../src/eval/index.js';
@@ -210,10 +212,11 @@ async function main(): Promise<number> {
   process.chdir(pkgRoot);
 
   const threshold = resolveHitRateMin();
+  const mrrMin = resolveMrrMin();
   process.stdout.write(`run-eval: loading eval set ${evalSetAbs}\n`);
   const evalSet = loadEvalSet(evalSetAbs);
   process.stdout.write(
-    `run-eval: ${evalSet.queries.length} queries, version=${evalSet.version}, threshold=${threshold}\n`,
+    `run-eval: ${evalSet.queries.length} queries, version=${evalSet.version}, threshold=${threshold}, mrrMin=${mrrMin ?? 'off'}\n`,
   );
 
   const { searchFn, dispose } = await buildToolkitSearchFn();
@@ -231,16 +234,17 @@ async function main(): Promise<number> {
     const { reportPath, summaryPath } = writeArtifacts(summary, { outDir: outDirAbs });
     process.stdout.write(`run-eval: wrote ${summaryPath}\n`);
     process.stdout.write(`run-eval: wrote ${reportPath}\n`);
-    emitGitHubActionsAnnotation(summary, threshold);
+    emitGitHubActionsAnnotation(summary, threshold, mrrMin);
 
     const pct = (summary.hitRate * 100).toFixed(2);
     const minPct = (threshold * 100).toFixed(2);
+    const mrrSuffix = mrrMin !== undefined ? `  (threshold ${mrrMin.toFixed(4)})` : '';
     process.stdout.write(
       `\nHit Rate@${summary.topK}: ${pct}%  (threshold ${minPct}%)\n` +
-        `MRR@${summary.topK}:      ${summary.mrr.toFixed(4)}\n`,
+        `MRR@${summary.topK}:      ${summary.mrr.toFixed(4)}${mrrSuffix}\n`,
     );
 
-    return passesGate(summary, threshold) ? 0 : 1;
+    return passesGate(summary, threshold, mrrMin) ? 0 : 1;
   } finally {
     // Isolate dispose failure so it cannot mask the primary error from the
     // try block — surface it on stderr but do not throw from finally.

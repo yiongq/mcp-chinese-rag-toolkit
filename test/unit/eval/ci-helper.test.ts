@@ -11,6 +11,7 @@ import {
   passesGate,
   renderMarkdownReport,
   resolveHitRateMin,
+  resolveMrrMin,
   writeArtifacts,
 } from '../../../src/eval/ci-helper.js';
 import type { EvalQueryResult, EvalSummary } from '../../../src/eval/types.js';
@@ -254,6 +255,57 @@ describe('passesGate', () => {
     expect(passesGate(summary({ hitRate: DEFAULT_HIT_RATE_MIN }))).toBe(true);
     expect(passesGate(summary({ hitRate: DEFAULT_HIT_RATE_MIN - 0.0001 }))).toBe(false);
   });
+
+  it('ignores MRR when no mrrThreshold is supplied (backward compatible)', () => {
+    expect(passesGate(summary({ hitRate: 0.95, mrr: 0.1 }), 0.9)).toBe(true);
+  });
+
+  it('fails when MRR is below the supplied mrrThreshold even if hitRate passes', () => {
+    expect(passesGate(summary({ hitRate: 0.95, mrr: 0.7999 }), 0.9, 0.8)).toBe(false);
+  });
+
+  it('passes when MRR equals the supplied mrrThreshold', () => {
+    expect(passesGate(summary({ hitRate: 0.95, mrr: 0.8 }), 0.9, 0.8)).toBe(true);
+  });
+
+  it('fails on hitRate regardless of a passing MRR', () => {
+    expect(passesGate(summary({ hitRate: 0.8, mrr: 0.95 }), 0.9, 0.8)).toBe(false);
+  });
+});
+
+describe('resolveMrrMin', () => {
+  const original = process.env.RAG_EVAL_MRR_MIN;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.RAG_EVAL_MRR_MIN;
+    else process.env.RAG_EVAL_MRR_MIN = original;
+  });
+
+  it('returns undefined (gate off) when env var is unset', () => {
+    delete process.env.RAG_EVAL_MRR_MIN;
+    expect(resolveMrrMin()).toBeUndefined();
+  });
+
+  it('returns undefined for a blank value', () => {
+    expect(resolveMrrMin('   ')).toBeUndefined();
+  });
+
+  it('parses a valid float from explicit argument', () => {
+    expect(resolveMrrMin('0.8')).toBe(0.8);
+  });
+
+  it('reads the RAG_EVAL_MRR_MIN env var', () => {
+    process.env.RAG_EVAL_MRR_MIN = '0.75';
+    expect(resolveMrrMin()).toBe(0.75);
+  });
+
+  it('throws an actionable error for out-of-range value', () => {
+    expect(() => resolveMrrMin('1.5')).toThrow(/RAG_EVAL_MRR_MIN.*\[0, 1\]/);
+  });
+
+  it('throws an actionable error for non-numeric value', () => {
+    expect(() => resolveMrrMin('abc')).toThrow(/RAG_EVAL_MRR_MIN/);
+  });
 });
 
 describe('resolveHitRateMin', () => {
@@ -316,6 +368,26 @@ describe('emitGitHubActionsAnnotation', () => {
     process.env.GITHUB_ACTIONS = 'true';
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     emitGitHubActionsAnnotation(summary({ hitRate: 0.95 }), 0.9);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const line = spy.mock.calls[0]?.[0];
+    expect(typeof line === 'string' ? line : '').toMatch(/::notice title=RAG Eval Passed/);
+  });
+
+  it('writes a `::error::` annotation when only the MRR floor fails', () => {
+    process.env.GITHUB_ACTIONS = 'true';
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    emitGitHubActionsAnnotation(summary({ hitRate: 0.95, mrr: 0.5 }), 0.9, 0.8);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const line = spy.mock.calls[0]?.[0];
+    const text = typeof line === 'string' ? line : '';
+    expect(text).toMatch(/::error title=RAG Eval CI Gate Failed/);
+    expect(text).toMatch(/MRR@5 = 0\.5000 < 0\.8000/);
+  });
+
+  it('writes a `::notice::` annotation when both floors pass', () => {
+    process.env.GITHUB_ACTIONS = 'true';
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    emitGitHubActionsAnnotation(summary({ hitRate: 0.95, mrr: 0.85 }), 0.9, 0.8);
     expect(spy).toHaveBeenCalledTimes(1);
     const line = spy.mock.calls[0]?.[0];
     expect(typeof line === 'string' ? line : '').toMatch(/::notice title=RAG Eval Passed/);

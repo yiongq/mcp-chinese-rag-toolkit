@@ -79,6 +79,7 @@ export {
   renderBenchmarkTable,
   renderMarkdownReport,
   resolveHitRateMin,
+  resolveMrrMin,
   runAnswerEval,
   runBenchmark,
   runEval,

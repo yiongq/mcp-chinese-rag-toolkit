@@ -4,14 +4,14 @@ import path from 'node:path';
 import type { EvalSummary } from './types.js';
 
 /**
- * Default `eval-results/` location relative to the consuming package (a downstream consumer package /
- * a downstream consumer package each have their own; toolkit self-eval writes to
- * `packages/mcp-chinese-rag-toolkit/eval-results/`).
+ * Default `eval-results/` location relative to the consuming package (each
+ * consumer package owns its own; the toolkit self-eval writes to
+ * `eval-results/` at the package root).
  */
 export const DEFAULT_RESULTS_DIR = 'eval-results';
 
 /**
- * Default minimum Hit Rate@K — matches  (90%). Can be overridden via the
+ * Default minimum Hit Rate@K (90%). Can be overridden via the
  * `RAG_EVAL_HIT_RATE_MIN` env var (parsed as float ∈ [0, 1]). Production CI
  * MUST keep the default; dev override exists only for debugging.
  */
@@ -141,8 +141,8 @@ function escapeMarkdown(s: string): string {
 /**
  * Read `RAG_EVAL_HIT_RATE_MIN` env var, fall back to {@link DEFAULT_HIT_RATE_MIN}.
  * Validates the parsed value is a finite float in [0, 1]; throws actionable
- * error otherwise (教训 3 — error message contains the env var name
- * so reviewers see immediately which knob is wrong).
+ * error otherwise (the error message contains the env var name so reviewers
+ * see immediately which knob is wrong).
  */
 export function resolveHitRateMin(envValue?: string): number {
   const raw = envValue ?? process.env.RAG_EVAL_HIT_RATE_MIN;
@@ -156,28 +156,68 @@ export function resolveHitRateMin(envValue?: string): number {
   return parsed;
 }
 
-/** Returns true when the eval summary meets the CI gate (hitRate ≥ threshold). */
-export function passesGate(summary: EvalSummary, threshold = DEFAULT_HIT_RATE_MIN): boolean {
-  return summary.hitRate >= threshold;
+/**
+ * Read `RAG_EVAL_MRR_MIN` env var. Unlike the Hit Rate floor there is no
+ * default: when the env var is unset (or blank) the MRR gate is simply not
+ * enforced, keeping existing pipelines backward compatible. Validates the
+ * parsed value is a finite float in [0, 1]; throws an actionable error
+ * otherwise (mirrors {@link resolveHitRateMin}).
+ */
+export function resolveMrrMin(envValue?: string): number | undefined {
+  const raw = envValue ?? process.env.RAG_EVAL_MRR_MIN;
+  if (raw === undefined || raw.trim().length === 0) return undefined;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`resolveMrrMin: RAG_EVAL_MRR_MIN must be a float in [0, 1], got '${raw}'`);
+  }
+  return parsed;
+}
+
+/**
+ * Returns true when the eval summary meets the CI gate: hitRate ≥ threshold
+ * AND — when an MRR floor is provided — mrr ≥ mrrThreshold. `mrrThreshold`
+ * defaults to undefined (no MRR gate) so existing callers keep their
+ * hit-rate-only behaviour.
+ */
+export function passesGate(
+  summary: EvalSummary,
+  threshold = DEFAULT_HIT_RATE_MIN,
+  mrrThreshold?: number,
+): boolean {
+  if (summary.hitRate < threshold) return false;
+  return mrrThreshold === undefined || summary.mrr >= mrrThreshold;
 }
 
 /**
  * GitHub Actions-friendly stdout writer — emits `::error::` annotation on
  * gate failure + `::notice::` on pass. Mirrors latency-harness
  * bench `::warning::` idiom for consistency. No-op outside GitHub Actions so
- * local runs do not pollute stdout.
+ * local runs do not pollute stdout. `mrrThreshold` mirrors {@link passesGate}:
+ * omitted → the MRR floor is not part of the verdict.
  */
-export function emitGitHubActionsAnnotation(summary: EvalSummary, threshold: number): void {
+export function emitGitHubActionsAnnotation(
+  summary: EvalSummary,
+  threshold: number,
+  mrrThreshold?: number,
+): void {
   if (process.env.GITHUB_ACTIONS !== 'true') return;
   const pct = (summary.hitRate * 100).toFixed(2);
   const minPct = (threshold * 100).toFixed(2);
+  const failures: string[] = [];
   if (summary.hitRate < threshold) {
+    failures.push(`Hit Rate@${summary.topK} = ${pct}% < ${minPct}%`);
+  }
+  if (mrrThreshold !== undefined && summary.mrr < mrrThreshold) {
+    failures.push(`MRR@${summary.topK} = ${summary.mrr.toFixed(4)} < ${mrrThreshold.toFixed(4)}`);
+  }
+  if (failures.length > 0) {
     process.stdout.write(
-      `::error title=RAG Eval CI Gate Failed::Hit Rate@${summary.topK} = ${pct}% < ${minPct}%. See eval-results/report.md for per-query breakdown.\n`,
+      `::error title=RAG Eval CI Gate Failed::${failures.join('; ')}. See eval-results/report.md for per-query breakdown.\n`,
     );
   } else {
+    const mrrSuffix = mrrThreshold !== undefined ? ` ≥ ${mrrThreshold.toFixed(4)}` : '';
     process.stdout.write(
-      `::notice title=RAG Eval Passed::Hit Rate@${summary.topK} = ${pct}% ≥ ${minPct}%. MRR = ${summary.mrr.toFixed(4)}.\n`,
+      `::notice title=RAG Eval Passed::Hit Rate@${summary.topK} = ${pct}% ≥ ${minPct}%. MRR = ${summary.mrr.toFixed(4)}${mrrSuffix}.\n`,
     );
   }
 }
