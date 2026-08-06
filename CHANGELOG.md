@@ -1,5 +1,38 @@
 # @yiong/mcp-chinese-rag-toolkit
 
+## 0.6.0
+
+### Minor Changes
+
+- e819cea: Ingest: add `parseDocument`, a stateless entry point that turns an uploaded file into a uniform `ParsedDoc` the existing chunkers accept as-is (additive, no breaking changes). It normalizes four whitelisted formats — PDF text layer (`application/pdf`), Word documents (docx), Markdown (`text/markdown`) and plain text (`text/plain`) — delegating every parse to a mature library (PDF via the existing `parsePdf`, docx via `mammoth`); no parser is hand-rolled. PDF documents keep their 1-indexed page numbers on `doc.pages` (ready for `chunkPdfPages`); docx/Markdown/text become heading-preserving text on `doc.text` (ready for `chunk`, whose heading tracker turns `#`–`####` into a `section` provenance path). Markdown and plain-text bytes are decoded as UTF-8 first with an automatic GBK fallback — no charset-detection dependency, using the Node-built-in decoder — and the detected encoding is reported on `doc.encoding`.
+
+  Failure is returned, never thrown, so a single bad file never crashes a batch ingest: the result is a discriminated union `{ ok: true; doc } | { ok: false; error; message }` carrying a stable `INGEST_ERROR_CODES` code — `UNSUPPORTED_MIME_TYPE`, `PARSE_FAILED` (corrupt / encrypted / malformed input), `PARSE_TIMEOUT` (a configurable `timeoutMs` hard ceiling, default `DEFAULT_PARSE_TIMEOUT_MS`) or `EMPTY_DOCUMENT`. The function is side-effect-free and never mutates or detaches its input buffer. Exports `parseDocument`, `DEFAULT_PARSE_TIMEOUT_MS`, `INGEST_ERROR_CODES`, and the `ParsedDoc` / `ParseResult` / `ParseDocumentOptions` / `SupportedMimeType` / `IngestErrorCode` types.
+
+- 89a903f: Knowledge graph: add stateless primitives to grow an entity / relation graph from already-indexed chunks and store it alongside the vectors and full-text index (additive, no breaking changes). The graph tables live in the **same `.db` file** as the existing `docs` / vector / FTS tables, so the graph travels with that index version; rebuilding the corpus into a fresh version starts with no graph.
+
+  - `buildGraphSchema(db)` — idempotent DDL (`IF NOT EXISTS`) that adds `entities`, `relations` and their `*_mentions` back-link tables in place. Safe to call on any already-built index to opt it into graph storage; it never touches the core tables, and a graph-less database still opens read-only unchanged.
+  - `extractGraph({ chunks, extractFn })` — pure orchestration that turns chunks into a deduplicated graph. Extraction is fully injected via `extractFn` (wire it to any LLM provider, a rule-based extractor, or a test stub) — the toolkit ships no default extractor and depends on no model SDK. Entities and relations collapse onto a deterministic, NFKC-based normalized key so re-extracting the same corpus produces no duplicate nodes; each node and edge back-links to the source chunk(s) it was mentioned in; relation endpoints are registered as nodes so the graph is always connected; and a single chunk whose `extractFn` throws (or resolves a malformed result) is skipped and counted in `failedChunks` rather than aborting the batch.
+  - `writeGraph(db, graph)` — persists an extracted graph in one transaction, idempotently: entities and relations use `INSERT OR IGNORE` against a `UNIQUE` normalized key and mention rows use a composite primary key, so writing the same graph twice inserts nothing and leaves node / edge counts unchanged.
+
+  `extractGraph` accepts an optional `onSpan` callback that emits one `ingest.graph` span carrying scalar counts only (chunk / entity / relation / failed counts) — never names or chunk content — so it is safe to export to an observability backend. Uses only Node built-ins and the existing SQLite dependency; no new dependencies. Exports `buildGraphSchema`, `extractGraph`, `writeGraph`, `GRAPH_ERROR_CODES`, `GraphError`, and the `GraphChunk` / `ExtractFn` / `RawEntity` / `RawRelation` / `RawExtraction` / `ExtractedEntity` / `ExtractedRelation` / `ExtractedGraph` / `GraphExtractionOptions` / `GraphStats` / `GraphErrorCode` types.
+
+- 0c1faaa: Observability: the retrieval and ingest pipelines can now emit structured `PipelineSpan` events through an optional, injected `onSpan` callback, so you can bridge pipeline timing to any observability backend without the toolkit depending on a tracing SDK (additive, no breaking changes).
+
+  Pass `onSpan` on the per-call options of the bound hybrid search (`createHybridSearch`), the bound reranker (`createReranker`), `parseDocument`, or `IndexStore.buildVersion`. Each pipeline stage then emits one span:
+
+  - `createHybridSearch` emits a `retrieve.hybrid` parent span with `retrieve.bm25` / `retrieve.vector` / `retrieve.rrf` child spans (each child's `parentId` is the hybrid span's `id`).
+  - `createReranker` emits a `retrieve.rerank` span (including a zero-candidate span when the input list is empty).
+  - `parseDocument` emits one `ingest.parse` span per call, for successful and failed parses alike.
+  - `IndexStore.buildVersion` emits an `ingest.index` span on a successful build.
+
+  Each span carries a name, an id and optional `parentId`, `startedAtEpochMs`, `durationMs`, and a scalar-only `attributes` map (counts, scores, dimensions, format enums, error codes). Spans are metadata only — never query text, chunk content, source or file names — so they are safe to export to an external backend. Pass an outer span id via `parentSpanId` to graft the toolkit's spans under your own trace.
+
+  When no `onSpan` is provided the pipelines read no clock, mint no id and allocate no span object, so the hot path is unchanged and there is zero overhead. Uses only Node built-ins (`node:crypto`, `performance`, `Date`) — no new dependencies. Exports the `PipelineSpan`, `PipelineSpanName`, `OnSpan` and `SpanAttributeValue` types.
+
+- e819cea: RAG store: add `openIndexStore`, a versioned wrapper over `openIndex` that lets a running service re-index a corpus and switch over without interrupting in-flight queries (additive, no breaking changes — `openIndex` and its handle are untouched). It keeps per-corpus version files (`v<N>.db`) plus a single `manifest.json` pointer, and exposes `buildVersion(rows)` (full rebuild into a fresh version file — decoupled from going live, so a slow rebuild never stalls current queries), `swap(version?)` (atomically flip the serving pointer via a temp-file + `rename`, so a reader or a crash never sees a half-written manifest), `rollback()` (step the pointer back one version), and `withHandle(fn)` for running a query against the current version.
+
+  Handle lifetime is reference-counted: a query that started before a `swap` keeps reading the pre-swap version to completion, and that version's connection is only closed once its last in-flight reader releases it. Old version files are pruned to a configurable `keepVersions` window (default 2), but the current version, its one-step rollback target, and any version with an in-flight reader are never deleted — a reader-held version's `.db` (with its WAL/SHM sidecars) is unlinked only after the reader releases. Building an empty corpus is refused, and a malformed or inconsistent `manifest.json` fails fast with a typed `IndexStoreError` (`err.code`, e.g. `EMPTY_CORPUS` / `CORRUPT_MANIFEST` / `VERSION_NOT_FOUND`). Zero new dependencies — pure `node:fs` over the existing `better-sqlite3` path. Exports `openIndexStore`, `IndexStoreError`, `INDEX_STORE_ERROR_CODES`, and the `IndexStore` / `IndexStoreOptions` / `BuildVersionResult` / `IndexStoreErrorCode` types.
+
 ## 0.5.0
 
 ### Minor Changes
