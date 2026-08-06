@@ -109,6 +109,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Hugging Face rate-limits anonymous downloads from GitHub's shared
+      # runner IPs (observed as 429 / mid-download terminations). Cache the
+      # model files across runs so only a cache-miss run ever touches HF; the
+      # key is the manifest source, which pins model revisions + SHA-256.
+      - name: Cache BGE models
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.model-cache
+          key: bge-models-${{ hashFiles('src/rag/model-manifest.ts') }}
+
       - name: Run fixture eval (downloads bge-large-zh + bge-reranker-v2-m3)
         env:
           # Explicit empty string so the pipeline's
@@ -123,7 +133,21 @@ jobs:
           # MRR floor — the gate only enforces MRR when this is set, so unset
           # local runs stay hit-rate-only while CI enforces both metrics.
           RAG_EVAL_MRR_MIN: '0.8'
-        run: pnpm test:eval
+          # Route the toolkit's model cache into the actions/cache path above.
+          XDG_CACHE_HOME: ${{ github.workspace }}/.model-cache
+        # Retry rides out HF 429 rate-limiting while the model cache is cold;
+        # a genuine gate failure (exit code 2 with a written summary) is NOT
+        # retried — only download/startup failures without a summary are.
+        run: |
+          for attempt in 1 2 3; do
+            if pnpm test:eval; then exit 0; fi
+            if [ -f eval-results/summary.json ]; then
+              echo "eval completed but gate failed — not retrying"; exit 1
+            fi
+            echo "attempt ${attempt} failed before eval could run (likely HF 429); retrying in 60s"
+            sleep 60
+          done
+          exit 1
 
       - name: Upload fixture eval report
         if: always()
