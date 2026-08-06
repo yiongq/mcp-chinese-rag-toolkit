@@ -1,44 +1,66 @@
 #!/usr/bin/env node
-// Public-hygiene gate — fails CI when a user-facing file in this public package
-// leaks internal development-process jargon. This package is open source; its
-// README, source comments, generated API docs, templates and tests are all read
-// by external users, so they must read as user-facing documentation, not as an
-// internal BMad story/epic/requirement tracker.
+// Public-hygiene gate — fails when a user-facing file in this public package
+// leaks internal development-process jargon (planning-tracker references,
+// internal project names, private roadmap items). This package is open
+// source; its README, source comments, generated API docs, templates and
+// tests are all read by external users, so they must read as user-facing
+// documentation, not as an internal planning tracker.
 //
-// Banned: Story/Epic numbers, FR/NFR/AR-Ext requirement IDs, "AI Agent Rule",
-// internal brand names, private downstream package names (the public package
-// must not advertise an unreleased private roadmap), and private planning-doc
-// paths. The private parent monorepo keeps these freely — this gate guards ONLY
-// this standalone public repo.
+// The banned-pattern list is intentionally NOT committed — listing the
+// internal names in a tracked file would itself leak them. Patterns live in
+// a gitignored sibling file:
+//
+//   scripts/hygiene-patterns.local.json
+//   [{ "label": "internal brand", "pattern": "\\bsome-name\\b", "flags": "i" }, …]
+//
+// When that file is absent (fresh clone / CI), the check prints a notice and
+// exits 0 so it never blocks builds that have nothing to load.
 //
 //   node scripts/check-public-hygiene.mjs
 //
-// Exits 1 (with file:line locations) on any violation; 0 when clean.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// Exits 1 (with file:line locations) on any violation; 0 when clean or skipped.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
+const PATTERNS_FILE = join(import.meta.dirname, 'hygiene-patterns.local.json');
 
-// Roots to scan — the public/published + source surface. `scripts/` is excluded
-// (this gate lives there and necessarily names the patterns it bans).
+// Roots to scan — the public/published + source surface. `scripts/` is
+// excluded (the gate and its local patterns file live there).
 const TARGETS = ['README.md', 'package.json', 'src', 'bin', 'templates', 'docs', 'eval', 'test'];
 const SCAN_EXT = new Set(['.md', '.ts', '.tsx', '.mjs', '.cjs', '.js', '.yml', '.yaml']);
 
-// Each rule: a human label + a RegExp. Word boundaries keep false positives out
-// (e.g. "history" must not trip "Story"; "frame" must not trip "FR1").
-const RULES = [
-  ['Story/Epic reference', /\b(?:stor(?:y|ies)|epics?)\b/i],
-  ['FR/NFR requirement id', /\bN?FR\d|\bNFR\b/],
-  ['AR-Ext requirement id', /\bAR-Ext-\d/i],
-  ['AI Agent Rule', /\bAI Agent Rule\b/i],
-  ['architecture rule', /\barchitecture rule\b/i],
-  ['internal brand', /glorysoft/i],
-  ['private package mcp-hr', /\bmcp-hr\b/],
-  ['private package mcp-modeling', /\bmcp-modeling\b/],
-  ['private package ai-edge-pack', /\bai-edge-pack\b/],
-  ['BMad tooling', /\b_?bmad\b/i],
-  ['private planning doc', /\b(?:architecture|prd|epics)(?:\.md\b|\s+L\d{2,})/],
-];
+if (!existsSync(PATTERNS_FILE)) {
+  console.log(
+    'public-hygiene: scripts/hygiene-patterns.local.json not found — skipping (no patterns to check).',
+  );
+  process.exit(0);
+}
+
+/** Load `[{ label, pattern, flags? }, …]` and compile to `[label, RegExp]` pairs. */
+function loadRules(file) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error(
+      `::error::public-hygiene: could not parse ${relative(ROOT, file)}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    process.exit(1);
+  }
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((r) => typeof r?.label !== 'string' || typeof r?.pattern !== 'string')
+  ) {
+    console.error(
+      '::error::public-hygiene: patterns file must be an array of { label, pattern, flags? } objects',
+    );
+    process.exit(1);
+  }
+  return parsed.map((r) => [r.label, new RegExp(r.pattern, r.flags ?? '')]);
+}
+
+const RULES = loadRules(PATTERNS_FILE);
 
 function* walk(abs) {
   let st;
@@ -98,8 +120,8 @@ for (const v of violations) {
   console.error(`  ${v.file}:${v.line}  [${v.label}]  ${v.text.slice(0, 120)}`);
 }
 console.error(
-  '\nThis is a public open-source package. Rephrase to user-facing wording — strip Story/Epic/FR/NFR\n' +
-    'scaffolding, generalize private package names to "a downstream consumer package", and drop private\n' +
-    'planning-doc references. The private parent monorepo is the place for internal naming, not this repo.',
+  '\nThis is a public open-source package. Rephrase the flagged lines to neutral, user-facing\n' +
+    'wording — internal project names, planning references, and private roadmap details belong\n' +
+    'in the private parent monorepo, not this repo.',
 );
 process.exit(1);
