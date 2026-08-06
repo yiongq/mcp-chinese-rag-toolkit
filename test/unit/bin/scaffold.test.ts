@@ -346,7 +346,7 @@ describe('scaffoldProject', () => {
     });
     const readme = readFileSync(path.join(workspace, 'pm-token-test', 'README.md'), 'utf-8');
     expect(readme).toContain('npm install');
-    expect(readme).toContain('npm build-index');
+    expect(readme).toContain('npm run build-index');
     expect(readme).not.toContain('__PACKAGE_MANAGER__');
   });
 

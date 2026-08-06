@@ -16,14 +16,14 @@ __PACKAGE_MANAGER__ install
 ## 2. Build the index
 
 ```sh
-__PACKAGE_MANAGER__ build-index
+__PACKAGE_MANAGER__ run build-index
 # → Indexed N chunks → data/index.db
 ```
 
 ## 3. Start the MCP server (stdio transport)
 
 ```sh
-__PACKAGE_MANAGER__ start:stdio
+__PACKAGE_MANAGER__ run start:stdio
 ```
 
 ## 4. Try it via MCP Inspector
@@ -31,7 +31,7 @@ __PACKAGE_MANAGER__ start:stdio
 In a second terminal:
 
 ```sh
-npx @modelcontextprotocol/inspector __PACKAGE_MANAGER__ start:stdio
+npx @modelcontextprotocol/inspector __PACKAGE_MANAGER__ run start:stdio
 ```
 
 Call `search_docs` with `{ "query": "试用期工资" }` — you should see a chunk
@@ -73,7 +73,7 @@ semantic vector search:
 
 ## Write your own eval set
 
-`eval/eval-set.yml` follows the same schema validated by 's
+`eval/eval-set.yml` follows the same schema validated by the toolkit's
 `loadEvalSet`. Add more `queries` entries that mirror real user questions
 from your domain. See the toolkit `docs/EVAL_GUIDE.md` for the
 methodology (query categories, Hit Rate@K, MRR interpretation).

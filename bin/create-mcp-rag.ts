@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * CLI — scaffolds a new MCP RAG server project.  final landing.
+ * CLI — scaffolds a new MCP RAG server project.
  *
  * Usage:
- *   npx @yiong/mcp-chinese-rag-toolkit create-mcp-rag <project-name> [options]
+ *   npx -y -p @yiong/mcp-chinese-rag-toolkit create-mcp-rag <project-name> [options]
  *
  * Options:
  *   --template <id>            Template to use (default: rag-basic)

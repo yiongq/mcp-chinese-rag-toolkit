@@ -57,8 +57,7 @@ export class ScaffoldError extends Error {
 
 /**
  * Thrown when the package-manager install subprocess exits non-zero.
- * Distinct subclass so callers can branch on install failures specifically
- *.
+ * Distinct subclass so callers can branch on install failures specifically.
  */
 export class InstallFailedError extends ScaffoldError {
   constructor(message: string) {
@@ -495,8 +494,8 @@ function isInsideGitWorktree(dir: string): boolean {
 
 /**
  * Core scaffolding workflow:
- *   1. Validate target dir (must NOT exist — never silently overwrite,
- *      lesson 7 / lesson 11). Created atomically.
+ *   1. Validate target dir (must NOT exist — an existing directory is never
+ *      silently overwritten). Created atomically.
  *   2. Validate template id + enforce template.json constraints
  *   3. Recursively copy `templates/create-mcp-rag/files/<template>/` → target
  *   4. Token-replace `__PROJECT_NAME__` / `__TOOLKIT_VERSION__` /
@@ -634,11 +633,11 @@ export async function scaffoldProject(
       'Next steps:',
       `  cd ${quotedName}`,
       opts.skipInstall ? `  ${opts.packageManager} install` : null,
-      `  ${opts.packageManager} build-index`,
-      `  ${opts.packageManager} start:stdio`,
+      `  ${opts.packageManager} run build-index`,
+      `  ${opts.packageManager} run start:stdio`,
       '',
       'Connect with MCP Inspector to call the search_docs tool:',
-      `  npx @modelcontextprotocol/inspector ${opts.packageManager} start:stdio`,
+      `  npx @modelcontextprotocol/inspector ${opts.packageManager} run start:stdio`,
       '',
     ]
       .filter((line): line is string => line !== null)

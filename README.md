@@ -272,8 +272,8 @@ The first slice of the Chinese RAG pipeline lands as pure primitives — PDF
 text extraction and Markdown-aware chunking. They are the data-shape source
 of truth (`Chunk` / `ChunkOptions` / `ParsePdfResult` / `PdfPage`) consumed
 by every subsequent indexing / retrieval layer. The higher-level
-`ChineseRagPipeline` (jieba + FTS5 + sqlite-vec + RRF + reranker) lands in
-.
+pipeline (jieba + FTS5 + sqlite-vec + RRF + reranker) builds on top of
+these primitives — see the sections below.
 
 ### `parsePdf` — PDF → per-page text (unpdf-based)
 
@@ -327,8 +327,8 @@ The toolkit now ships an opinionated SQLite + `sqlite-vec` + jieba storage
 layer that turns `Chunk[]` (from `chunkPdfPages` / `chunk`) into a single
 `.db` file with three tables: `docs` (content + provenance), `docs_fts`
 (FTS5 BM25 over jieba-pretokenized text) and `docs_vec` (`vec0` virtual
-table holding the per-chunk embedding). Hybrid Search + RRF land in
-— this section is the storage substrate they sit on.
+table holding the per-chunk embedding). Hybrid Search + RRF (next
+sections) sit on top of this storage substrate.
 
 ### `openIndex` — open / create an index handle
 
@@ -344,7 +344,7 @@ try {
 ```
 
 Pass `{ readonly: true }` to open a prebuilt `.db` (e.g. one shipped
-inside an a downstream consumer package npm tarball) without re-running the schema.
+inside a consumer package's npm tarball) without re-running the schema.
 
 ### `indexChunks` — three-table transactional write
 
@@ -355,7 +355,7 @@ const handle = openIndex('data/hr-index.db');
 const { pages } = await parsePdf('hr.pdf');
 const chunks = await chunkPdfPages(pages, { source: 'hr.pdf' });
 // `embedding` is a Float32Array of length `embeddingDim` (default 1024,
-// matching bge-large-zh-v1.5 — will provide the embedder).
+// matching bge-large-zh-v1.5 — see `loadEmbedder` below).
 handle.indexChunks(chunks.map((chunk, i) => ({ chunk, embedding: embeddings[i] })));
 handle.close();
 ```
@@ -458,9 +458,9 @@ The retrieval layer composes the storage primitives and the
 embedder into a single fused query: BM25 (`ftsSearch`) and
 vector KNN (`vecSearch`) run in parallel, and Reciprocal Rank Fusion
 (Cormack et al. 2009) merges the two ranked lists without normalizing
-their disparate score scales. adds the
-`bge-reranker-v2-m3` cross-encoder on top of the hybrid top-K; 
-adds the LRU cache around the whole pipeline.
+their disparate score scales. The reranker stage adds the
+`bge-reranker-v2-m3` cross-encoder on top of the hybrid top-K, and the
+L0 LRU cache wraps the whole pipeline.
 
 ### `createHybridSearch` — BM25 + vec fused via RRF
 
@@ -478,7 +478,7 @@ const handle = openIndex('index.db', { embeddingDim: embedder.dim });
 writeEmbedderMeta(handle.db, embedder); // → meta.embedding_model
 writeTokenizerMeta(handle.db); // → meta.tokenizer_version = '@node-rs/jieba@2.0.1'
 
-// (a downstream consumer package / a downstream consumer package build-index.ts owns the chunk → embedding → indexChunks loop.)
+// (Your indexing script — e.g. a consumer package's build-index.ts — owns the chunk → embedding → indexChunks loop.)
 
 const search = createHybridSearch({ handle, embedder });
 const hits = await search('试用期管理规定', { topK: 5 });
@@ -524,7 +524,7 @@ writeTokenizerMeta(handle.db); // defaults to JIEBA_VERSION ('@node-rs/jieba@2.0
 ```
 
 Symmetric to `writeEmbedderMeta`: call once during indexing to pin the
-jieba release into the on-disk index. 's cache key and any
+jieba release into the on-disk index. The L0 cache key and any
 future jieba-dictionary upgrade trigger a reindex decision based on this
 field; upgrading the dep without bumping `JIEBA_VERSION` is a
 correctness bug.
@@ -535,13 +535,13 @@ The reranker stage is the *last* stop in the RAG retrieval pipeline
 (`hybrid → rerank → optional LRU cache`). It runs the
 `bge-reranker-v2-m3` cross-encoder over `(query, chunk.content)` pairs
 to produce a sigmoid-of-logit relevance score in `[0, 1]` and trims the
-hybrid top-10 down to the canonical top-5 envelope used by
-`a downstream consumer package.search_hr_docs` and `a downstream consumer package.*`. The LRU cache,
+hybrid top-10 down to the canonical top-5 envelope consumed by
+downstream MCP tools (e.g. a `search_hr_docs` tool). The LRU cache,
 when it lands, wraps the entire `hybrid + rerank` pipeline as a single
 `withLruCache` middleware — the reranker is intentionally a separate
 factory so callers can skip it (ablation eval) or share its cache.
 
-This section is also the home of  (`stdio P95 < 200ms`): the
+This section is also the home of the stdio latency budget (`stdio P95 < 200ms`): the
 `runStdioLatencyHarness` + `bin/latency-harness.ts` harness measures P95 and,
 once a `bench/baseline.json` is committed, warns on `>50ms` drift (warn-not-block;
 the baseline is generated on first `pnpm bench -- --write`, see below).
@@ -702,7 +702,7 @@ import {
 const handle = openIndex('./data/hr-index.db', { readonly: true });
 
 const server = createMcpServer({
-  name: 'a downstream consumer package',
+  name: 'my-mcp-server',
   version: '0.1.0',
   tools: [searchHrDocs],
   cache: { indexVersion: handle.getIndexVersion() }, // 500 entries / 1h TTL defaults
@@ -837,45 +837,47 @@ parse → chunk → generateChunkContext → stitchPrefixedChunk → embedder.em
                                            AND the dense vector
 ```
 
-### a downstream consumer package / a downstream consumer package integration
+### Consumer-package integration
 
-`a downstream consumer package` `build-index.ts` is the first real consumer.
+A consumer package's `build-index.ts` is the natural first caller.
 The toolkit only provides the prompt template + provider abstraction
 + stitching helpers; SDK selection, API key handling, and per-doc
-sha256 computation happen caller-side (architecture §AI Agent 强制规则
-#4 — API keys never enter the toolkit).
+sha256 computation happen caller-side — API keys never enter the
+toolkit.
 
 ### Out of scope here
 
-- Real LLM end-to-end token-reduction validation (a downstream consumer package verifies
-  in real `client.messages.create` `cache_read_input_tokens` /
+- Real LLM end-to-end token-reduction validation (a consumer package can
+  verify it against real `client.messages.create` `cache_read_input_tokens` /
   `cache_creation_input_tokens` fields)
 - RAG Hit Rate@K evaluation framework
 - Vision-caption plugin for PDFs with images
 
 **Related:** the eval framework enforces
-`Hit Rate@5 ≥ 90%` as a CI gate; a downstream consumer package wires this Contextual
-Retrieval + L0 cache pair into a real HR Q&A end-to-end demo.
+`Hit Rate@5 ≥ 90%` as a CI gate; a consumer package can wire this Contextual
+Retrieval + L0 cache pair into a real end-to-end Q&A flow.
 
 ## Eval Framework + RAG Eval CI Gate
 
-lands the **eval framework** + **`rag-eval` CI gate** that enforces
-`Hit Rate@5 ≥ 90%` on every PR — *before* a downstream consumer package ships, so the
+The toolkit ships an **eval framework** + **`rag-eval` CI gate** that enforces
+`Hit Rate@5 ≥ 90%` on every PR — *before* any consumer package ships, so the
 RAG pipeline parameters (chunking / RRF constants / reranker / embedder /
 contextual retrieval) are locked-in by a measurable contract rather than vibe.
 
-The eval framework covers :
-- **** YAML-declared eval set with reason comments (``)
-- **** Hit Rate@K + MRR aggregate metrics
-- **** CI exit-code 1 when `Hit Rate@5 < 90%` (blocking, not warn)
-- **** GitHub Actions artifact: `summary.json` + `report.md` + `per-query.json`
-- **** per-query metric breakdown (`rerankScore` / `distance` / `ftsRank`)
+The eval framework covers:
 
-The 90% baseline mirrors Anthropic's
-[Contextual Retrieval blog (Sep 2024)](https://www.anthropic.com/news/contextual-retrieval)
-industry numbers for Chinese RAG (BM25 + reranker stack lands around 88-93%);
-toolkit fixture is engineered to land well above, so any regression points at a
-real pipeline change rather than a noisy bar.
+- YAML-declared eval set with per-query reason comments
+- Hit Rate@K + MRR aggregate metrics
+- CI exit-code 1 when `Hit Rate@5 < 90%` (blocking, not warn)
+- GitHub Actions artifact: `summary.json` + `report.md` + `per-query.json`
+- per-query metric breakdown (`rerankScore` / `distance` / `ftsRank`)
+
+The hybrid + rerank direction follows Anthropic's
+[Contextual Retrieval blog (Sep 2024)](https://www.anthropic.com/news/contextual-retrieval);
+the 90% floor itself is not a number from that post — it is the measured
+baseline of this repo's own eval fixture. The fixture is engineered to land
+well above the floor, so any regression points at a real pipeline change
+rather than a noisy bar.
 
 ### YAML eval set schema
 
@@ -885,7 +887,7 @@ description: |                        # optional, surfaces in report.md header
   Toolkit self-contained eval set.
 
 queries:
-  # reason: BM25 sanity check on 差旅 keyword — required by 
+  # reason: BM25 sanity check on the 差旅 keyword
   - query: 差旅报销需要保留什么凭证
     category: leave-policy            # kebab-case
     expected:                          # OR-semantics: ANY match scores hit
@@ -934,12 +936,12 @@ process.exit(passesGate(summary, threshold) ? 0 : 1);
 
 ### Adapter pattern for downstream MCP packages
 
-`a downstream consumer package` and `a downstream consumer package` each own
-their own eval set + adapter. The toolkit provides no domain logic — only the
+Each downstream MCP package owns
+its own eval set + adapter. The toolkit provides no domain logic — only the
 runner, scorer, and CI helper. Wiring sketch:
 
 ```ts
-// packages/a downstream consumer package/bin/run-eval.ts
+// your-mcp-package/bin/run-eval.ts
 import { loadEvalSet, runEval, writeArtifacts, ... } from '@yiong/mcp-chinese-rag-toolkit';
 import { searchHrDocs } from '../src/tools/search-hr-docs.js';
 
@@ -952,41 +954,44 @@ const searchFn: EvalSearchFn = async (q, opts) => {
 
 ### CI integration
 
-`.github/workflows/ci.yml` ships with a `rag-eval` job that runs on every PR:
+`.github/workflows/ci.yml` ships with a `rag-eval` job that runs on every PR
+and push to `main`:
 
 ```yaml
 rag-eval:
-  name: RAG Eval (Hit Rate@5 ≥ 90% blocking gate)
-  if: github.event_name == 'pull_request'
+  name: RAG Eval (fixture Hit Rate@5 ≥ 90% blocking gate)
   runs-on: ubuntu-latest
   continue-on-error: false           # opposite of `bench` (warn-not-block)
   timeout-minutes: 15
   steps:
     # …checkout / setup / install / build…
-    - name: Run RAG eval
+    - name: Run fixture eval (downloads bge-large-zh + bge-reranker-v2-m3)
       env:
         SKIP_MODEL_DOWNLOAD: ''      # force real model download for accurate eval
-        RAG_EVAL_HIT_RATE_MIN: '0.9' #  default; do NOT lower in main
-      run: pnpm --filter @yiong/mcp-chinese-rag-toolkit test:eval
-    - name: Upload RAG eval report
+        RAG_EVAL_HIT_RATE_MIN: '0.9' # Hit Rate@5 floor; do NOT lower in main
+        RAG_EVAL_MRR_MIN: '0.8'      # MRR floor
+      run: pnpm test:eval
+    - name: Upload fixture eval report
       if: always()                   # upload even on failure for debugging
+      continue-on-error: true        # diagnostic upload must not flip the gate
       uses: actions/upload-artifact@v4
       with:
-        name: rag-eval-report
+        name: fixture-rag-eval-report
         path: |
-          packages/mcp-chinese-rag-toolkit/eval-results/summary.json
-          packages/mcp-chinese-rag-toolkit/eval-results/report.md
-          packages/mcp-chinese-rag-toolkit/eval-results/per-query.json
-        retention-days: 30          # default 90 wastes storage; 30 = ample PR window
+          eval-results/summary.json
+          eval-results/report.md
+          eval-results/per-query.json
+        retention-days: 30           # default 90 wastes storage; 30 = ample PR window
+        if-no-files-found: warn
 ```
 
-### `RAG_EVAL_HIT_RATE_MIN` env var
+### `RAG_EVAL_HIT_RATE_MIN` / `RAG_EVAL_MRR_MIN` env vars
 
-Threshold defaults to **0.9** (`DEFAULT_HIT_RATE_MIN`). Override only for dev
-debugging via `RAG_EVAL_HIT_RATE_MIN=0.85 pnpm test:eval`. Production CI keeps
-the default; any PR that flips it permanently must include explicit ADR
-justification (the env var exists for transient debugging, not as a knob to
-weaken ).
+The Hit Rate threshold defaults to **0.9** (`DEFAULT_HIT_RATE_MIN`); override
+only for dev debugging via `RAG_EVAL_HIT_RATE_MIN=0.85 pnpm test:eval`. The
+MRR gate is enforced only when `RAG_EVAL_MRR_MIN` is set (CI sets `0.8`).
+Production CI keeps these values; the env vars exist for transient debugging,
+not as knobs to weaken the gate.
 
 ### Per-query metric breakdown semantics
 
@@ -1017,9 +1022,11 @@ still a first-class citizen.
   Real production gates live in downstream consumer packages (real PDFs, 10+
   queries, engine routing, hooks, db-config queries).
 
-**Related:** the Vision Caption Plugin (ADR-0008) layers on top
-for PDFs with image-heavy pages, and the `create-mcp-rag` CLI
-scaffolds a new MCP RAG package wired into this eval framework out of the box.
+**Related:** the Vision Caption Plugin (next section) layers on top
+for PDFs with image-heavy pages, and the `create-mcp-rag` CLI scaffolds a
+new MCP RAG package with a sample `eval/eval-set.yml` — wire it into this
+framework via `loadEvalSet` / `runEval` / `passesGate` (see
+[docs/EVAL_GUIDE.md](./docs/EVAL_GUIDE.md)).
 
 ## Vision Caption Plugin
 
@@ -1094,7 +1101,7 @@ bumping the prompt template).
 
 ### Cost & Latency
 
-See ADR-0008 §索引期成本估算 — 50-image PDF @ `maxConcurrency=3`:
+Rough indexing-time cost for a 50-image PDF @ `maxConcurrency=3`:
 
 - 豆包视觉: ~¥25 / ~3 min
 - Claude Haiku: ~$0.5 / ~2 min
@@ -1113,7 +1120,7 @@ the SDK choice in caller-land (mirrors `LlmProvider` provider-injection
 
 Scaffold a new MCP RAG server project in one command. Replaces the stale
 official `@modelcontextprotocol/create-server` (1+ year no updates) and
-makes  / the J4 ("5-min hello-world") milestone concrete.
+makes the "5-min hello-world" promise concrete.
 
 ### Quick start
 
