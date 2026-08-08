@@ -4,33 +4,40 @@
 //
 // `parseDocument` is the single missing entry point in front of the existing
 // "text → Chunk → index" pipeline: it turns an uploaded file (PDF text layer,
-// docx, xlsx, Markdown, or plain text) into a uniform `ParsedDoc` that the
-// existing chunkers can consume as-is. It reuses `parsePdf` and the `PdfPage` type from
-// the rag layer; it deliberately does NOT re-implement chunking or indexing.
+// docx, xlsx, Markdown, plain text, or a PNG / JPEG image) into a uniform
+// `ParsedDoc` that the existing chunkers can consume as-is. It reuses `parsePdf`
+// and the `PdfPage` type from the rag layer; it deliberately does NOT
+// re-implement chunking or indexing.
 
 import type { OnSpan } from '../observability/span.js';
 import type { PdfPage } from '../rag/types.js';
 import type { IngestErrorCode } from './errors.js';
 
 /**
- * The five whitelisted input formats. Anything outside this set is rejected
+ * The seven whitelisted input formats. Anything outside this set is rejected
  * with an `UNSUPPORTED_MIME_TYPE` result (returned, never thrown). The set is
  * intentionally narrow — parsing is delegated to mature libraries, never
- * hand-rolled, so only formats with a trusted parser are accepted.
+ * hand-rolled, so only formats with a trusted parser are accepted. The image
+ * formats need no parser at all: their bytes pass through untouched (see
+ * {@link ParsedDoc.image}) and true validity surfaces at the downstream
+ * caption stage's decoder.
  */
 export type SupportedMimeType =
   | 'application/pdf'
   | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // docx
   | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // xlsx
   | 'text/markdown'
-  | 'text/plain';
+  | 'text/plain'
+  | 'image/png'
+  | 'image/jpeg';
 
 /**
  * Uniform parse output. Shaped so both existing chunk feeders accept it with
  * no adapter: paginated formats carry `pages` (feed `chunkPdfPages`), streaming
  * formats carry `text` (feed `chunk`, whose Markdown heading tracker turns
- * `#`–`####` headings into a `section` path). Exactly one of `pages` / `text`
- * is present for a successful parse.
+ * `#`–`####` headings into a `section` path), and image formats carry `image`
+ * (raw bytes for a vision caption pipeline). Exactly one of `pages` / `text` /
+ * `image` is present for a successful parse.
  */
 export interface ParsedDoc {
   mimeType: SupportedMimeType;
@@ -38,6 +45,16 @@ export interface ParsedDoc {
   pages?: PdfPage[];
   /** Streaming format (docx→Markdown / xlsx→Markdown tables / Markdown / plain text): heading-preserving full text. Undefined for PDF. */
   text?: string;
+  /**
+   * Image format (PNG / JPEG): the raw file bytes, passed through untouched —
+   * this shape produces NO text. Consumers should hand it to a vision caption
+   * pipeline (e.g. `captionImage` from the rag plugins) to turn the image into
+   * indexable text; that pipeline's decoder is also where a mislabeled or
+   * corrupt image surfaces (`parseDocument` does not sniff image content, so
+   * the contract stays uniform with every other format). Undefined for every
+   * text-producing format.
+   */
+  image?: Uint8Array;
   /**
    * Source encoding detected for a text-byte input (Markdown / plain text).
    * PDF and docx are decoded internally by their parser, so this is undefined

@@ -1,5 +1,7 @@
 export type { CaptionCache, CaptionCacheLookup, CaptionCacheOptions } from './caption-cache.js';
 export { openCaptionCache, resolveDefaultCaptionCacheDir, sha256Hex } from './caption-cache.js';
+export type { CaptionImageArgs } from './caption-image.js';
+export { captionImage } from './caption-image.js';
 export { encodePng, ensureCanvasAvailable } from './png-encoder.js';
 export type {
   CaptionCacheEntry,
