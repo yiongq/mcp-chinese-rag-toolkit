@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 
 import { parseDocument } from '../../../src/ingest/document-parser.js';
@@ -23,6 +24,30 @@ describe('parseDocument — ingest.parse span', () => {
     });
     expect(span?.durationMs).toBeGreaterThanOrEqual(0);
     expect(span?.parentId).toBeUndefined();
+  });
+
+  it('emits an ok span for an xlsx parse with the canonical mime and textLength', async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.addWorksheet('清单').addRows([
+      ['名称', '数量'],
+      ['样例', 1],
+    ]);
+    const xlsxBytes = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const spans: PipelineSpan[] = [];
+    const res = await parseDocument(
+      xlsxBytes,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      { onSpan: (s) => spans.push(s) },
+    );
+
+    expect(res.ok).toBe(true);
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.attributes).toMatchObject({
+      ok: true,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      textLength: res.ok ? (res.doc.text?.length ?? 0) : -1,
+    });
   });
 
   it('canonicalizes a parameterized content type in the span mime attribute', async () => {
