@@ -399,9 +399,31 @@ function readSheetRows(worksheet: Worksheet): { rows: string[][]; truncated: boo
  * contract described in the section comment above). The first row is treated
  * as the header; rows are padded to the sheet's widest row so every line has
  * a uniform column count.
+ *
+ * Single-column sheets are NOT tables — prose-notes sheets (one sentence per
+ * row) are a common authoring pattern, and piping them (`| sentence |`)
+ * degrades both display (raw pipes in source cards) and rerank (the
+ * cross-encoder scores table-ish text lower than prose). They render as plain
+ * paragraph groups instead: one line per row, grouped under the same
+ * character budget, no header repetition (a single-cell "header" is content).
  */
 function renderRowGroups(rows: string[][]): string[] {
   const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (width <= 1) {
+    const groups: string[] = [];
+    let group = '';
+    for (const row of rows) {
+      const line = row[0] ?? '';
+      if (line === '') continue;
+      if (group !== '' && group.length + 1 + line.length > MAX_XLSX_GROUP_CHARS) {
+        groups.push(group);
+        group = '';
+      }
+      group = group === '' ? line : `${group}\n${line}`;
+    }
+    if (group !== '') groups.push(group);
+    return groups;
+  }
   const toLine = (row: string[]): string => {
     const padded = [...row, ...Array<string>(width - row.length).fill('')];
     return `| ${padded.join(' | ')} |`;
