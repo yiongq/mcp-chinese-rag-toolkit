@@ -1,5 +1,11 @@
 # @yiong/mcp-chinese-rag-toolkit
 
+## 0.7.1
+
+### Patch Changes
+
+- fcbafd8: xlsx: single-column sheets now render as plain prose lines instead of piped one-cell Markdown tables — fixes raw-pipe noise in snippet displays and improves cross-encoder rerank scores for prose-notes sheets.
+
 ## 0.7.0
 
 ### Minor Changes
