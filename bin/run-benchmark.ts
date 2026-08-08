@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
  * CLI — retrieval-only multi-config benchmark over the self-contained RAG
- * eval set + 12-chunk bench fixture. Runs FOUR retrieval configurations
- * (bm25-only / vector-only / hybrid+rrf / hybrid+rrf+rerank) through the same
- * `runEval` scorer, measures per-query wall-clock latency across repeats for a
- * P95, and writes one `benchmark.json` artifact (consumed by the web eval page
- * as a committed snapshot) plus a stdout markdown table.
+ * eval set + 12-chunk bench fixture. Runs SIX retrieval configurations
+ * (bm25-only / vector-only / hybrid+rrf / hybrid+rrf+graph / hybrid+rrf+rerank
+ * / hybrid+rrf+graph+rerank) through the same `runEval` scorer, measures
+ * per-query wall-clock latency across repeats for a P95, and writes one
+ * `benchmark.json` artifact (consumed by the web eval page as a committed
+ * snapshot) plus a stdout markdown table. The `+graph` pair A/Bs the
+ * entity-match third recall source against its two-source baseline.
  *
  * Deliberately NOT `runBenchmark` (src/eval/benchmark.ts): that orchestrator
  * requires the answer-eval pass (`generateFn` + judge), whose faithfulness
@@ -25,6 +27,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { EvalSearchFn, EvalSearchResult } from '../src/eval/index.js';
 import { DEFAULT_EVAL_TOP_K, loadEvalSet, runEval } from '../src/eval/index.js';
+import type { RawExtraction } from '../src/graph/index.js';
+import { buildGraphSchema, extractGraph, graphRecall, writeGraph } from '../src/graph/index.js';
 import type { ChunkRow } from '../src/rag/index.js';
 import {
   createHybridSearch,
@@ -95,6 +99,108 @@ const FIXTURE_CHUNKS = [
   },
 ] as const;
 
+/**
+ * FIXTURE_GRAPH_BY_PAGE — hand-written deterministic entity / relation
+ * extraction over FIXTURE_CHUNKS, keyed by fixture page number. Stands in for
+ * the LLM-backed `ExtractFn` (graph writes are async in production and the CI
+ * fixture ships no graph), so the `+graph` configs are benchmarkable without
+ * any model call and the numbers are reproducible run-to-run. Entity names are
+ * chosen so a subset of benchmark-set queries contain them verbatim
+ * (graphRecall's containment match): 差旅报销/凭证 (p1), 试用期 (p3), 请假
+ * (p5), 法定节假日 (p7), 保密协议 (p8), 年终奖 (p9), 体检 (p10), 离职 (p11),
+ * 出差/机票 (p12) all fire on easy-tier queries. Hard-tier paraphrases mostly
+ * stay entity-free — that asymmetry is the honest shape of entity recall.
+ */
+const FIXTURE_GRAPH_BY_PAGE: Record<number, RawExtraction> = {
+  1: {
+    entities: [
+      { name: '差旅报销', type: 'policy' },
+      { name: '凭证', type: 'document' },
+      { name: '电子差旅单', type: 'document' },
+    ],
+    relations: [{ source: '差旅报销', target: '凭证', type: '要求保留' }],
+  },
+  2: {
+    entities: [
+      { name: '实习期评估', type: 'process' },
+      { name: '导师面谈', type: 'process' },
+    ],
+    relations: [{ source: '实习期评估', target: '导师面谈', type: '包含' }],
+  },
+  3: {
+    entities: [
+      { name: '试用期', type: 'policy' },
+      { name: '转正评估', type: 'process' },
+    ],
+    relations: [{ source: '试用期', target: '转正评估', type: '期满启动' }],
+  },
+  4: {
+    entities: [
+      { name: '员工培训', type: 'program' },
+      { name: '人力资源部', type: 'org' },
+    ],
+    relations: [{ source: '人力资源部', target: '员工培训', type: '统筹' }],
+  },
+  5: {
+    entities: [
+      { name: '请假', type: 'process' },
+      { name: 'OA 系统', type: 'system' },
+      { name: '直属上级', type: 'role' },
+    ],
+    relations: [{ source: '请假', target: '直属上级', type: '审批人' }],
+  },
+  6: {
+    entities: [
+      { name: '加班', type: 'policy' },
+      { name: '调休', type: 'benefit' },
+    ],
+    relations: [{ source: '加班', target: '调休', type: '可折算为' }],
+  },
+  7: {
+    entities: [
+      { name: '法定节假日', type: 'policy' },
+      { name: '排班表', type: 'document' },
+    ],
+    relations: [],
+  },
+  8: {
+    entities: [
+      { name: '保密协议', type: 'policy' },
+      { name: '客户资料', type: 'asset' },
+    ],
+    relations: [{ source: '保密协议', target: '客户资料', type: '覆盖' }],
+  },
+  9: {
+    entities: [
+      { name: '年终奖', type: 'benefit' },
+      { name: '绩效', type: 'metric' },
+    ],
+    relations: [{ source: '年终奖', target: '绩效', type: '挂钩' }],
+  },
+  10: {
+    entities: [
+      { name: '体检', type: 'benefit' },
+      { name: '体检合作机构', type: 'org' },
+    ],
+    relations: [],
+  },
+  11: {
+    entities: [
+      { name: '离职', type: 'process' },
+      { name: '直属上级', type: 'role' },
+    ],
+    relations: [{ source: '离职', target: '直属上级', type: '提交至' }],
+  },
+  12: {
+    entities: [
+      { name: '出差', type: 'activity' },
+      { name: '机票', type: 'item' },
+      { name: '协议供应商', type: 'vendor' },
+    ],
+    relations: [{ source: '出差', target: '协议供应商', type: '优先使用' }],
+  },
+};
+
 export interface CliArgs {
   evalSetPath: string;
   outDir: string;
@@ -152,9 +258,9 @@ function requireSource(source: unknown, cfg: string, query: string, i: number): 
 }
 
 /**
- * Build the four retrieval configurations over ONE shared index / embedder /
- * reranker stack (identical corpus + models per config — only the retrieval
- * strategy differs, so the comparison isolates strategy).
+ * Build the six retrieval configurations over ONE shared index / embedder /
+ * reranker stack (identical corpus + models + graph per config — only the
+ * retrieval strategy differs, so the comparison isolates strategy).
  */
 async function buildConfigs(): Promise<{ configs: BenchConfig[]; dispose: () => void }> {
   const embedder = await loadEmbedder();
@@ -173,7 +279,28 @@ async function buildConfigs(): Promise<{ configs: BenchConfig[]; dispose: () => 
   });
   handle.indexChunks(rows);
 
+  // Graph over the same docs rows — deterministic hand-written extraction
+  // (see FIXTURE_GRAPH_BY_PAGE), resolved to real docs.id values so the
+  // entity back-links live in the same id space as the other two sources.
+  buildGraphSchema(handle.db);
+  const docRows = handle.db.prepare('SELECT id, page FROM docs').all() as Array<{
+    id: number;
+    page: number;
+  }>;
+  const pageByDocId = new Map(docRows.map((r) => [r.id, r.page]));
+  const extracted = await extractGraph({
+    chunks: docRows.map((r) => ({ chunkId: r.id, content: `bench fixture p${r.page}` })),
+    extractFn: async ({ chunkId }) =>
+      FIXTURE_GRAPH_BY_PAGE[pageByDocId.get(chunkId) ?? -1] ?? { entities: [], relations: [] },
+  });
+  writeGraph(handle.db, extracted);
+
   const hybridSearch = createHybridSearch({ handle, embedder });
+  const hybridGraphSearch = createHybridSearch({
+    handle,
+    embedder,
+    graphRecall: (query, topK) => graphRecall(handle.db, query, { topK }),
+  });
   const rerank = createReranker({ reranker, defaultOpts: { topK: DEFAULT_EVAL_TOP_K } });
 
   const bm25Only: EvalSearchFn = async (query, opts) => {
@@ -220,6 +347,21 @@ async function buildConfigs(): Promise<{ configs: BenchConfig[]; dispose: () => 
     });
   };
 
+  const hybridRrfGraph: EvalSearchFn = async (query, opts) => {
+    const topK = opts?.topK ?? DEFAULT_EVAL_TOP_K;
+    return (await hybridGraphSearch(query, { topK })).map((hit, i): EvalSearchResult => {
+      const out: EvalSearchResult = {
+        source: requireSource(hit.chunk.source, 'hybrid+rrf+graph', query, i),
+      };
+      if (hit.chunk.page !== undefined) out.page = hit.chunk.page;
+      if (hit.chunk.section !== undefined) out.section = hit.chunk.section;
+      if (hit.chunk.content !== undefined) out.content = hit.chunk.content;
+      if (hit.distance !== undefined) out.distance = hit.distance;
+      if (hit.bm25Rank !== undefined) out.ftsRank = hit.bm25Rank;
+      return out;
+    });
+  };
+
   const hybridRrfRerank: EvalSearchFn = async (query, opts) => {
     const topK = opts?.topK ?? DEFAULT_EVAL_TOP_K;
     const hybrid = await hybridSearch(query, { topK: Math.max(topK * 2, 10) });
@@ -237,12 +379,31 @@ async function buildConfigs(): Promise<{ configs: BenchConfig[]; dispose: () => 
     });
   };
 
+  const hybridRrfGraphRerank: EvalSearchFn = async (query, opts) => {
+    const topK = opts?.topK ?? DEFAULT_EVAL_TOP_K;
+    const hybrid = await hybridGraphSearch(query, { topK: Math.max(topK * 2, 10) });
+    return (await rerank(query, hybrid, { topK })).map((r, i): EvalSearchResult => {
+      const out: EvalSearchResult = {
+        source: requireSource(r.chunk.source, 'hybrid+rrf+graph+rerank', query, i),
+        rerankScore: r.rerankScore,
+      };
+      if (r.chunk.page !== undefined) out.page = r.chunk.page;
+      if (r.chunk.section !== undefined) out.section = r.chunk.section;
+      if (r.chunk.content !== undefined) out.content = r.chunk.content;
+      if (r.distance !== undefined) out.distance = r.distance;
+      if (r.bm25Rank !== undefined) out.ftsRank = r.bm25Rank;
+      return out;
+    });
+  };
+
   return {
     configs: [
       { name: 'bm25-only', searchFn: bm25Only },
       { name: 'vector-only', searchFn: vectorOnly },
       { name: 'hybrid+rrf', searchFn: hybridRrf },
+      { name: 'hybrid+rrf+graph', searchFn: hybridRrfGraph },
       { name: 'hybrid+rrf+rerank', searchFn: hybridRrfRerank },
+      { name: 'hybrid+rrf+graph+rerank', searchFn: hybridRrfGraphRerank },
     ],
     dispose: () => {
       handle.close();
