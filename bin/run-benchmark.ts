@@ -25,7 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { EvalSearchFn, EvalSearchResult } from '../src/eval/index.js';
+import type { EvalSearchFn, EvalSearchResult, EvalSet, EvalSummary } from '../src/eval/index.js';
 import { DEFAULT_EVAL_TOP_K, loadEvalSet, runEval } from '../src/eval/index.js';
 import type { RawExtraction } from '../src/graph/index.js';
 import { buildGraphSchema, extractGraph, graphRecall, writeGraph } from '../src/graph/index.js';
@@ -43,10 +43,19 @@ import {
 } from '../src/rag/index.js';
 
 /**
- * FIXTURE_CHUNKS — mirrors `bin/run-eval.ts#FIXTURE_CHUNKS` verbatim (which in
- * turn mirrors `bin/latency-harness.ts`). Inline copy per the standing ruling:
- * bin CLIs do not develop cross-dependencies; drift is caught by the Task 10
- * fixture test.
+ * FIXTURE_CHUNKS — pages 1–12 mirror `bin/run-eval.ts#FIXTURE_CHUNKS` verbatim
+ * (which in turn mirrors `bin/latency-harness.ts`). Inline copy per the
+ * standing ruling: bin CLIs do not develop cross-dependencies; drift is caught
+ * by the Task 10 fixture test.
+ *
+ * Pages 13–18 are BENCHMARK-ONLY aggregation soil (absent from the CI fixture,
+ * so the Hit Rate@5 ≥ 90% gate is untouched): page 13 is an anchor that binds
+ * two canonical entities (张伟 / 差旅报销系统) to their alias surface forms
+ * (工号 A1024 / TRS), and pages 14–18 each state one fact about those entities
+ * while referring to them ONLY by alias. The facts are deliberately lexically
+ * and semantically cold against the aggregation queries — BM25 shares no token
+ * with them and the embedding has no surface bridge — so the only retrieval
+ * path that reaches them is the graph third source via `entity_mentions`.
  */
 const FIXTURE_CHUNKS = [
   {
@@ -97,6 +106,42 @@ const FIXTURE_CHUNKS = [
     source: 'bench-fixture.md',
     page: 12,
   },
+  // ── benchmark-only aggregation tier (pages 13–18) — see docstring above ──
+  // Wording rule for this tier: no high-frequency function words (的/把/还/…)
+  // that existing benchmark queries tokenize to — stray stopword overlap makes
+  // BM25 OR-match these pages for unrelated queries, crowding vector-only
+  // evidence out of the hybrid candidate pool (observed: p1 fell out of the
+  // rerank pool for the 垫付 hard query until 的/把 were removed here).
+  {
+    content: '行政部张伟（工号 A1024）负责差旅报销系统（内部代号 TRS）日常运维和账号发放。',
+    source: 'bench-fixture.md',
+    page: 13,
+  },
+  {
+    content: 'TRS 将于十月停机升级三天，期间提交入口关闭，紧急事项转线下受理。',
+    source: 'bench-fixture.md',
+    page: 14,
+  },
+  {
+    content: '新版 TRS 界面将常用入口移到首页顶部，旧版入口保留至年底。',
+    source: 'bench-fixture.md',
+    page: 15,
+  },
+  {
+    content: '档案室钥匙由工号 A1024 统一保管，外借需在前台登记。',
+    source: 'bench-fixture.md',
+    page: 16,
+  },
+  {
+    content: 'A1024 兼任消防疏散演练楼层联络员，覆盖三层东侧区域。',
+    source: 'bench-fixture.md',
+    page: 17,
+  },
+  {
+    content: 'TRS 年度安全审计由工号 A1024 牵头，计划十一月完成。',
+    source: 'bench-fixture.md',
+    page: 18,
+  },
 ] as const;
 
 /**
@@ -110,6 +155,15 @@ const FIXTURE_CHUNKS = [
  * (p5), 法定节假日 (p7), 保密协议 (p8), 年终奖 (p9), 体检 (p10), 离职 (p11),
  * 出差/机票 (p12) all fire on easy-tier queries. Hard-tier paraphrases mostly
  * stay entity-free — that asymmetry is the honest shape of entity recall.
+ *
+ * Pages 13–18 (aggregation tier): mentions LINK ALIAS SURFACE FORMS to their
+ * canonical entity — p14/15/18 mention 差旅报销系统 as "TRS", p16/17/18
+ * mention 张伟 as "工号 A1024" — standing in for a document-level entity
+ * linking pass (the anchor p13 establishes both aliases, so a linker that sees
+ * the whole document can resolve them). This out-of-text link is exactly the
+ * capability BM25/vector lack and precisely what the aggregation tier
+ * measures; if a production extractor only copies surface strings, the graph
+ * source degenerates into a BM25 subset and the aggregation gain disappears.
  */
 const FIXTURE_GRAPH_BY_PAGE: Record<number, RawExtraction> = {
   1: {
@@ -198,6 +252,43 @@ const FIXTURE_GRAPH_BY_PAGE: Record<number, RawExtraction> = {
       { name: '协议供应商', type: 'vendor' },
     ],
     relations: [{ source: '出差', target: '协议供应商', type: '优先使用' }],
+  },
+  // ── aggregation tier: alias mentions resolved to canonical entities ──
+  13: {
+    entities: [
+      { name: '张伟', type: 'person' },
+      { name: '差旅报销系统', type: 'system' },
+      { name: '行政部', type: 'org' },
+    ],
+    relations: [
+      { source: '张伟', target: '差旅报销系统', type: '运维' },
+      { source: '张伟', target: '行政部', type: '属于' },
+    ],
+  },
+  // "TRS" → 差旅报销系统 (alias established by the p13 anchor)
+  14: {
+    entities: [{ name: '差旅报销系统', type: 'system' }],
+    relations: [],
+  },
+  15: {
+    entities: [{ name: '差旅报销系统', type: 'system' }],
+    relations: [],
+  },
+  // "工号 A1024" → 张伟 (alias established by the p13 anchor)
+  16: {
+    entities: [{ name: '张伟', type: 'person' }],
+    relations: [],
+  },
+  17: {
+    entities: [{ name: '张伟', type: 'person' }],
+    relations: [],
+  },
+  18: {
+    entities: [
+      { name: '差旅报销系统', type: 'system' },
+      { name: '张伟', type: 'person' },
+    ],
+    relations: [{ source: '张伟', target: '差旅报销系统', type: '牵头审计' }],
   },
 };
 
@@ -411,6 +502,28 @@ async function buildConfigs(): Promise<{ configs: BenchConfig[]; dispose: () => 
   };
 }
 
+/**
+ * Category name of the aggregation tier in eval/benchmark-set.yml. Queries in
+ * this category declare MULTIPLE expected pages (scattered evidence); the
+ * subset gets its own stdout table + artifact block because the any-hit
+ * Hit Rate@5 of the full set dilutes exactly the signal the tier exists for.
+ */
+const AGGREGATION_CATEGORY = 'aggregation';
+
+/**
+ * Aggregation-subset metrics for one config. `coverage5` is the mean, over the
+ * subset's queries, of |expected pages present in top-5| / |expected pages| —
+ * the "did we fetch ALL the scattered evidence" complement to the any-hit
+ * hitRate5 (runEval's hitRank counts a query as hit when ANY expected page
+ * appears in top-K; see `expectedMatches`).
+ */
+export interface AggregationStats {
+  queries: number;
+  hitRate5: number;
+  mrr: number;
+  coverage5: number;
+}
+
 /** One config's benchmark row in the JSON artifact. */
 export interface BenchmarkRow {
   config: string;
@@ -419,6 +532,47 @@ export interface BenchmarkRow {
   p50Ms: number;
   p95Ms: number;
   latencySamples: number;
+  /** Present only when the eval set declares `category: aggregation` queries. */
+  aggregation?: AggregationStats;
+}
+
+/**
+ * Compute {@link AggregationStats} for one config's summary, or `undefined`
+ * when the eval set has no `category: aggregation` queries. Relies on the
+ * runEval contract that `summary.perQuery[i]` corresponds to
+ * `evalSet.queries[i]` (runEval iterates queries in order, one row each).
+ */
+export function aggregationStats(
+  evalSet: EvalSet,
+  summary: EvalSummary,
+): AggregationStats | undefined {
+  const rows: Array<{ hit: boolean; reciprocalRank: number; coverage: number }> = [];
+  for (let i = 0; i < evalSet.queries.length; i += 1) {
+    const query = evalSet.queries[i];
+    const result = summary.perQuery[i];
+    if (!query || !result || query.category !== AGGREGATION_CATEGORY) continue;
+    const pagesInTop = new Set(
+      result.topResults
+        .filter((r) => r.source !== undefined && r.page !== undefined)
+        .map((r) => `${r.source}#${r.page}`),
+    );
+    const found = query.expected.filter(
+      (e) => e.page !== undefined && pagesInTop.has(`${e.source}#${e.page}`),
+    ).length;
+    rows.push({
+      hit: result.hitRank !== undefined,
+      reciprocalRank: result.reciprocalRank,
+      coverage: query.expected.length === 0 ? 0 : found / query.expected.length,
+    });
+  }
+  if (rows.length === 0) return undefined;
+  const n = rows.length;
+  return {
+    queries: n,
+    hitRate5: rows.filter((r) => r.hit).length / n,
+    mrr: Number((rows.reduce((s, r) => s + r.reciprocalRank, 0) / n).toFixed(4)),
+    coverage5: Number((rows.reduce((s, r) => s + r.coverage, 0) / n).toFixed(4)),
+  };
 }
 
 async function main(): Promise<number> {
@@ -473,6 +627,8 @@ async function main(): Promise<number> {
         p95Ms: Number(percentile(latencies, 0.95).toFixed(1)),
         latencySamples: latencies.length,
       };
+      const agg = aggregationStats(evalSet, summary);
+      if (agg) row.aggregation = agg;
       rowsOut.push(row);
       process.stdout.write(
         `run-benchmark: ${config.name.padEnd(18)} hit@5=${row.hitRate5.toFixed(2)} ` +
@@ -494,7 +650,7 @@ async function main(): Promise<number> {
       repeats: args.repeats,
       ranAt: new Date().toISOString(),
       command: 'pnpm bench:retrieval',
-      note: '检索指标确定性计算（strict 页级命中）；P95 为本机 wall-clock（含 embedding/rerank 推理），跨机器不可比。回答层指标不在本表——faithfulness judge 未过校准门前不参与配置对比。',
+      note: '检索指标确定性计算（strict 页级命中，任一 expected 页进 top-K 即计 hit）；聚合题子集另附 coverage@5（expected 页被捞回的比例，度量「捞得全」）。P95 为本机 wall-clock（含 embedding/rerank 推理），跨机器不可比。回答层指标不在本表——faithfulness judge 未过校准门前不参与配置对比。',
       configs: rowsOut,
     };
     fs.mkdirSync(outDirAbs, { recursive: true });
@@ -508,6 +664,22 @@ async function main(): Promise<number> {
       process.stdout.write(
         `| ${row.config} | ${row.hitRate5.toFixed(2)} | ${row.mrr.toFixed(4)} | ${row.p50Ms}ms | ${row.p95Ms}ms |\n`,
       );
+    }
+
+    // Aggregation-subset table — only when the eval set declares the tier.
+    // coverage@5 is the "捞得全" metric the any-hit hitRate cannot express.
+    if (rowsOut.some((r) => r.aggregation !== undefined)) {
+      process.stdout.write(
+        `\n聚合题子集（category: ${AGGREGATION_CATEGORY}）\n` +
+          `| 配置 | Hit Rate@${DEFAULT_EVAL_TOP_K} | MRR | Coverage@${DEFAULT_EVAL_TOP_K} |\n|---|---|---|---|\n`,
+      );
+      for (const row of rowsOut) {
+        const agg = row.aggregation;
+        if (!agg) continue;
+        process.stdout.write(
+          `| ${row.config} | ${agg.hitRate5.toFixed(2)} | ${agg.mrr.toFixed(4)} | ${agg.coverage5.toFixed(2)} |\n`,
+        );
+      }
     }
     return 0;
   } finally {
