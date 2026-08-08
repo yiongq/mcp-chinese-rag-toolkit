@@ -3,12 +3,14 @@
 // ---------------------------------------------------------------------------
 //
 // The one entry point in front of the existing "text → Chunk → index" pipeline.
-// It normalizes five whitelisted formats into a `ParsedDoc` the existing
+// It normalizes seven whitelisted formats into a `ParsedDoc` the existing
 // chunkers consume directly, delegating all parsing to mature libraries — PDF
 // reuses `parsePdf` (unpdf), docx uses mammoth, xlsx uses exceljs, Markdown /
-// plain text are byte decode + pass-through. No parser is hand-rolled. (The
-// xlsx→Markdown LAYOUT — sheet headings + header-repeating table row groups —
-// is ours; the file-format parsing itself stays with exceljs.)
+// plain text are byte decode + pass-through, and PNG / JPEG images skip
+// parsing entirely (raw bytes pass through for the downstream vision-caption
+// stage). No parser is hand-rolled. (The xlsx→Markdown LAYOUT — sheet
+// headings + header-repeating table row groups — is ours; the file-format
+// parsing itself stays with exceljs.)
 //
 // Boundaries, deliberately narrow:
 //   - PURE BY DEFAULT: with no `onSpan`, input is in-memory bytes; no disk
@@ -50,6 +52,8 @@ const SUPPORTED_MIME_TYPES = [
   XLSX_MIME_TYPE,
   'text/markdown',
   'text/plain',
+  'image/png',
+  'image/jpeg',
 ] as const satisfies readonly SupportedMimeType[];
 
 /**
@@ -99,13 +103,17 @@ interface XlsxFileLoader {
  * Supported `mimeType`s: `application/pdf`, docx
  * (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`),
  * xlsx (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`),
- * `text/markdown`, `text/plain`. Any other value resolves to an
- * `UNSUPPORTED_MIME_TYPE` result.
+ * `text/markdown`, `text/plain`, `image/png`, `image/jpeg`. Any other value
+ * resolves to an `UNSUPPORTED_MIME_TYPE` result.
  *
  * Always resolves — never rejects. A corrupt / encrypted / malformed input
  * resolves to `PARSE_FAILED`; a parse that outruns the timeout resolves to
  * `PARSE_TIMEOUT`; a parse that yields no extractable text resolves to
  * `EMPTY_DOCUMENT`.
+ *
+ * Image inputs are never parsed: their bytes pass through as `doc.image` for
+ * a downstream vision-caption pipeline (see {@link ParsedDoc.image}), so the
+ * only failure an image can produce here is the zero-byte `EMPTY_DOCUMENT`.
  *
  * When `opts.onSpan` is provided, one `ingest.parse` span is emitted per call —
  * for a successful and a failed parse alike — carrying metadata only (mime type,
@@ -161,6 +169,7 @@ function buildParseAttributes(
       attributes.textLength = doc.pages.reduce((sum, page) => sum + page.text.length, 0);
     }
     if (doc.text !== undefined) attributes.textLength = doc.text.length;
+    if (doc.image !== undefined) attributes.imageBytes = doc.image.byteLength;
     if (doc.encoding !== undefined) attributes.encoding = doc.encoding;
   } else {
     attributes.errorCode = result.error;
@@ -279,6 +288,9 @@ function runParse(buffer: Uint8Array, mimeType: SupportedMimeType): Promise<Pars
       return parseDocxDocument(buffer);
     case XLSX_MIME_TYPE:
       return parseXlsxDocument(buffer);
+    case 'image/png':
+    case 'image/jpeg':
+      return parseImageDocument(buffer, mimeType);
     default:
       // 'text/markdown' | 'text/plain'
       return parseTextDocument(buffer, mimeType);
@@ -455,6 +467,21 @@ function parseTextDocument(
   const { text, encoding } = decodeText(buffer);
   if (text.trim() === '') return Promise.resolve(emptyDocument(mimeType));
   return Promise.resolve({ ok: true, doc: { mimeType, text, encoding } });
+}
+
+/**
+ * "Parse" an image by passing its bytes through untouched. Deliberately NO
+ * content sniffing — the declared mimeType is trusted exactly like every
+ * other format's, and true validity surfaces downstream when the caption
+ * stage's decoder consumes the bytes (see {@link ParsedDoc.image}). Zero-byte
+ * inputs never reach here: the central EMPTY_DOCUMENT guard in
+ * `parseDocumentCore` runs first.
+ */
+function parseImageDocument(
+  buffer: Uint8Array,
+  mimeType: 'image/png' | 'image/jpeg',
+): Promise<ParseResult> {
+  return Promise.resolve({ ok: true, doc: { mimeType, image: buffer } });
 }
 
 function emptyDocument(mimeType: SupportedMimeType): ParseResult {

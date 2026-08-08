@@ -20,6 +20,8 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MD_MIME = 'text/markdown';
 const TXT_MIME = 'text/plain';
+const PNG_MIME = 'image/png';
+const JPEG_MIME = 'image/jpeg';
 
 /** Read a fixture as a plain in-memory `Uint8Array` (parseDocument's input shape). */
 async function bytes(path: string): Promise<Uint8Array> {
@@ -143,11 +145,37 @@ describe('parseDocument — successful parses', () => {
     expect(result.doc.encoding).toBe('gbk');
     expect(result.doc.text).toBe('中文编码测试，你好世界。');
   });
+
+  it('passes image/png bytes through as the image shape (no pages, no text)', async () => {
+    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+    const result = await parseDocument(pngBytes, PNG_MIME);
+
+    assertOk(result);
+    expect(result.doc.mimeType).toBe(PNG_MIME);
+    expect(result.doc.image).toEqual(pngBytes);
+    expect(result.doc.pages).toBeUndefined();
+    expect(result.doc.text).toBeUndefined();
+    expect(result.doc.encoding).toBeUndefined();
+  });
+
+  it('accepts image/jpeg without sniffing content (validity surfaces at the caption stage)', async () => {
+    // Contract parity with every other format: the declared mimeType is
+    // trusted, so even non-JPEG bytes parse ok — the downstream caption
+    // pipeline's decoder is where a mislabeled image actually fails.
+    const notReallyAJpeg = new TextEncoder().encode('not really a jpeg');
+
+    const result = await parseDocument(notReallyAJpeg, JPEG_MIME);
+
+    assertOk(result);
+    expect(result.doc.mimeType).toBe(JPEG_MIME);
+    expect(result.doc.image).toEqual(notReallyAJpeg);
+  });
 });
 
 describe('parseDocument — failure paths (returned, never thrown)', () => {
   it('returns UNSUPPORTED_MIME_TYPE for a non-whitelisted mimeType', async () => {
-    const result = await parseDocument(new TextEncoder().encode('x'), 'image/png');
+    const result = await parseDocument(new TextEncoder().encode('x'), 'image/gif');
 
     assertFailed(result);
     expect(result.error).toBe(INGEST_ERROR_CODES.UNSUPPORTED_MIME_TYPE);
@@ -282,7 +310,7 @@ describe('parseDocument — hardened input handling', () => {
   });
 
   it('classifies a zero-length buffer as EMPTY_DOCUMENT uniformly across formats', async () => {
-    for (const mime of [PDF_MIME, DOCX_MIME, XLSX_MIME, MD_MIME, TXT_MIME]) {
+    for (const mime of [PDF_MIME, DOCX_MIME, XLSX_MIME, MD_MIME, TXT_MIME, PNG_MIME, JPEG_MIME]) {
       const result = await parseDocument(new Uint8Array(0), mime);
       assertFailed(result);
       expect(result.error).toBe(INGEST_ERROR_CODES.EMPTY_DOCUMENT);
@@ -290,7 +318,7 @@ describe('parseDocument — hardened input handling', () => {
   });
 
   it('still rejects an unsupported mimeType even after parameter normalization', async () => {
-    const result = await parseDocument(new Uint8Array(0), 'image/png; foo=bar');
+    const result = await parseDocument(new Uint8Array(0), 'image/gif; foo=bar');
 
     assertFailed(result);
     expect(result.error).toBe(INGEST_ERROR_CODES.UNSUPPORTED_MIME_TYPE);
