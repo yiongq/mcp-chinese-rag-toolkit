@@ -1,3 +1,4 @@
+import type { GraphHit } from '../graph/types.js';
 import { makeSpan, newSpanId, runSpanSafe } from '../observability/span.js';
 import { rrfFuse } from './rrf.js';
 import type {
@@ -72,11 +73,19 @@ function readHandleEmbeddingDim(handle: HybridSearchDeps['handle']): number | un
 }
 
 /**
- * Fuse the BM25 and vector ranked lists via Reciprocal Rank Fusion and project
- * each surviving row into a `HybridHit`. Pure over its inputs — shared verbatim
- * by the instrumented and hot paths so the two can never drift in fusion logic.
+ * Fuse the BM25, vector and (optional) graph ranked lists via Reciprocal Rank
+ * Fusion and project each surviving row into a `HybridHit`. Pure over its
+ * inputs — shared verbatim by the instrumented and hot paths so the two can
+ * never drift in fusion logic. An empty `graphHits` list contributes zero
+ * score and sets no fields, so two-source callers see byte-identical output.
  */
-function fuseHits(ftsHits: FtsHit[], vecHits: VecHit[], rrfK: number, topK: number): HybridHit[] {
+function fuseHits(
+  ftsHits: FtsHit[],
+  vecHits: VecHit[],
+  graphHits: GraphHit[],
+  rrfK: number,
+  topK: number,
+): HybridHit[] {
   const ftsRanked: RankedRow<FtsHit>[] = ftsHits.map((hit) => ({
     id: hit.docId,
     payload: hit,
@@ -87,15 +96,24 @@ function fuseHits(ftsHits: FtsHit[], vecHits: VecHit[], rrfK: number, topK: numb
     payload: hit,
     rank: index + 1,
   }));
+  const graphRanked: RankedRow<GraphHit>[] = graphHits.map((hit) => ({
+    id: hit.docId,
+    payload: hit,
+    rank: hit.graphRank,
+  }));
 
-  const fused = rrfFuse<FtsHit | VecHit>([ftsRanked, vecRanked], { k: rrfK, topK });
+  const fused = rrfFuse<FtsHit | VecHit | GraphHit>([ftsRanked, vecRanked, graphRanked], {
+    k: rrfK,
+    topK,
+  });
 
   return fused.map((row) => {
     const ftsPayload = row.payloads[0] as FtsHit | null;
     const vecPayload = row.payloads[1] as VecHit | null;
-    // Both sources project from `docs.id`; whichever populated this row
+    const graphPayload = row.payloads[2] as GraphHit | null;
+    // All sources project from `docs.id`; whichever populated this row
     // carries the canonical chunk metadata.
-    const chunk = ftsPayload?.chunk ?? vecPayload?.chunk;
+    const chunk = ftsPayload?.chunk ?? vecPayload?.chunk ?? graphPayload?.chunk;
     if (!chunk) {
       // `rrfFuse` only emits rows where at least one source hit, so payloads
       // are guaranteed to have at least one non-null entry. The throw keeps
@@ -113,6 +131,9 @@ function fuseHits(ftsHits: FtsHit[], vecHits: VecHit[], rrfK: number, topK: numb
     const vecRank = row.ranks[1];
     if (vecRank !== null && vecRank !== undefined) hit.vecRank = vecRank;
     if (vecPayload) hit.distance = vecPayload.distance;
+    const graphRank = row.ranks[2];
+    if (graphRank !== null && graphRank !== undefined) hit.graphRank = graphRank;
+    if (graphPayload) hit.graphMatchCount = graphPayload.matchCount;
     return hit;
   });
 }
@@ -122,7 +143,10 @@ function fuseHits(ftsHits: FtsHit[], vecHits: VecHit[], rrfK: number, topK: numb
  * `Embedder`. The returned function runs `ftsSearch` (BM25 +
  * jieba) and `embed(query) → vecSearch` (sqlite-vec) in parallel and fuses
  * the two ranked lists via Reciprocal Rank Fusion (`score = Σ 1/(k + rank)`,
- * default `k = 60`, Cormack 2009).
+ * default `k = 60`, Cormack 2009). When the optional `deps.graphRecall` is
+ * wired, its entity-match ranked list joins as a third fusion source (RRF is
+ * inherently N-way); it runs synchronously next to `ftsSearch` while the
+ * async embed is in flight, so it adds no serialization point.
  *
  * The factory itself is side-effect-free w.r.t. db writes: it captures
  * `handle` / `embedder` / `defaultOpts` in a closure, runs a single read on
@@ -134,7 +158,7 @@ function fuseHits(ftsHits: FtsHit[], vecHits: VecHit[], rrfK: number, topK: numb
  * surrounding tool handler (per `docs/conventions.md §2.4`).
  */
 export function createHybridSearch(deps: HybridSearchDeps): HybridSearchFn {
-  const { handle, embedder, defaultOpts } = deps;
+  const { handle, embedder, graphRecall, defaultOpts } = deps;
 
   const handleDim = readHandleEmbeddingDim(handle);
   if (handleDim !== undefined && handleDim !== embedder.dim) {
@@ -211,11 +235,31 @@ export function createHybridSearch(deps: HybridSearchDeps): HybridSearchFn {
           ),
         );
 
+        // Third source (optional): synchronous like ftsSearch, so it also
+        // overlaps the in-flight embed. Emits a child span only when wired —
+        // two-source consumers keep today's exact span stream.
+        let graphHits: GraphHit[] = [];
+        if (graphRecall) {
+          const graphStartEpoch = Date.now();
+          const graphStartPerf = performance.now();
+          graphHits = graphRecall(query, perSourceTopK);
+          runSpanSafe(
+            onSpan,
+            makeSpan(
+              'retrieve.graph',
+              { id: newSpanId(), parentId: hybridId },
+              graphStartEpoch,
+              performance.now() - graphStartPerf,
+              { topK: perSourceTopK, hitCount: graphHits.length },
+            ),
+          );
+        }
+
         const vecHits = await vecPromise;
 
         const rrfStartEpoch = Date.now();
         const rrfStartPerf = performance.now();
-        const results = fuseHits(ftsHits, vecHits, rrfK, topK);
+        const results = fuseHits(ftsHits, vecHits, graphHits, rrfK, topK);
         runSpanSafe(
           onSpan,
           makeSpan(
@@ -228,6 +272,9 @@ export function createHybridSearch(deps: HybridSearchDeps): HybridSearchFn {
               topK,
               bm25InputCount: ftsHits.length,
               vecInputCount: vecHits.length,
+              // Only surfaced when the third source is wired, so existing
+              // span consumers see unchanged attribute sets.
+              ...(graphRecall ? { graphInputCount: graphHits.length } : {}),
               fusedCount: results.length,
             },
           ),
@@ -275,8 +322,12 @@ export function createHybridSearch(deps: HybridSearchDeps): HybridSearchFn {
       .embed(query)
       .then((emb) => handle.vecSearch(emb, { topK: perSourceTopK }));
     const ftsHits = handle.ftsSearch(query, { topK: perSourceTopK });
+    // Optional third source — synchronous sqlite reads on the same connection,
+    // overlapping the in-flight embed exactly like ftsSearch does. Absent
+    // graphRecall, the empty list makes fuseHits behave two-source-identically.
+    const graphHits = graphRecall ? graphRecall(query, perSourceTopK) : [];
     const vecHits = await vecPromise;
 
-    return fuseHits(ftsHits, vecHits, rrfK, topK);
+    return fuseHits(ftsHits, vecHits, graphHits, rrfK, topK);
   };
 }

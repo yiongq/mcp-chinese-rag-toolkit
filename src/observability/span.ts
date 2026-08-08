@@ -32,11 +32,13 @@ export type SpanAttributeValue = string | number | boolean;
  * `retrieve.*` cover the hybrid-search sub-stages plus reranking; `ingest.*`
  * cover document parsing, index building and graph extraction. The
  * `retrieve.hybrid` span is the parent of the `retrieve.bm25` /
- * `retrieve.vector` / `retrieve.rrf` spans.
+ * `retrieve.vector` / `retrieve.rrf` spans — plus `retrieve.graph` when the
+ * optional entity-match third source is wired.
  */
 export type PipelineSpanName =
   | 'retrieve.bm25'
   | 'retrieve.vector'
+  | 'retrieve.graph'
   | 'retrieve.rrf'
   | 'retrieve.hybrid'
   | 'retrieve.rerank'

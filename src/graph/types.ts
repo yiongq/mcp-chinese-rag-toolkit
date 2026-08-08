@@ -9,6 +9,7 @@
 // backed by any LLM provider), keeping the toolkit free of any model SDK.
 
 import type { OnSpan } from '../observability/span.js';
+import type { Chunk } from '../rag/types.js';
 
 /**
  * One input chunk fed to {@link extractGraph}. `chunkId` is the stable id of the
@@ -109,6 +110,35 @@ export interface GraphExtractionOptions {
    * scalar counts only (never entity / relation names or chunk content).
    */
   onSpan?: OnSpan;
+}
+
+/** Options for {@link graphRecall}. */
+export interface GraphRecallOptions {
+  /**
+   * Maximum hits returned. Range [1, 1000] — mirrors the hybrid per-source
+   * candidate cap. @default 30
+   */
+  topK?: number;
+}
+
+/**
+ * Result from {@link graphRecall} — one chunk reached through the entity graph.
+ *
+ * Projection contract intentionally mirrors {@link FtsHit} / {@link VecHit}:
+ * `docId` is drawn from the same `docs.id` space (the `rrfFuse` caller
+ * contract), `chunk` carries the canonical content + provenance, and
+ * `graphRank` is the 1-indexed position within this source's ordering
+ * (consumed by RRF `1/(k + rank)`).
+ */
+export interface GraphHit {
+  /** `docs.id` of the back-linked source chunk. */
+  docId: number;
+  /** Chunk content + provenance, projected from the `docs` row. */
+  chunk: Chunk;
+  /** Number of distinct matched query entities that mention this chunk. */
+  matchCount: number;
+  /** 1-indexed position in the returned ordering (score-descending). */
+  graphRank: number;
 }
 
 /** Row counts returned by {@link writeGraph} for one persistence pass. */
