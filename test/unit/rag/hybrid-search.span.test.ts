@@ -90,6 +90,24 @@ describe('createHybridSearch — pipeline spans', () => {
     expect(hybrid?.parentId).toBeUndefined();
   });
 
+  it('emits a retrieve.graph child (and graphInputCount on the rrf span) only when graphRecall is wired', async () => {
+    const spans: PipelineSpan[] = [];
+    const search = createHybridSearch({
+      handle,
+      embedder: makeStubEmbedder(() => 4),
+      graphRecall: () => [],
+    });
+    await search('试用期管理', { topK: 10, onSpan: (s) => spans.push(s) });
+
+    const byName = (name: PipelineSpan['name']) => spans.filter((s) => s.name === name);
+    expect(spans).toHaveLength(5);
+    expect(byName('retrieve.graph')).toHaveLength(1);
+    const hybrid = byName('retrieve.hybrid')[0];
+    expect(byName('retrieve.graph')[0]?.parentId).toBe(hybrid?.id);
+    expect(byName('retrieve.graph')[0]?.attributes).toMatchObject({ topK: 30, hitCount: 0 });
+    expect(byName('retrieve.rrf')[0]?.attributes).toMatchObject({ graphInputCount: 0 });
+  });
+
   it('gives every span a fresh id and a non-negative numeric durationMs', async () => {
     const spans: PipelineSpan[] = [];
     const search = createHybridSearch({ handle, embedder: makeStubEmbedder(() => 4) });

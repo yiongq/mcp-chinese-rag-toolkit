@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { GraphHit } from '../../../src/graph/types.js';
 import { createHybridSearch } from '../../../src/rag/hybrid-search.js';
 import { openIndex } from '../../../src/rag/sqlite-store.js';
 import type { ChunkRow, Embedder, IndexHandle } from '../../../src/rag/types.js';
@@ -308,5 +309,118 @@ describe('createHybridSearch (unit, stub embedder + real sqlite)', () => {
     const ftsStartIdx = events.indexOf('fts-start');
     expect(embedStartIdx).toBeGreaterThanOrEqual(0);
     expect(ftsStartIdx).toBeGreaterThan(embedStartIdx);
+  });
+});
+
+describe('createHybridSearch — optional graph third source', () => {
+  let handle: IndexHandle;
+
+  beforeEach(() => {
+    handle = openIndex(':memory:');
+    handle.indexChunks(makeFixtureRows());
+  });
+
+  afterEach(() => {
+    handle.close();
+  });
+
+  function makeGraphHit(docId: number, graphRank: number, matchCount: number): GraphHit {
+    return {
+      docId,
+      graphRank,
+      matchCount,
+      chunk: { content: `graph-stub-${docId}`, source: 'unit-fixture.md', page: docId },
+    };
+  }
+
+  it('graph-only survival: hits reachable only through entities surface with graphRank set and RRF math 1/(60+rank)', async () => {
+    // Unknown tokens → BM25 empty; perSourceTopK=1 + seed 2 → vec returns id=2
+    // only. docIds 3 and 5 can therefore only arrive through the graph source.
+    const embedder = makeStubEmbedder(() => 2);
+    const search = createHybridSearch({
+      handle,
+      embedder,
+      graphRecall: () => [makeGraphHit(3, 1, 2), makeGraphHit(5, 2, 1)],
+    });
+    const hits = await search('蓝鲸深空探测', { perSourceTopK: 1, topK: 5 });
+
+    const rank1 = hits.find((h) => h.docId === 3);
+    expect(rank1).toBeDefined();
+    expect(rank1?.graphRank).toBe(1);
+    expect(rank1?.graphMatchCount).toBe(2);
+    expect(rank1?.bm25Rank).toBeUndefined();
+    expect(rank1?.vecRank).toBeUndefined();
+    expect(Math.abs((rank1?.rrfScore ?? 0) - 1 / 61)).toBeLessThan(1e-12);
+    // Graph is the only source that carried this row → its chunk payload wins.
+    expect(rank1?.chunk.content).toBe('graph-stub-3');
+
+    const rank2 = hits.find((h) => h.docId === 5);
+    expect(rank2?.graphRank).toBe(2);
+    expect(rank2?.graphMatchCount).toBe(1);
+    expect(Math.abs((rank2?.rrfScore ?? 0) - 1 / 62)).toBeLessThan(1e-12);
+  });
+
+  it('three-source fusion: rrfScore accumulates the graph term on top of BM25 + vec', async () => {
+    // seed 4 → vec self-hits id=4; '试用期管理' also BM25-hits id=4; graph adds it too.
+    const embedder = makeStubEmbedder(() => 4);
+    const search = createHybridSearch({
+      handle,
+      embedder,
+      graphRecall: () => [makeGraphHit(4, 1, 1)],
+    });
+    const hits = await search('试用期管理', { topK: 5 });
+
+    const hit = hits.find((h) => h.docId === 4);
+    expect(hit).toBeDefined();
+    expect(hit?.graphRank).toBe(1);
+    expect(hit?.vecRank).toBe(1);
+    expect(hit?.bm25Rank).toBeDefined();
+    // Recompute Σ 1/(60 + rank) over the ranks the hit actually carries.
+    const expected = [hit?.bm25Rank, hit?.vecRank, hit?.graphRank]
+      .filter((r): r is number => r !== undefined)
+      .reduce((sum, r) => sum + 1 / (60 + r), 0);
+    expect(Math.abs((hit?.rrfScore ?? 0) - expected)).toBeLessThan(1e-12);
+    // FTS carried the row too → canonical chunk metadata comes from storage,
+    // not the graph payload.
+    expect(hit?.chunk.content).toBe('试用期管理覆盖入职三个月内的所有同事。');
+  });
+
+  it('omitting graphRecall keeps behaviour identical to a graph source returning [] and adds no fields', async () => {
+    const embedder = makeStubEmbedder(() => 4);
+    const withoutGraph = createHybridSearch({ handle, embedder });
+    const withEmptyGraph = createHybridSearch({ handle, embedder, graphRecall: () => [] });
+
+    const baseline = await withoutGraph('试用期管理', { topK: 5 });
+    const emptied = await withEmptyGraph('试用期管理', { topK: 5 });
+
+    expect(emptied).toEqual(baseline);
+    expect(baseline.length).toBeGreaterThan(0);
+    for (const hit of [...baseline, ...emptied]) {
+      // Optional fields must be absent (not `undefined`-assigned) when the
+      // graph source did not contribute — same contract as bm25Rank/vecRank.
+      expect('graphRank' in hit).toBe(false);
+      expect('graphMatchCount' in hit).toBe(false);
+    }
+  });
+
+  it('forwards (query, effective perSourceTopK) to graphRecall', async () => {
+    const embedder = makeStubEmbedder(() => 4);
+    const graphSpy = vi.fn<(query: string, topK: number) => GraphHit[]>(() => []);
+    const search = createHybridSearch({ handle, embedder, graphRecall: graphSpy });
+
+    await search('试用期', { perSourceTopK: 7, topK: 3 });
+    expect(graphSpy).toHaveBeenCalledExactlyOnceWith('试用期', 7);
+  });
+
+  it('propagates graphRecall errors without swallowing them', async () => {
+    const embedder = makeStubEmbedder(() => 4);
+    const search = createHybridSearch({
+      handle,
+      embedder,
+      graphRecall: () => {
+        throw new Error('graph-boom');
+      },
+    });
+    await expect(search('试用期')).rejects.toThrow(/graph-boom/);
   });
 });

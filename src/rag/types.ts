@@ -1,5 +1,8 @@
 import type Database from 'better-sqlite3';
 
+// Type-only import — erased at emit, so the rag ↔ graph module cycle exists
+// only in the type graph, never at runtime.
+import type { GraphHit } from '../graph/types.js';
 import type { OnSpan } from '../observability/span.js';
 
 /**
@@ -353,12 +356,31 @@ export interface HybridHit {
   vecRank?: number;
   /** Mirrors {@link VecHit.distance} — undefined when only BM25 hit. */
   distance?: number;
+  /**
+   * 1-indexed graph-recall position within the entity-match top-N — undefined
+   * when the graph source did not hit this docId (or is not wired at all).
+   * Same single-source-survival semantics as {@link HybridHit.bm25Rank} /
+   * {@link HybridHit.vecRank}.
+   */
+  graphRank?: number;
+  /** Mirrors {@link GraphHit.matchCount} — undefined when the graph source did not hit. */
+  graphMatchCount?: number;
 }
 
 /** Dependencies bound by `createHybridSearch`. */
 export interface HybridSearchDeps {
   handle: IndexHandle;
   embedder: Embedder;
+  /**
+   * Optional third recall source — entity-match graph recall (see
+   * `graphRecall` in `src/graph/graph-search.ts`; typically wired as
+   * `(query, topK) => graphRecall(handle.db, query, { topK })`). Called
+   * synchronously next to `ftsSearch` with the effective `perSourceTopK`;
+   * its ranked list joins BM25 + vector in the same RRF fusion. When omitted
+   * the search runs the classic two-source path unchanged — existing
+   * consumers are unaffected.
+   */
+  graphRecall?: (query: string, topK: number) => GraphHit[];
   /** Optional default options applied when the per-call `opts` does not override. */
   defaultOpts?: HybridSearchOptions;
 }

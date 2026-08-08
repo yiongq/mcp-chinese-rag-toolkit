@@ -96,6 +96,8 @@ export type {
   GraphChunk,
   GraphErrorCode,
   GraphExtractionOptions,
+  GraphHit,
+  GraphRecallOptions,
   GraphStats,
   RawEntity,
   RawExtraction,
@@ -106,6 +108,7 @@ export {
   extractGraph,
   GRAPH_ERROR_CODES,
   GraphError,
+  graphRecall,
   writeGraph,
 } from './graph/index.js';
 export type {
