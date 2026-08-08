@@ -1,8 +1,11 @@
 # Multi-config benchmark eval set — the CI smoke set (eval-set.yml) PLUS a
 # hard tier of colloquial paraphrase queries with near-zero lexical overlap
-# against the 12-chunk bench fixture. The hard tier is what differentiates the
-# four retrieval configs: BM25 needs shared tokens, embeddings do not — on the
-# easy tier every config scores 1.0 and the comparison table says nothing.
+# PLUS an aggregation tier of entity-scatter queries, all against the 18-chunk
+# bench fixture (12 CI-mirrored chunks + 6 benchmark-only aggregation chunks,
+# see bin/run-benchmark.ts#FIXTURE_CHUNKS). Each tier isolates one mechanism:
+# the hard tier differentiates BM25 vs embeddings (shared tokens vs semantics);
+# the aggregation tier isolates the graph third source (entity_mentions reach
+# alias-only pages that neither BM25 nor the embedding can bridge).
 #
 # Used by bin/run-benchmark.ts ONLY. The CI gate (bin/run-eval.ts) keeps using
 # eval-set.yml — hard queries here must NOT tighten the CI threshold.
@@ -10,12 +13,15 @@
 # When adding queries: every new query MUST have a leading `# reason:` comment
 # (same ruling as eval-set.yml).
 
-version: v2-hr-bench-hard-mix
+version: v3-hr-bench-agg-mix
 description: |
-  24-query benchmark set over the 12-chunk bench fixture: the 12 CI smoke
+  28-query benchmark set over the 18-chunk bench fixture: the 12 CI smoke
   queries (easy tier, keyword-adjacent) + 12 paraphrase queries (hard tier,
-  near-zero lexical overlap) that require semantic retrieval. Retrieval-only;
-  answer metrics stay out until the faithfulness judge passes calibration.
+  near-zero lexical overlap) + 4 entity-aggregation queries (aggregation
+  tier) whose evidence is scattered across pages 14-18 and mentions the
+  entity only by alias (TRS / 工号 A1024, bound by the p13 anchor) — the
+  tier that isolates the graph third source. Retrieval-only; answer metrics
+  stay out until the faithfulness judge passes calibration.
 
 queries:
   # ── easy tier: verbatim copy of eval-set.yml（基础题，四配置都应命中）──
@@ -189,3 +195,50 @@ queries:
     expected:
       - source: bench-fixture.md
         page: 12
+
+  # ── aggregation tier: 实体聚合题（证据分散在 p14-18，正文只以别名提及实体；
+  #    锚点 p13 建立别名映射，本身是词面磁铁但不含答案事实，刻意不进 expected。
+  #    评分是任一 expected 页命中即 hit（见 expectedMatches），因此 expected 全部
+  #    选两路检索都够不着的别名页——「捞得全」由 run-benchmark 的 coverage@5 度量）──
+
+  # reason: 系统聚合题——p14/15/18 只写 "TRS"，与查询零词面重叠且语义冷；仅图谱 mention 展开可达
+  - query: 差旅报销系统最近有哪些调整和通知
+    category: aggregation
+    expected:
+      - source: bench-fixture.md
+        page: 14
+      - source: bench-fixture.md
+        page: 15
+      - source: bench-fixture.md
+        page: 18
+
+  # reason: 系统聚合题改述——"变更"限定排除锚点 p13（职责说明不含变更事实），expected 收敛到两页
+  - query: 差旅报销系统今年发布过哪些变更
+    category: aggregation
+    expected:
+      - source: bench-fixture.md
+        page: 14
+      - source: bench-fixture.md
+        page: 15
+
+  # reason: 人物聚合题——p16/17/18 只写 "工号 A1024"，BM25 无 "张伟" token、向量无表面桥接
+  - query: 张伟负责的工作内容都有哪些
+    category: aggregation
+    expected:
+      - source: bench-fixture.md
+        page: 16
+      - source: bench-fixture.md
+        page: 17
+      - source: bench-fixture.md
+        page: 18
+
+  # reason: 人物聚合题口语改述——"手头的事"考实体名 + 口语组合下第三路的稳健性
+  - query: 张伟手头都有什么事
+    category: aggregation
+    expected:
+      - source: bench-fixture.md
+        page: 16
+      - source: bench-fixture.md
+        page: 17
+      - source: bench-fixture.md
+        page: 18
