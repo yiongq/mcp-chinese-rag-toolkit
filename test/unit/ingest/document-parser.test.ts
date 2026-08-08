@@ -208,6 +208,40 @@ describe('parseDocument — failure paths (returned, never thrown)', () => {
     expect(result.error).toBe(INGEST_ERROR_CODES.PARSE_FAILED);
   });
 
+  it('renders single-column sheets as plain prose lines (no table pipes)', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('要点说明');
+    ws.addRow(['美光 FY2025 的毛利率为 40%，上一财年为 22%。']);
+    ws.addRow(['美光 FY2025 净利润为 85.4 亿美元。']);
+    const bytes = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const result = await parseDocument(bytes, XLSX_MIME);
+
+    assertOk(result);
+    const text = result.doc.text ?? '';
+    expect(text).toContain('# 要点说明');
+    expect(text).toContain('美光 FY2025 的毛利率为 40%，上一财年为 22%。');
+    // 单列没有表格语义：不出现管道行/分隔行（防「| 句子 |」污染展示与 rerank）
+    expect(text).not.toContain('|');
+  });
+
+  it('groups long single-column sheets under the character budget', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('长说明');
+    const line = '这是一条足够长的说明句子，用来撑爆单个行组的字符预算并强制分组。'.repeat(4);
+    for (let i = 0; i < 8; i += 1) ws.addRow([`${i}：${line}`]);
+    const bytes = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const result = await parseDocument(bytes, XLSX_MIME);
+
+    assertOk(result);
+    const blocks = (result.doc.text ?? '').split('\n\n').slice(1); // 掉头部标题
+    expect(blocks.length).toBeGreaterThan(1); // 确实分了组
+    for (const b of blocks) {
+      for (const l of b.split('\n')) expect(l.length).toBeLessThanOrEqual(300);
+    }
+  });
+
   it('returns EMPTY_DOCUMENT for a workbook whose sheets hold no cells', async () => {
     const workbook = new ExcelJS.Workbook();
     workbook.addWorksheet('空表');
@@ -341,7 +375,8 @@ describe('parseDocument — hardened input handling', () => {
       // Truncation is never silent: the sheet ends with an explicit marker…
       expect(text).toContain('[表格截断：仅含前 20000 行]');
       // …and only the first 20000 rows (header + 19999 data rows) are kept.
-      expect(text).toContain('| 19999 |');
+      // (single-column pathological sheet → prose lines, no pipes)
+      expect(text).toContain('\n19999');
       expect(text).not.toContain('| 20000 |');
     },
     30_000,
