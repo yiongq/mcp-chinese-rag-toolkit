@@ -3,10 +3,12 @@
 // ---------------------------------------------------------------------------
 //
 // The one entry point in front of the existing "text → Chunk → index" pipeline.
-// It normalizes four whitelisted formats into a `ParsedDoc` the existing
+// It normalizes five whitelisted formats into a `ParsedDoc` the existing
 // chunkers consume directly, delegating all parsing to mature libraries — PDF
-// reuses `parsePdf` (unpdf), docx uses mammoth, Markdown / plain text are byte
-// decode + pass-through. No parser is hand-rolled.
+// reuses `parsePdf` (unpdf), docx uses mammoth, xlsx uses exceljs, Markdown /
+// plain text are byte decode + pass-through. No parser is hand-rolled. (The
+// xlsx→Markdown LAYOUT — sheet headings + header-repeating table row groups —
+// is ours; the file-format parsing itself stays with exceljs.)
 //
 // Boundaries, deliberately narrow:
 //   - PURE BY DEFAULT: with no `onSpan`, input is in-memory bytes; no disk
@@ -23,6 +25,11 @@
 //   - NO BUSINESS FIELDS: no service id / citation / confidence — bytes in, an
 //     honest structured result out.
 
+// exceljs is a CJS package whose named exports are invisible to Node's ESM
+// named-export detection (like mammoth's), so the runtime-safe import is the
+// default binding; the type-only names come in separately below.
+import ExcelJS from 'exceljs';
+import type { CellValue, Worksheet } from 'exceljs';
 import mammoth from 'mammoth';
 import { makeSpan, newSpanId, runSpanSafe } from '../observability/span.js';
 import type { SpanAttributeValue } from '../observability/span.js';
@@ -33,10 +40,14 @@ import type { ParseDocumentOptions, ParseResult, SupportedMimeType } from './typ
 const DOCX_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as const;
 
+const XLSX_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' as const;
+
 /** The whitelisted formats, in a single source of truth for the type guard + diagnostics. */
 const SUPPORTED_MIME_TYPES = [
   'application/pdf',
   DOCX_MIME_TYPE,
+  XLSX_MIME_TYPE,
   'text/markdown',
   'text/plain',
 ] as const satisfies readonly SupportedMimeType[];
@@ -72,10 +83,22 @@ interface MarkdownConverter {
 const mammothMd = mammoth as typeof mammoth & MarkdownConverter;
 
 /**
+ * exceljs's published typings bind `Buffer` to the ancient `@types/node` 14 the
+ * package pins, which is structurally incompatible with the modern `Buffer`, so
+ * its `xlsx.load` signature rejects a current Node `Buffer`. Declare the one
+ * method we call against today's types so the usage stays type-checked without
+ * inheriting the stale upstream Buffer.
+ */
+interface XlsxFileLoader {
+  load(buffer: Buffer): Promise<unknown>;
+}
+
+/**
  * Parse an uploaded document into a uniform {@link ParsedDoc}.
  *
  * Supported `mimeType`s: `application/pdf`, docx
  * (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`),
+ * xlsx (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`),
  * `text/markdown`, `text/plain`. Any other value resolves to an
  * `UNSUPPORTED_MIME_TYPE` result.
  *
@@ -254,6 +277,8 @@ function runParse(buffer: Uint8Array, mimeType: SupportedMimeType): Promise<Pars
       return parsePdfDocument(buffer);
     case DOCX_MIME_TYPE:
       return parseDocxDocument(buffer);
+    case XLSX_MIME_TYPE:
+      return parseXlsxDocument(buffer);
     default:
       // 'text/markdown' | 'text/plain'
       return parseTextDocument(buffer, mimeType);
@@ -278,6 +303,149 @@ async function parseDocxDocument(buffer: Uint8Array): Promise<ParseResult> {
   const { value: text } = await mammothMd.convertToMarkdown({ buffer: Buffer.from(buffer) });
   if (text.trim() === '') return emptyDocument(DOCX_MIME_TYPE);
   return { ok: true, doc: { mimeType: DOCX_MIME_TYPE, text } };
+}
+
+// --- xlsx → Markdown layout ------------------------------------------------
+//
+// The layout is designed FOR the downstream character splitter, not for human
+// display: every boundary the splitter is likely to cut on is placed where a
+// cut is semantically safe.
+//   - Each sheet renders as an `# <sheet name>` heading, so the chunker's
+//     Markdown heading tracker attributes every chunk to its sheet for free
+//     (sheet name = `section` provenance).
+//   - Rows render as SMALL Markdown table "row groups" — header row + `|---|`
+//     divider + a few data rows — each kept within `MAX_XLSX_GROUP_CHARS` so a
+//     typical chunk budget swallows a group whole. Groups are separated by a
+//     blank line (`\n\n`, the splitter's first separator), and EVERY group
+//     repeats the header row: a chunk cut at a group boundary still carries
+//     its column names, so table Q&A never loses them.
+//   - A single row longer than the group budget is NOT hard-split here — it
+//     becomes a group of its own and the character splitter is the fallback.
+
+/**
+ * Soft ceiling (characters) for one rendered row group, header lines included.
+ * Sized comfortably under common chunk budgets so a group survives splitting
+ * intact; it is a layout target, not a guarantee (see the oversized-row note
+ * above).
+ */
+const MAX_XLSX_GROUP_CHARS = 380;
+
+/**
+ * Hard cap on data rows rendered per sheet, guarding against a pathological
+ * million-row workbook exploding the output text. Exceeding it is never
+ * silent: the sheet ends with an explicit truncation marker paragraph.
+ */
+const MAX_XLSX_SHEET_ROWS = 20_000;
+
+async function parseXlsxDocument(buffer: Uint8Array): Promise<ParseResult> {
+  // exceljs expects a Node `Buffer`; copy the bytes into one (never a shared
+  // view), keeping the caller's buffer untouched. Corrupt / non-xlsx bytes make
+  // `load` throw, which the caller's catch maps to PARSE_FAILED.
+  const workbook = new ExcelJS.Workbook();
+  await (workbook.xlsx as unknown as XlsxFileLoader).load(Buffer.from(buffer));
+
+  const parts: string[] = [];
+  for (const worksheet of workbook.worksheets) {
+    const { rows, truncated } = readSheetRows(worksheet);
+    // A sheet with no non-blank rows contributes nothing — not even a heading,
+    // which would otherwise fabricate an empty section.
+    if (rows.length === 0) continue;
+    parts.push(`# ${foldWhitespace(worksheet.name)}`, ...renderRowGroups(rows));
+    if (truncated) parts.push(`[表格截断：仅含前 ${MAX_XLSX_SHEET_ROWS} 行]`);
+  }
+
+  if (parts.length === 0) return emptyDocument(XLSX_MIME_TYPE);
+  return { ok: true, doc: { mimeType: XLSX_MIME_TYPE, text: parts.join('\n\n') } };
+}
+
+/**
+ * Read a worksheet into dense rows of sanitized cell text. Blank rows are
+ * dropped; reading stops at {@link MAX_XLSX_SHEET_ROWS} kept rows, with
+ * `truncated` flagging that at least one further row existed.
+ */
+function readSheetRows(worksheet: Worksheet): { rows: string[][]; truncated: boolean } {
+  const rows: string[][] = [];
+  let truncated = false;
+  // `eachRow` visits only rows that exist in the sheet model, in order.
+  worksheet.eachRow((row) => {
+    if (rows.length >= MAX_XLSX_SHEET_ROWS) {
+      truncated = true;
+      return;
+    }
+    const cells: string[] = [];
+    for (let col = 1; col <= row.cellCount; col += 1) {
+      cells.push(formatCellText(row.getCell(col).value));
+    }
+    if (cells.every((cell) => cell === '')) return; // blank row: skip
+    rows.push(cells);
+  });
+  return { rows, truncated };
+}
+
+/**
+ * Render dense rows as header-repeating Markdown table row groups (the layout
+ * contract described in the section comment above). The first row is treated
+ * as the header; rows are padded to the sheet's widest row so every line has
+ * a uniform column count.
+ */
+function renderRowGroups(rows: string[][]): string[] {
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  const toLine = (row: string[]): string => {
+    const padded = [...row, ...Array<string>(width - row.length).fill('')];
+    return `| ${padded.join(' | ')} |`;
+  };
+
+  // rows is non-empty by the caller's guard; the header block leads every group.
+  const headerBlock = `${toLine(rows[0] ?? [])}\n|${'---|'.repeat(width)}`;
+  const groups: string[] = [];
+  let group = headerBlock;
+  let groupHasDataRow = false;
+
+  for (const row of rows.slice(1)) {
+    const line = toLine(row);
+    // Close the group when this row would overflow the budget — unless the
+    // group holds no data row yet, in which case the row stays (an oversized
+    // single row is allowed to exceed; the character splitter is the fallback).
+    if (groupHasDataRow && group.length + 1 + line.length > MAX_XLSX_GROUP_CHARS) {
+      groups.push(group);
+      group = headerBlock;
+      groupHasDataRow = false;
+    }
+    group += `\n${line}`;
+    groupHasDataRow = true;
+  }
+  groups.push(group);
+  return groups;
+}
+
+/** Sanitized single-line Markdown-table text for one cell value. */
+function formatCellText(value: CellValue): string {
+  return foldWhitespace(formatCellValue(value).replace(/\|/g, '\\|'));
+}
+
+/**
+ * Flatten any exceljs `CellValue` shape to plain text: strings pass through,
+ * numbers / booleans stringify, dates become ISO dates (`yyyy-mm-dd`), formula
+ * cells surface their CACHED `result` (this parser never evaluates formulas),
+ * rich text concatenates its runs, hyperlinks keep their display text, error
+ * cells keep the error literal (`#N/A` etc. — honest, not blank), and
+ * null / undefined render empty.
+ */
+function formatCellValue(value: CellValue): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if ('richText' in value) return value.richText.map((run) => run.text).join('');
+  if ('error' in value) return value.error;
+  if ('text' in value) return formatCellValue(value.text); // hyperlink display text
+  if ('result' in value && value.result !== undefined) return formatCellValue(value.result);
+  return ''; // formula with no cached result carries no displayable text
+}
+
+/** Collapse every whitespace run that contains a line break into one space, then trim. */
+function foldWhitespace(text: string): string {
+  return text.replace(/[^\S\r\n]*[\r\n]\s*/g, ' ').trim();
 }
 
 function parseTextDocument(

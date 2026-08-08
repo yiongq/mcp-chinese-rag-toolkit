@@ -4,8 +4,8 @@
 //
 // `parseDocument` is the single missing entry point in front of the existing
 // "text → Chunk → index" pipeline: it turns an uploaded file (PDF text layer,
-// docx, Markdown, or plain text) into a uniform `ParsedDoc` that the existing
-// chunkers can consume as-is. It reuses `parsePdf` and the `PdfPage` type from
+// docx, xlsx, Markdown, or plain text) into a uniform `ParsedDoc` that the
+// existing chunkers can consume as-is. It reuses `parsePdf` and the `PdfPage` type from
 // the rag layer; it deliberately does NOT re-implement chunking or indexing.
 
 import type { OnSpan } from '../observability/span.js';
@@ -13,7 +13,7 @@ import type { PdfPage } from '../rag/types.js';
 import type { IngestErrorCode } from './errors.js';
 
 /**
- * The four whitelisted input formats. Anything outside this set is rejected
+ * The five whitelisted input formats. Anything outside this set is rejected
  * with an `UNSUPPORTED_MIME_TYPE` result (returned, never thrown). The set is
  * intentionally narrow — parsing is delegated to mature libraries, never
  * hand-rolled, so only formats with a trusted parser are accepted.
@@ -21,6 +21,7 @@ import type { IngestErrorCode } from './errors.js';
 export type SupportedMimeType =
   | 'application/pdf'
   | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // docx
+  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // xlsx
   | 'text/markdown'
   | 'text/plain';
 
@@ -35,7 +36,7 @@ export interface ParsedDoc {
   mimeType: SupportedMimeType;
   /** Paginated format (PDF): per-page text, `pageNumber` 1-indexed. Undefined for streaming formats. */
   pages?: PdfPage[];
-  /** Streaming format (docx→Markdown / Markdown / plain text): heading-preserving full text. Undefined for PDF. */
+  /** Streaming format (docx→Markdown / xlsx→Markdown tables / Markdown / plain text): heading-preserving full text. Undefined for PDF. */
   text?: string;
   /**
    * Source encoding detected for a text-byte input (Markdown / plain text).
