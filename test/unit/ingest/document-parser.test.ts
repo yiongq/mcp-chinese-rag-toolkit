@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PARSE_TIMEOUT_MS, decodeText, parseDocument } from '../../../src/ingest/document-parser.js';
 import { INGEST_ERROR_CODES } from '../../../src/ingest/errors.js';
@@ -9,12 +10,14 @@ import { chunk } from '../../../src/rag/chunking.js';
 const FIXTURES = new URL('../../fixtures/', import.meta.url);
 const PDF = fileURLToPath(new URL('sample.pdf', FIXTURES));
 const DOCX = fileURLToPath(new URL('sample.docx', FIXTURES));
+const XLSX = fileURLToPath(new URL('sample.xlsx', FIXTURES));
 const MD = fileURLToPath(new URL('sample.md', FIXTURES));
 const UTF8_TXT = fileURLToPath(new URL('sample-utf8.txt', FIXTURES));
 const GBK_TXT = fileURLToPath(new URL('sample-gbk.txt', FIXTURES));
 
 const PDF_MIME = 'application/pdf';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MD_MIME = 'text/markdown';
 const TXT_MIME = 'text/plain';
 
@@ -77,6 +80,52 @@ describe('parseDocument — successful parses', () => {
     expect(chunks.some((c) => c.section?.includes('安装步骤'))).toBe(true);
   });
 
+  it('parses xlsx into sheet-headed Markdown table row groups that repeat the header', async () => {
+    const result = await parseDocument(await bytes(XLSX), XLSX_MIME);
+
+    assertOk(result);
+    expect(result.doc.mimeType).toBe(XLSX_MIME);
+    const text = result.doc.text ?? '';
+    expect(text).toContain('# 员工名单');
+    expect(text).toContain('# 统计数据');
+    expect(result.doc.pages).toBeUndefined();
+    expect(result.doc.encoding).toBeUndefined();
+
+    // Layout contract: EVERY row group repeats the header row, so a chunk cut
+    // at a group boundary still carries its column names — the fixture's first
+    // sheet is sized to overflow one group's budget and force a repetition.
+    const headerLines = text.match(/^\| 姓名 \| 部门 \| 职责 \|$/gm) ?? [];
+    expect(headerLines.length).toBeGreaterThanOrEqual(2);
+    // Groups are separated by a blank line — the splitter's first separator.
+    expect(text).toContain('|\n\n| 姓名 | 部门 | 职责 |');
+  });
+
+  it('normalizes xlsx cell values (formula result, ISO date, escaped pipe, folded newline)', async () => {
+    const result = await parseDocument(await bytes(XLSX), XLSX_MIME);
+
+    assertOk(result);
+    const text = result.doc.text ?? '';
+    expect(text).toContain('| 256 |'); // formula cell surfaces its CACHED result…
+    expect(text).not.toContain('B2*2'); // …never the formula source
+    expect(text).toContain('2026-03-15'); // date cell → ISO date
+    expect(text).toContain('含 A\\|B 两类内部服务'); // `|` escaped to keep the table well-formed
+    expect(text).toContain('第一期 第二期合并统计'); // embedded newline folded to a space
+    expect(text).toContain('富文本单元格'); // rich-text runs concatenated
+    expect(text).toContain('| true |'); // boolean stringified
+  });
+
+  it('parses xlsx into text whose sheet headings become chunk sections', async () => {
+    const result = await parseDocument(await bytes(XLSX), XLSX_MIME);
+
+    assertOk(result);
+    // AC anchor: the `# <sheet name>` headings drop straight into the existing
+    // chunker, which attributes every table chunk to its sheet as `section`.
+    const chunks = await chunk(result.doc.text ?? '', { source: 'sample.xlsx' });
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.some((c) => c.section?.includes('员工名单'))).toBe(true);
+    expect(chunks.some((c) => c.section?.includes('统计数据'))).toBe(true);
+  });
+
   it('parses plain UTF-8 text and detects the encoding', async () => {
     const result = await parseDocument(await bytes(UTF8_TXT), TXT_MIME);
 
@@ -120,6 +169,26 @@ describe('parseDocument — failure paths (returned, never thrown)', () => {
 
     assertFailed(result);
     expect(result.error).toBe(INGEST_ERROR_CODES.PARSE_FAILED);
+  });
+
+  it('returns PARSE_FAILED (not throw) for bytes that are not a valid xlsx', async () => {
+    const notAnXlsx = new TextEncoder().encode('these bytes are no zip archive');
+
+    const result = await parseDocument(notAnXlsx, XLSX_MIME);
+
+    assertFailed(result);
+    expect(result.error).toBe(INGEST_ERROR_CODES.PARSE_FAILED);
+  });
+
+  it('returns EMPTY_DOCUMENT for a workbook whose sheets hold no cells', async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.addWorksheet('空表');
+    const empty = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const result = await parseDocument(empty, XLSX_MIME);
+
+    assertFailed(result);
+    expect(result.error).toBe(INGEST_ERROR_CODES.EMPTY_DOCUMENT);
   });
 
   it('returns EMPTY_DOCUMENT for whitespace-only text', async () => {
@@ -213,7 +282,7 @@ describe('parseDocument — hardened input handling', () => {
   });
 
   it('classifies a zero-length buffer as EMPTY_DOCUMENT uniformly across formats', async () => {
-    for (const mime of [PDF_MIME, DOCX_MIME, MD_MIME, TXT_MIME]) {
+    for (const mime of [PDF_MIME, DOCX_MIME, XLSX_MIME, MD_MIME, TXT_MIME]) {
       const result = await parseDocument(new Uint8Array(0), mime);
       assertFailed(result);
       expect(result.error).toBe(INGEST_ERROR_CODES.EMPTY_DOCUMENT);
@@ -226,4 +295,27 @@ describe('parseDocument — hardened input handling', () => {
     assertFailed(result);
     expect(result.error).toBe(INGEST_ERROR_CODES.UNSUPPORTED_MIME_TYPE);
   });
+
+  it(
+    'caps a pathological xlsx sheet at 20000 rows with an explicit truncation marker',
+    async () => {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('超长表');
+      sheet.addRow(['编号']);
+      // Header + 20000 data rows = 20001 non-blank rows: one past the cap.
+      for (let i = 1; i <= 20_000; i += 1) sheet.addRow([i]);
+      const oversized = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+      const result = await parseDocument(oversized, XLSX_MIME);
+
+      assertOk(result);
+      const text = result.doc.text ?? '';
+      // Truncation is never silent: the sheet ends with an explicit marker…
+      expect(text).toContain('[表格截断：仅含前 20000 行]');
+      // …and only the first 20000 rows (header + 19999 data rows) are kept.
+      expect(text).toContain('| 19999 |');
+      expect(text).not.toContain('| 20000 |');
+    },
+    30_000,
+  );
 });
